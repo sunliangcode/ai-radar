@@ -123,6 +123,41 @@ export type Settings = {
   localTokenConfigured: boolean
 }
 
+export type FetchSourceProgress = {
+  id: number
+  name: string
+  type: string
+  status: 'pending' | 'running' | 'done' | 'error'
+  startedAt?: string | null
+  durationMs?: number | null
+  itemCount?: number | null
+  error?: string | null
+}
+
+export type FetchProgress = {
+  running: boolean
+  stage: string
+  startedAt?: string | null
+  elapsedMs: number
+  error?: string | null
+  message?: string | null
+  sources: FetchSourceProgress[]
+  totals: {
+    total: number
+    done: number
+    running: number
+    remaining: number
+  }
+  result?: {
+    fetched?: number
+    deduped?: number
+    scored?: number
+    kept?: number
+    briefPath?: string
+    durationMs?: number
+  } | null
+}
+
 export const api = {
   health: () => request<{ status: string; db: string }>('/api/health'),
   items: (q: string = '') => request<Item[]>(`/api/items${q}`),
@@ -143,6 +178,7 @@ export const api = {
   saveSettings: (body: Partial<Settings>) =>
     request<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
   fetchJob: () => request<Record<string, unknown>>('/api/jobs/fetch', { method: 'POST' }),
+  fetchProgress: () => request<FetchProgress>('/api/jobs/fetch/progress'),
   pushJob: () => request<Record<string, unknown>>('/api/jobs/push', { method: 'POST' }),
   clusterJob: () => request<Record<string, unknown>>('/api/jobs/cluster', { method: 'POST' }),
   events: (q: string = '') => request<RadarEvent[]>(`/api/events${q}`),

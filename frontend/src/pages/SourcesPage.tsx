@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { Button, PageHeader, StateBox } from '../components/ui'
+import { FetchProgressPanel } from '../components/FetchProgressPanel'
+import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { dateLocale } from '../i18n'
 
 const TYPES = ['RSS', 'HACKER_NEWS', 'REDDIT', 'GITHUB', 'FIXTURE'] as const
@@ -36,10 +38,7 @@ export default function SourcesPage() {
     mutationFn: api.deleteSource,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sources'] }),
   })
-  const fetchJob = useMutation({
-    mutationFn: api.fetchJob,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sources'] }),
-  })
+  const { fetchJob, progress, showPanel, isPending } = useFetchJobWithProgress([['sources']])
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -58,13 +57,15 @@ export default function SourcesPage() {
         subtitle={t('sources.subtitle')}
         actions={
           <>
-            <Button variant="ghost" onClick={() => fetchJob.mutate()} disabled={fetchJob.isPending}>
-              {t('common.fetchNow')}
+            <Button variant="ghost" onClick={() => fetchJob.mutate()} disabled={isPending}>
+              {isPending ? t('common.fetching') : t('common.fetchNow')}
             </Button>
             <Button onClick={() => setOpen((v) => !v)}>{open ? t('common.cancel') : t('sources.add')}</Button>
           </>
         }
       />
+
+      {showPanel ? <FetchProgressPanel progress={progress} /> : null}
 
       {open ? (
         <form onSubmit={onSubmit} className="mb-6 grid gap-3 rounded-xl border border-mist bg-paper/80 p-4 sm:grid-cols-2">

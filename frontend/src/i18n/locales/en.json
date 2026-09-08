@@ -28,6 +28,25 @@
     "itemsCount": "{{count}} items",
     "lastFetched": "last {{time}}"
   },
+  "fetchProgress": {
+    "elapsed": "elapsed {{time}}",
+    "remaining": "{{remaining}} left / {{total}}",
+    "pending": "queued",
+    "doneStats": "fetched {{fetched}} · kept {{kept}} · {{time}}",
+    "stage": {
+      "idle": "Idle",
+      "fetch": "Fetching sources",
+      "normalize": "Normalizing",
+      "dedup": "Deduplicating",
+      "score": "Scoring",
+      "summarize": "Summarizing",
+      "persist": "Saving items",
+      "cluster": "Clustering events",
+      "brief": "Writing brief",
+      "done": "Fetch complete",
+      "error": "Fetch failed"
+    }
+  },
   "home": {
     "title": "Intelligence Home",
     "subtitle": "What Changed · What Matters · What's Emerging · What to Watch",

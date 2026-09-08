@@ -1,6 +1,7 @@
 package com.airadar.api;
 
 import com.airadar.domain.NewsItem;
+import com.airadar.job.FetchProgress;
 import com.airadar.pipeline.PipelineOrchestrator;
 import com.airadar.pipeline.PipelineRequest;
 import com.airadar.pipeline.PipelineResult;
@@ -20,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,15 +32,18 @@ public class PipelineController {
     private final PipelineOrchestrator orchestrator;
     private final NewsItemRepository newsItemRepository;
     private final EntityMapper entityMapper;
+    private final FetchProgress fetchProgress;
 
     public PipelineController(
             PipelineOrchestrator orchestrator,
             NewsItemRepository newsItemRepository,
-            EntityMapper entityMapper
+            EntityMapper entityMapper,
+            FetchProgress fetchProgress
     ) {
         this.orchestrator = orchestrator;
         this.newsItemRepository = newsItemRepository;
         this.entityMapper = entityMapper;
+        this.fetchProgress = fetchProgress;
     }
 
     @PostMapping("/pipeline/run")
@@ -48,16 +53,29 @@ public class PipelineController {
                 body == null ? null : body.maxItems(),
                 body == null ? null : body.scoreThreshold()
         );
-        PipelineResult result = orchestrator.run(request);
-        Map<String, Object> response = new HashMap<>();
-        response.put("fetched", result.fetched());
-        response.put("deduped", result.deduped());
-        response.put("scored", result.scored());
-        response.put("kept", result.kept());
-        response.put("briefPath", result.briefPath());
-        response.put("durationMs", result.durationMs());
-        response.put("topItems", result.topItems().stream().map(this::toDto).toList());
-        return ResponseEntity.ok(response);
+        try {
+            PipelineResult result = orchestrator.run(request);
+            Map<String, Object> response = new HashMap<>();
+            response.put("fetched", result.fetched());
+            response.put("deduped", result.deduped());
+            response.put("scored", result.scored());
+            response.put("kept", result.kept());
+            response.put("briefPath", result.briefPath());
+            response.put("durationMs", result.durationMs());
+            response.put("topItems", result.topItems().stream().map(this::toDto).toList());
+            Map<String, Object> progressResult = new LinkedHashMap<>();
+            progressResult.put("fetched", result.fetched());
+            progressResult.put("deduped", result.deduped());
+            progressResult.put("scored", result.scored());
+            progressResult.put("kept", result.kept());
+            progressResult.put("briefPath", result.briefPath());
+            progressResult.put("durationMs", result.durationMs());
+            fetchProgress.complete(progressResult);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            fetchProgress.fail(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            throw e;
+        }
     }
 
     @GetMapping("/news")

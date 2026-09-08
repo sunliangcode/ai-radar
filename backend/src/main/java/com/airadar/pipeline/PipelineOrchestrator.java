@@ -9,6 +9,7 @@ import com.airadar.domain.NewsItem;
 import com.airadar.domain.RawItem;
 import com.airadar.domain.Source;
 import com.airadar.event.EventClusterService;
+import com.airadar.job.FetchProgress;
 import com.airadar.persistence.EntityMapper;
 import com.airadar.persistence.NewsItemEntity;
 import com.airadar.persistence.NewsItemRepository;
@@ -46,6 +47,7 @@ public class PipelineOrchestrator {
     private final RadarProperties properties;
     private final ExecutorService fetchExecutor;
     private final EventClusterService eventClusterService;
+    private final FetchProgress fetchProgress;
 
     public PipelineOrchestrator(
             SourceRepository sourceRepository,
@@ -56,7 +58,8 @@ public class PipelineOrchestrator {
             AiService aiService,
             RadarProperties properties,
             ExecutorService fetchExecutor,
-            EventClusterService eventClusterService
+            EventClusterService eventClusterService,
+            FetchProgress fetchProgress
     ) {
         this.sourceRepository = sourceRepository;
         this.newsItemRepository = newsItemRepository;
@@ -67,6 +70,7 @@ public class PipelineOrchestrator {
         this.properties = properties;
         this.fetchExecutor = fetchExecutor;
         this.eventClusterService = eventClusterService;
+        this.fetchProgress = fetchProgress;
     }
 
     @Transactional
@@ -77,14 +81,17 @@ public class PipelineOrchestrator {
         int scoreThreshold = request.scoreThreshold() != null ? request.scoreThreshold() : properties.getScoreThreshold();
         Instant since = Instant.now().minus(lookbackHours, ChronoUnit.HOURS);
 
+        fetchProgress.setStage(FetchProgress.Stage.fetch);
         List<RawItem> fetched = fetchAll(since, lookbackHours);
         long tFetch = System.currentTimeMillis();
         log.info("pipeline_stage=fetch count={} durationMs={}", fetched.size(), tFetch - started);
 
+        fetchProgress.setStage(FetchProgress.Stage.normalize);
         List<NewsItem> normalized = NormalizeStage.normalize(fetched, properties);
         long tNorm = System.currentTimeMillis();
         log.info("pipeline_stage=normalize count={} durationMs={}", normalized.size(), tNorm - tFetch);
 
+        fetchProgress.setStage(FetchProgress.Stage.dedup);
         List<NewsItem> deduped = urlDedupStage.dedup(normalized, properties.getDedupLookbackDays());
         long tDedup = System.currentTimeMillis();
         log.info("pipeline_stage=dedup count={} durationMs={}", deduped.size(), tDedup - tNorm);
@@ -92,6 +99,8 @@ public class PipelineOrchestrator {
         List<NewsItem> toScore = deduped.stream()
                 .filter(i -> i.getScore() == null || i.getStatus() == ItemStatus.NEW || i.getStatus() == ItemStatus.ERROR)
                 .toList();
+        fetchProgress.setStage(FetchProgress.Stage.score);
+        fetchProgress.setMessage("scoring " + toScore.size() + " items");
         scoreItems(toScore);
         long tScore = System.currentTimeMillis();
         log.info("pipeline_stage=score count={} durationMs={}", toScore.size(), tScore - tDedup);
@@ -104,12 +113,16 @@ public class PipelineOrchestrator {
         long tFilter = System.currentTimeMillis();
         log.info("pipeline_stage=filter kept={} threshold={} durationMs={}", kept.size(), scoreThreshold, tFilter - tScore);
 
+        fetchProgress.setStage(FetchProgress.Stage.summarize);
+        fetchProgress.setMessage("summarizing " + kept.size() + " items");
         summarizeItems(kept);
         long tSummary = System.currentTimeMillis();
         log.info("pipeline_stage=summary count={} durationMs={}", kept.size(), tSummary - tFilter);
 
+        fetchProgress.setStage(FetchProgress.Stage.persist);
         persistAll(deduped);
         try {
+            fetchProgress.setStage(FetchProgress.Stage.cluster);
             eventClusterService.linkNewItems(kept.stream().filter(i -> i.getId() != null).toList());
             eventClusterService.linkNewItems(deduped.stream()
                     .filter(i -> i.getId() != null && i.getStatus() == ItemStatus.DONE)
@@ -119,6 +132,7 @@ public class PipelineOrchestrator {
         }
         Path briefPath;
         try {
+            fetchProgress.setStage(FetchProgress.Stage.brief);
             LocalDate day = LocalDate.now(ZoneOffset.UTC);
             briefPath = BriefWriter.write(Path.of(properties.getBriefsDir()), day, kept);
         } catch (Exception e) {
@@ -141,7 +155,17 @@ public class PipelineOrchestrator {
 
     private List<RawItem> fetchAll(Instant since, int lookbackHours) {
         List<SourceEntity> sources = sourceRepository.findByEnabledTrue();
-        if (sources.isEmpty()) {
+        List<FetchProgress.SourceSeed> seeds = new ArrayList<>();
+        for (SourceEntity entity : sources) {
+            if (connectorRegistry.get(entity.getType().name()) == null) {
+                log.warn("No connector for source type {}", entity.getType());
+                continue;
+            }
+            seeds.add(new FetchProgress.SourceSeed(entity.getId(), entity.getName(), entity.getType().name()));
+        }
+        fetchProgress.begin(seeds);
+
+        if (sources.isEmpty() || seeds.isEmpty()) {
             return List.of();
         }
 
@@ -149,7 +173,6 @@ public class PipelineOrchestrator {
         for (SourceEntity entity : sources) {
             SourceConnector connector = connectorRegistry.get(entity.getType().name());
             if (connector == null) {
-                log.warn("No connector for source type {}", entity.getType());
                 continue;
             }
             Source source = entityMapper.toDomain(entity);
@@ -158,11 +181,17 @@ public class PipelineOrchestrator {
             String sourceName = entity.getName();
             String sourceType = entity.getType().name();
             futures.add(CompletableFuture.supplyAsync(() -> {
+                long t0 = System.currentTimeMillis();
+                fetchProgress.markSourceRunning(sourceId);
                 try {
                     List<RawItem> items = connector.fetch(ctx);
+                    long durationMs = System.currentTimeMillis() - t0;
+                    fetchProgress.markSourceDone(sourceId, items.size(), durationMs);
                     log.info("source_fetch name={} type={} count={}", sourceName, sourceType, items.size());
                     return new SourceFetchOutcome(sourceId, items, null);
                 } catch (Exception e) {
+                    long durationMs = System.currentTimeMillis() - t0;
+                    fetchProgress.markSourceError(sourceId, e.getMessage(), durationMs);
                     log.error("source_fetch_failed name={} type={} error={}", sourceName, sourceType, e.getMessage());
                     return new SourceFetchOutcome(sourceId, List.of(), e.getMessage());
                 }

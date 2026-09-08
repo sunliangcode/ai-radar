@@ -1,18 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { Button, PageHeader, StateBox } from '../components/ui'
+import { FetchProgressPanel } from '../components/FetchProgressPanel'
+import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { dateLocale } from '../i18n'
 
 export default function BriefsPage() {
   const { t, i18n } = useTranslation()
-  const qc = useQueryClient()
   const briefs = useQuery({ queryKey: ['briefs'], queryFn: api.briefs })
-  const fetchJob = useMutation({
-    mutationFn: api.fetchJob,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['briefs'] }),
-  })
+  const { fetchJob, progress, showPanel, isPending } = useFetchJobWithProgress([['briefs']])
   const pushJob = useMutation({ mutationFn: api.pushJob })
   const locale = dateLocale(i18n.language)
 
@@ -23,8 +21,8 @@ export default function BriefsPage() {
         subtitle={t('briefs.subtitle')}
         actions={
           <>
-            <Button onClick={() => fetchJob.mutate()} disabled={fetchJob.isPending}>
-              {t('briefs.generate')}
+            <Button onClick={() => fetchJob.mutate()} disabled={isPending}>
+              {isPending ? t('common.fetching') : t('briefs.generate')}
             </Button>
             <Button variant="ghost" onClick={() => pushJob.mutate()} disabled={pushJob.isPending}>
               {t('briefs.pushToday')}
@@ -32,6 +30,9 @@ export default function BriefsPage() {
           </>
         }
       />
+
+      {showPanel ? <FetchProgressPanel progress={progress} /> : null}
+
       {briefs.isLoading ? <StateBox>{t('briefs.loading')}</StateBox> : null}
       {briefs.isError ? (
         <StateBox>{t('common.loadFailed', { message: (briefs.error as Error).message })}</StateBox>

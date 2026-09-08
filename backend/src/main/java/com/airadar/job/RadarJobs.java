@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -26,6 +27,7 @@ public class RadarJobs {
     private final JobMutex jobMutex;
     private final SettingsService settingsService;
     private final EventClusterService eventClusterService;
+    private final FetchProgress fetchProgress;
     private final AtomicBoolean clusterRunning = new AtomicBoolean(false);
 
     public RadarJobs(
@@ -33,13 +35,15 @@ public class RadarJobs {
             DeliveryService deliveryService,
             JobMutex jobMutex,
             SettingsService settingsService,
-            EventClusterService eventClusterService
+            EventClusterService eventClusterService,
+            FetchProgress fetchProgress
     ) {
         this.orchestrator = orchestrator;
         this.deliveryService = deliveryService;
         this.jobMutex = jobMutex;
         this.settingsService = settingsService;
         this.eventClusterService = eventClusterService;
+        this.fetchProgress = fetchProgress;
     }
 
     @Scheduled(fixedDelayString = "${radar.fetch-interval-ms:7200000}", initialDelayString = "${radar.fetch-initial-delay-ms:60000}")
@@ -50,7 +54,7 @@ public class RadarJobs {
         }
         try {
             log.info("scheduled_fetch_start");
-            PipelineResult result = orchestrator.run(new PipelineRequest(null, null, null));
+            PipelineResult result = runPipelineWithProgress();
             log.info("scheduled_fetch_done kept={} durationMs={}", result.kept(), result.durationMs());
         } catch (Exception e) {
             log.error("scheduled_fetch_failed error={}", e.getMessage());
@@ -97,7 +101,33 @@ public class RadarJobs {
     }
 
     public PipelineResult runFetch() {
-        return jobMutex.withFetchLock(() -> orchestrator.run(new PipelineRequest(null, null, null)));
+        return jobMutex.withFetchLock(this::runPipelineWithProgress);
+    }
+
+    public Map<String, Object> fetchProgressSnapshot() {
+        return fetchProgress.snapshot();
+    }
+
+    private PipelineResult runPipelineWithProgress() {
+        try {
+            PipelineResult result = orchestrator.run(new PipelineRequest(null, null, null));
+            fetchProgress.complete(toResultMap(result));
+            return result;
+        } catch (Exception e) {
+            fetchProgress.fail(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            throw e;
+        }
+    }
+
+    private static Map<String, Object> toResultMap(PipelineResult result) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("fetched", result.fetched());
+        map.put("deduped", result.deduped());
+        map.put("scored", result.scored());
+        map.put("kept", result.kept());
+        map.put("briefPath", result.briefPath());
+        map.put("durationMs", result.durationMs());
+        return map;
     }
 
     public Map<String, Object> runPush() {

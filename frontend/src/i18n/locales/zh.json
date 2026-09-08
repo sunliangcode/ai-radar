@@ -28,6 +28,25 @@
     "itemsCount": "{{count}} items",
     "lastFetched": "last {{time}}"
   },
+  "fetchProgress": {
+    "elapsed": "已用时 {{time}}",
+    "remaining": "剩余 {{remaining}} / 共 {{total}}",
+    "pending": "排队中",
+    "doneStats": "抓取 {{fetched}} · 保留 {{kept}} · {{time}}",
+    "stage": {
+      "idle": "空闲",
+      "fetch": "正在抓取源",
+      "normalize": "规范化",
+      "dedup": "去重",
+      "score": "评分",
+      "summarize": "摘要",
+      "persist": "写入条目",
+      "cluster": "事件聚类",
+      "brief": "生成简报",
+      "done": "抓取完成",
+      "error": "抓取失败"
+    }
+  },
   "home": {
     "title": "情报首页",
     "subtitle": "What Changed · What Matters · What's Emerging · What to Watch",

@@ -3,6 +3,7 @@ package com.airadar.api;
 import com.airadar.job.RadarJobs;
 import com.airadar.pipeline.PipelineResult;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +32,11 @@ public class JobsController {
         response.put("briefPath", result.briefPath());
         response.put("durationMs", result.durationMs());
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/fetch/progress")
+    public ResponseEntity<Map<String, Object>> fetchProgress() {
+        return ResponseEntity.ok(radarJobs.fetchProgressSnapshot());
     }
 
     @PostMapping("/push")

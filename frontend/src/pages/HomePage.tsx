@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { Button, PageHeader, ScorePill, StateBox } from '../components/ui'
+import { FetchProgressPanel } from '../components/FetchProgressPanel'
+import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { dateLocale } from '../i18n'
 
 function Column({
@@ -28,15 +30,12 @@ export default function HomePage() {
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const briefs = useQuery({ queryKey: ['briefs'], queryFn: api.briefs })
 
-  const fetchJob = useMutation({
-    mutationFn: api.fetchJob,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-      qc.invalidateQueries({ queryKey: ['events'] })
-      qc.invalidateQueries({ queryKey: ['items'] })
-      qc.invalidateQueries({ queryKey: ['briefs'] })
-    },
-  })
+  const { fetchJob, progress, showPanel, isPending, error } = useFetchJobWithProgress([
+    ['intelligence-home'],
+    ['events'],
+    ['items'],
+    ['briefs'],
+  ])
   const pushJob = useMutation({ mutationFn: api.pushJob })
   const clusterJob = useMutation({
     mutationFn: api.clusterJob,
@@ -54,8 +53,8 @@ export default function HomePage() {
         subtitle={t('home.subtitle')}
         actions={
           <>
-            <Button disabled={fetchJob.isPending} onClick={() => fetchJob.mutate()}>
-              {fetchJob.isPending ? t('common.fetching') : t('common.fetchNow')}
+            <Button disabled={isPending} onClick={() => fetchJob.mutate()}>
+              {isPending ? t('common.fetching') : t('common.fetchNow')}
             </Button>
             <Button variant="ghost" disabled={clusterJob.isPending} onClick={() => clusterJob.mutate()}>
               {clusterJob.isPending ? t('home.clustering') : t('home.cluster')}
@@ -66,6 +65,8 @@ export default function HomePage() {
           </>
         }
       />
+
+      {showPanel ? <FetchProgressPanel progress={progress} /> : null}
 
       <div className="mb-6 flex flex-wrap gap-4 text-sm text-muted">
         {latestBrief ? (
@@ -78,7 +79,7 @@ export default function HomePage() {
         <Link className="text-moss underline underline-offset-2" to="/events">
           {t('home.allEvents')}
         </Link>
-        {fetchJob.isError ? <span className="text-ember">{(fetchJob.error as Error).message}</span> : null}
+        {error ? <span className="text-ember">{error.message}</span> : null}
         {clusterJob.isSuccess ? <span className="text-moss">{t('home.clusterDone')}</span> : null}
       </div>
 
