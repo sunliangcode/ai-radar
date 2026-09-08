@@ -1,0 +1,85 @@
+spring:
+  application:
+    name: ai-radar
+  datasource:
+    url: jdbc:sqlite:./data/radar.db
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      # Flyway owns schema; SQLite type affinity fights Hibernate validate (INTEGER vs BIGINT).
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  config:
+    import: optional:file:.env[.properties]
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: ${SMTP_STARTTLS:true}
+
+server:
+  port: 8080
+
+radar:
+  score-threshold: 60
+  max-items: 30
+  lookback-hours: 48
+  dedup-lookback-days: 14
+  interest-profile: 开源模型、Agent、推理基建、LLM 应用、AI 基础设施
+  summary-language: zh
+  briefs-dir: ./data/briefs
+  max-snippet-chars: 2000
+  ai-batch-size: 8
+  fetch-parallelism: 8
+  fetch-interval-ms: 7200000
+  push-cron: "0 0 8 * * *"
+  timezone: Asia/Shanghai
+  ui-base-url: http://localhost:8080
+  push-only-when-items: true
+  local-token: ${LOCAL_TOKEN:}
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+  github:
+    token: ${GITHUB_TOKEN:}
+  delivery:
+    feishu-webhook-url: ${FEISHU_WEBHOOK_URL:}
+    webhook-url: ${WEBHOOK_URL:}
+    webhook-headers: ${WEBHOOK_HEADERS:}
+    outbox-enabled: true
+    smtp:
+      host: ${SMTP_HOST:}
+      port: ${SMTP_PORT:587}
+      username: ${SMTP_USERNAME:}
+      password: ${SMTP_PASSWORD:}
+      from: ${SMTP_FROM:}
+      to: ${SMTP_TO:}
+      starttls: ${SMTP_STARTTLS:true}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.airadar: INFO

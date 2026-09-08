@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-ink: #1a1f1c;
+  --color-paper: #f3f0e8;
+  --color-mist: #e4e0d4;
+  --color-moss: #2f5d50;
+  --color-moss-deep: #1e3d34;
+  --color-ember: #c45c26;
+  --color-muted: #5c635e;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, #dfe8e2 0%, transparent 55%),
+    linear-gradient(180deg, #f7f4ec 0%, #efebe1 100%);
+}
+
+.prose-brief h1 {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+}
+.prose-brief h2 {
+  font-size: 1.15rem;
+  margin: 1.25rem 0 0.5rem;
+}
+.prose-brief a {
+  color: var(--color-moss);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose-brief p,
+.prose-brief li {
+  color: var(--color-muted);
+  line-height: 1.6;
+}

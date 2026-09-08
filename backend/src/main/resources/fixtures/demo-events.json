@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "title": "OpenAI releases GPT-5 preview for developers",
+      "url": "https://example.com/openai-gpt5-preview-day1",
+      "publishedAt": "2026-09-06T10:00:00Z",
+      "snippet": "OpenAI announced a limited GPT-5 preview for selected developers."
+    },
+    {
+      "title": "GPT-5 preview expands to API customers",
+      "url": "https://example.com/openai-gpt5-preview-day2",
+      "publishedAt": "2026-09-07T12:00:00Z",
+      "snippet": "OpenAI says GPT-5 preview access is rolling out to more API customers."
+    },
+    {
+      "title": "Developers react to OpenAI GPT-5 preview launch",
+      "url": "https://example.com/openai-gpt5-preview-day3",
+      "publishedAt": "2026-09-08T09:00:00Z",
+      "snippet": "Community discussion of the OpenAI GPT-5 preview continues across forums."
+    }
+  ]
+}

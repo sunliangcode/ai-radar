@@ -1,0 +1,22 @@
+# Build
+backend/target/
+**/target/
+.idea/
+*.iml
+*.class
+.DS_Store
+frontend/node_modules/
+frontend/dist/
+
+# Runtime data
+backend/data/
+data/
+*.db
+*.db-journal
+
+# Secrets
+backend/.env
+.env
+
+# Logs
+*.log

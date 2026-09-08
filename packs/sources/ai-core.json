@@ -1,0 +1,20 @@
+[
+  {
+    "type": "RSS",
+    "name": "OpenAI Blog RSS",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://openai.com/blog/rss.xml" }
+  },
+  {
+    "type": "HACKER_NEWS",
+    "name": "HN AI stories",
+    "defaultEnabled": true,
+    "config": { "query": "AI OR LLM OR GPT", "hitsPerPage": 50 }
+  },
+  {
+    "type": "FIXTURE",
+    "name": "Demo Event Fixture",
+    "defaultEnabled": false,
+    "config": { "path": "fixtures/demo-events.json" }
+  }
+]
