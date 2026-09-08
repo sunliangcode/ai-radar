@@ -31,11 +31,27 @@ public class FetchProgress {
     private final ConcurrentHashMap<Long, SourceState> sources = new ConcurrentHashMap<>();
     private final AtomicReference<List<Long>> sourceOrder = new AtomicReference<>(List.of());
 
-    public void begin(List<SourceSeed> seeds) {
+    /** Mark job as started before sources are known (so UI can show immediately). */
+    public void markStarting() {
         synchronized (lock) {
             running = true;
             stage = Stage.fetch;
             startedAt = Instant.now();
+            error = null;
+            message = null;
+            result = null;
+            sources.clear();
+            sourceOrder.set(List.of());
+        }
+    }
+
+    public void begin(List<SourceSeed> seeds) {
+        synchronized (lock) {
+            running = true;
+            stage = Stage.fetch;
+            if (startedAt == null) {
+                startedAt = Instant.now();
+            }
             error = null;
             message = null;
             result = null;

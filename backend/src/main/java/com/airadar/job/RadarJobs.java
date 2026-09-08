@@ -109,6 +109,7 @@ public class RadarJobs {
     }
 
     private PipelineResult runPipelineWithProgress() {
+        fetchProgress.markStarting();
         try {
             PipelineResult result = orchestrator.run(new PipelineRequest(null, null, null));
             fetchProgress.complete(toResultMap(result));

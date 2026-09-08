@@ -4,6 +4,14 @@ import { api, type FetchProgress } from '../lib/api'
 
 const PROGRESS_KEY = ['fetch-progress'] as const
 
+const EMPTY_PROGRESS: FetchProgress = {
+  running: true,
+  stage: 'fetch',
+  elapsedMs: 0,
+  sources: [],
+  totals: { total: 0, done: 0, running: 0, remaining: 0 },
+}
+
 export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
   const qc = useQueryClient()
   const [holdVisible, setHoldVisible] = useState(false)
@@ -12,6 +20,7 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     mutationFn: api.fetchJob,
     onMutate: () => {
       setHoldVisible(true)
+      qc.setQueryData(PROGRESS_KEY, EMPTY_PROGRESS)
     },
     onSuccess: async () => {
       const keys = onSuccessInvalidate ?? [
@@ -37,22 +46,19 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     queryFn: api.fetchProgress,
     enabled: polling,
     refetchInterval: polling ? 300 : false,
+    refetchIntervalInBackground: true,
     staleTime: 0,
+    gcTime: 0,
   })
 
   useEffect(() => {
-    if (fetchJob.isPending) {
-      void qc.invalidateQueries({ queryKey: PROGRESS_KEY })
-    }
-  }, [fetchJob.isPending, qc])
+    if (!polling) return
+    void qc.fetchQuery({ queryKey: PROGRESS_KEY, queryFn: api.fetchProgress })
+  }, [polling, qc])
 
-  const progress: FetchProgress | undefined = progressQuery.data
-  const showPanel =
-    fetchJob.isPending ||
-    holdVisible ||
-    Boolean(progress?.running) ||
-    (progress?.stage === 'done' && holdVisible) ||
-    (progress?.stage === 'error' && holdVisible)
+  const progress: FetchProgress | undefined =
+    progressQuery.data ?? (polling ? EMPTY_PROGRESS : undefined)
+  const showPanel = polling || Boolean(progress?.running)
 
   return {
     fetchJob,

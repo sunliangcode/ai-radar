@@ -60,7 +60,13 @@ function stageWeight(stage: string): number {
 
 export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
   const { t } = useTranslation()
-  if (!progress) return null
+  if (!progress) {
+    return (
+      <div className="mb-6 rounded-xl border border-dashed border-mist bg-paper/80 px-4 py-6 text-center text-sm text-muted">
+        {t('common.fetching')}
+      </div>
+    )
+  }
 
   const pct = progressPercent(progress)
   const remaining = progress.totals?.remaining ?? 0
