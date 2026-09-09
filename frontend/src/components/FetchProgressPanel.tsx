@@ -73,7 +73,6 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
   const total = progress.totals?.total ?? 0
   const inFetch = progress.stage === 'fetch' || progress.stage === 'idle'
   const dimSources = POST_FETCH_STAGES.has(progress.stage) && progress.stage !== 'error'
-  const result = progress.result
 
   return (
     <div className="mb-6 overflow-hidden rounded-xl border border-mist bg-paper/80">
@@ -139,20 +138,6 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
             </li>
           ))}
         </ul>
-      ) : null}
-
-      {progress.stage === 'done' && result ? (
-        <p className="border-t border-mist/80 px-4 py-2.5 font-mono text-xs text-moss-deep">
-          {t('fetchProgress.doneStats', {
-            fetched: result.fetched ?? 0,
-            kept: result.kept ?? 0,
-            time: formatDuration(result.durationMs ?? progress.elapsedMs),
-          })}
-        </p>
-      ) : null}
-
-      {progress.stage === 'error' && progress.error ? (
-        <p className="border-t border-mist/80 px-4 py-2.5 text-xs text-ember">{progress.error}</p>
       ) : null}
     </div>
   )

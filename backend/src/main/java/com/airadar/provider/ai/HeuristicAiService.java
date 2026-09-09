@@ -128,6 +128,33 @@ public class HeuristicAiService implements AiService {
         );
     }
 
+    @Override
+    public List<ExtractedItem> extractItems(String content, String extractionPrompt) {
+        if (content == null || content.isBlank()) {
+            return List.of();
+        }
+        List<ExtractedItem> items = new ArrayList<>();
+        org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse(content);
+        for (org.jsoup.nodes.Element a : doc.select("a[href]")) {
+            String href = a.absUrl("href");
+            if (href.isBlank()) {
+                href = a.attr("href");
+            }
+            if (!href.startsWith("http")) {
+                continue;
+            }
+            String title = a.text().trim();
+            if (title.isBlank() || title.length() < 8) {
+                continue;
+            }
+            items.add(new ExtractedItem(title, href, title));
+            if (items.size() >= 10) {
+                break;
+            }
+        }
+        return items;
+    }
+
     private static String nullToEmpty(String s) {
         return s == null ? "" : s;
     }
@@ -217,15 +244,18 @@ public class HeuristicAiService implements AiService {
         }
         return switch (type) {
             case HACKER_NEWS -> 5;
-            case GITHUB -> 6;
-            case RSS -> 4;
-            case REDDIT -> 3;
+            case GITHUB, GITHUB_TRENDING, OSS_INSIGHT -> 6;
+            case RSS, GOOGLE_NEWS, GDELT -> 4;
+            case REDDIT, V2EX, TELEGRAM -> 3;
+            case PRODUCT_HUNT, TWITTER, WEB -> 4;
+            case EMAIL -> 3;
             case FIXTURE -> 2;
         };
     }
 
     private static String detectCategory(String text, SourceType type) {
-        if (type == SourceType.GITHUB || countHits(text, OSS_KEYWORDS) > 0) {
+        if (type == SourceType.GITHUB || type == SourceType.GITHUB_TRENDING || type == SourceType.OSS_INSIGHT
+                || countHits(text, OSS_KEYWORDS) > 0) {
             if (countHits(text, AI_KEYWORDS) > 0) {
                 return "oss";
             }

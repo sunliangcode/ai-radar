@@ -33,6 +33,16 @@
     "remaining": "{{remaining}} left / {{total}}",
     "pending": "queued",
     "doneStats": "fetched {{fetched}} · kept {{kept}} · {{time}}",
+    "summary": {
+      "titleDone": "Fetch summary",
+      "titleError": "Fetch failed",
+      "overview": "Fetched {{fetched}} · kept {{kept}} · {{time}}",
+      "failedCount": "{{count}} sources failed",
+      "failed": "failed",
+      "items": "{{count}} items",
+      "noSources": "No enabled sources in this run.",
+      "dismiss": "Close and view intel"
+    },
     "stage": {
       "idle": "Idle",
       "fetch": "Fetching sources",
@@ -91,6 +101,19 @@
     "fixturePath": "Fixture path",
     "subreddits": "Subreddits (comma-separated)",
     "query": "Query",
+    "hl": "Language (hl)",
+    "gl": "Country (gl)",
+    "languages": "Languages (comma-separated)",
+    "keywords": "Keyword filter",
+    "language": "GitHub language slug (optional)",
+    "nodes": "V2EX nodes (comma-separated)",
+    "channels": "Telegram public channels",
+    "users": "Twitter/X usernames",
+    "pageUrl": "Page URL",
+    "extractionPrompt": "Extraction prompt",
+    "phTokenHint": "Requires PH_TOKEN env var; skipped when unset.",
+    "apifyTokenHint": "Requires APIFY_TOKEN env var; skipped when unset.",
+    "emailHint": "Requires EMAIL_INGEST_ENABLED=true and IMAP_* env vars.",
     "create": "Create",
     "loading": "Loading sources…",
     "empty": "No sources yet.",
@@ -161,7 +184,7 @@
     "smtpFrom": "SMTP from",
     "smtpTo": "SMTP to",
     "smtpPasswordHint": "SMTP password configured: {{status}} (set SMTP_PASSWORD env var)",
-    "importPack": "Import Pack (ai-core)",
+    "importPack": "Import Pack",
     "importing": "Importing…"
   }
 }

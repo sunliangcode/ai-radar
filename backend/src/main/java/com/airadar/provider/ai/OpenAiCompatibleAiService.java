@@ -31,6 +31,7 @@ public class OpenAiCompatibleAiService implements AiService {
     private final String summarizePromptTemplate;
     private final String assignEventPromptTemplate;
     private final String eventIntelligencePromptTemplate;
+    private final String webExtractPromptTemplate;
 
     public OpenAiCompatibleAiService(
             RestClient.Builder restClientBuilder,
@@ -44,6 +45,7 @@ public class OpenAiCompatibleAiService implements AiService {
         this.summarizePromptTemplate = readPrompt("prompts/summarize.md");
         this.assignEventPromptTemplate = readPrompt("prompts/assign_event.md");
         this.eventIntelligencePromptTemplate = readPrompt("prompts/event_intelligence.md");
+        this.webExtractPromptTemplate = readPrompt("prompts/web-extract.md");
     }
 
     @Override
@@ -150,6 +152,33 @@ public class OpenAiCompatibleAiService implements AiService {
                 response.path("impact").asText(""),
                 response.path("watchNext").asText("")
         );
+    }
+
+    @Override
+    public List<ExtractedItem> extractItems(String content, String extractionPrompt) {
+        ensureApiKey();
+        String prompt = webExtractPromptTemplate
+                .replace("{{extractionPrompt}}", nullToEmpty(extractionPrompt))
+                .replace("{{content}}", truncate(nullToEmpty(content), 100_000));
+        JsonNode response = chatJson(prompt, true);
+        List<ExtractedItem> items = new ArrayList<>();
+        JsonNode arr = response.path("items");
+        if (!arr.isArray()) {
+            return items;
+        }
+        for (JsonNode node : arr) {
+            String title = node.path("title").asText("").trim();
+            String url = node.path("url").asText("").trim();
+            String body = node.path("content").asText("").trim();
+            if (title.isBlank() || url.isBlank()) {
+                continue;
+            }
+            items.add(new ExtractedItem(title, url, body));
+            if (items.size() >= 10) {
+                break;
+            }
+        }
+        return items;
     }
 
     private List<ScoreResult> parseScoreResults(JsonNode response, int expected) {

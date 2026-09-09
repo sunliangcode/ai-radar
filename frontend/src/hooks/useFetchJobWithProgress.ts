@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type FetchProgress } from '../lib/api'
 
 const PROGRESS_KEY = ['fetch-progress'] as const
+
+export type FetchPhase = 'idle' | 'running' | 'summary'
 
 const EMPTY_PROGRESS: FetchProgress = {
   running: true,
@@ -12,35 +14,51 @@ const EMPTY_PROGRESS: FetchProgress = {
   totals: { total: 0, done: 0, running: 0, remaining: 0 },
 }
 
+const DEFAULT_INVALIDATE: string[][] = [
+  ['intelligence-home'],
+  ['events'],
+  ['items'],
+  ['briefs'],
+  ['sources'],
+]
+
 export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
   const qc = useQueryClient()
-  const [holdVisible, setHoldVisible] = useState(false)
+  const [phase, setPhase] = useState<FetchPhase>('idle')
+  const [summaryProgress, setSummaryProgress] = useState<FetchProgress | null>(null)
+  const [jobError, setJobError] = useState<Error | null>(null)
+  const invalidateKeysRef = useRef(onSuccessInvalidate ?? DEFAULT_INVALIDATE)
+  invalidateKeysRef.current = onSuccessInvalidate ?? DEFAULT_INVALIDATE
 
   const fetchJob = useMutation({
     mutationFn: api.fetchJob,
     onMutate: () => {
-      setHoldVisible(true)
+      setPhase('running')
+      setSummaryProgress(null)
+      setJobError(null)
       qc.setQueryData(PROGRESS_KEY, EMPTY_PROGRESS)
     },
     onSuccess: async () => {
-      const keys = onSuccessInvalidate ?? [
-        ['intelligence-home'],
-        ['events'],
-        ['items'],
-        ['briefs'],
-        ['sources'],
-      ]
-      for (const key of keys) {
-        await qc.invalidateQueries({ queryKey: key })
-      }
-      await qc.invalidateQueries({ queryKey: PROGRESS_KEY })
+      const finalSnap = await api.fetchProgress().catch(() => qc.getQueryData<FetchProgress>(PROGRESS_KEY))
+      setSummaryProgress(finalSnap ?? EMPTY_PROGRESS)
+      setPhase('summary')
     },
-    onSettled: () => {
-      window.setTimeout(() => setHoldVisible(false), 2200)
+    onError: async (err) => {
+      setJobError(err as Error)
+      const finalSnap = await api.fetchProgress().catch(() => qc.getQueryData<FetchProgress>(PROGRESS_KEY))
+      setSummaryProgress(
+        finalSnap ?? {
+          ...EMPTY_PROGRESS,
+          running: false,
+          stage: 'error',
+          error: (err as Error).message,
+        },
+      )
+      setPhase('summary')
     },
   })
 
-  const polling = fetchJob.isPending || holdVisible
+  const polling = phase === 'running'
   const progressQuery = useQuery({
     queryKey: PROGRESS_KEY,
     queryFn: api.fetchProgress,
@@ -56,15 +74,27 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     void qc.fetchQuery({ queryKey: PROGRESS_KEY, queryFn: api.fetchProgress })
   }, [polling, qc])
 
-  const progress: FetchProgress | undefined =
+  const dismiss = useCallback(async () => {
+    for (const key of invalidateKeysRef.current) {
+      await qc.invalidateQueries({ queryKey: key })
+    }
+    await qc.invalidateQueries({ queryKey: PROGRESS_KEY })
+    setSummaryProgress(null)
+    setJobError(null)
+    setPhase('idle')
+  }, [qc])
+
+  const liveProgress: FetchProgress | undefined =
     progressQuery.data ?? (polling ? EMPTY_PROGRESS : undefined)
-  const showPanel = polling || Boolean(progress?.running)
+  const progress: FetchProgress | undefined =
+    phase === 'summary' ? (summaryProgress ?? undefined) : liveProgress
 
   return {
     fetchJob,
+    phase,
     progress,
-    showPanel,
-    isPending: fetchJob.isPending,
-    error: fetchJob.error as Error | null,
+    dismiss,
+    isPending: phase !== 'idle',
+    error: jobError,
   }
 }

@@ -22,7 +22,7 @@ ai-radar/
 
 Contributions are welcome across:
 
-- Fetch connectors (RSS, HN, Reddit, GitHub, …)
+- Fetch connectors (RSS, HN, Reddit, GitHub, Google News, GDELT, Telegram, Twitter, …)
 - Scoring / summarization / event clustering
 - Delivery channels (Feishu, Email, Webhook, Outbox)
 - Web UI and intelligence home

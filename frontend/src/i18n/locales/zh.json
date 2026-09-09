@@ -33,6 +33,16 @@
     "remaining": "剩余 {{remaining}} / 共 {{total}}",
     "pending": "排队中",
     "doneStats": "抓取 {{fetched}} · 保留 {{kept}} · {{time}}",
+    "summary": {
+      "titleDone": "抓取结论",
+      "titleError": "抓取失败",
+      "overview": "共抓取 {{fetched}} 条 · 保留 {{kept}} 条 · 耗时 {{time}}",
+      "failedCount": "{{count}} 个渠道失败",
+      "failed": "失败",
+      "items": "{{count}} 条",
+      "noSources": "本次没有启用的渠道。",
+      "dismiss": "关闭并查看资讯"
+    },
     "stage": {
       "idle": "空闲",
       "fetch": "正在抓取源",
@@ -91,6 +101,19 @@
     "fixturePath": "Fixture path",
     "subreddits": "Subreddits（逗号分隔）",
     "query": "Query",
+    "hl": "语言 hl",
+    "gl": "国家 gl",
+    "languages": "语言（逗号分隔）",
+    "keywords": "关键词过滤",
+    "language": "GitHub language slug（可空）",
+    "nodes": "V2EX 节点（逗号分隔）",
+    "channels": "Telegram 公开频道",
+    "users": "Twitter/X 用户名",
+    "pageUrl": "网页 URL",
+    "extractionPrompt": "抽取提示词",
+    "phTokenHint": "需要环境变量 PH_TOKEN；未配置时会跳过该源。",
+    "apifyTokenHint": "需要环境变量 APIFY_TOKEN；未配置时会跳过该源。",
+    "emailHint": "需要 EMAIL_INGEST_ENABLED=true 与 IMAP_* 环境变量。",
     "create": "创建",
     "loading": "加载源…",
     "empty": "还没有源。",
@@ -161,7 +184,7 @@
     "smtpFrom": "SMTP from",
     "smtpTo": "SMTP to",
     "smtpPasswordHint": "SMTP 密码已配置：{{status}}（设 SMTP_PASSWORD 环境变量）",
-    "importPack": "导入 Pack (ai-core)",
+    "importPack": "导入 Pack",
     "importing": "导入中…"
   }
 }

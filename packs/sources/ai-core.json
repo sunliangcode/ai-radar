@@ -6,10 +6,52 @@
     "config": { "feedUrl": "https://openai.com/blog/rss.xml" }
   },
   {
+    "type": "RSS",
+    "name": "Hugging Face Blog RSS",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://huggingface.co/blog/feed.xml" }
+  },
+  {
+    "type": "RSS",
+    "name": "Simon Willison Weblog",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://simonwillison.net/atom/everything/" }
+  },
+  {
+    "type": "RSS",
+    "name": "Anthropic News",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml" }
+  },
+  {
     "type": "HACKER_NEWS",
     "name": "HN AI stories",
     "defaultEnabled": true,
     "config": { "query": "AI OR LLM OR GPT", "hitsPerPage": 50 }
+  },
+  {
+    "type": "GOOGLE_NEWS",
+    "name": "Google News AI",
+    "defaultEnabled": true,
+    "config": { "query": "artificial intelligence OR LLM OR \"large language model\"", "hl": "en", "gl": "US", "maxResults": 30 }
+  },
+  {
+    "type": "GDELT",
+    "name": "GDELT AI news",
+    "defaultEnabled": true,
+    "config": { "query": "\"artificial intelligence\" OR LLM", "timespan": "48h", "maxRecords": 40 }
+  },
+  {
+    "type": "OSS_INSIGHT",
+    "name": "OSS Insight AI repos",
+    "defaultEnabled": true,
+    "config": { "period": "past_24_hours", "languages": ["All"], "keywords": ["AI", "LLM", "agent", "gpt"], "maxItems": 25 }
+  },
+  {
+    "type": "GITHUB_TRENDING",
+    "name": "GitHub Trending daily",
+    "defaultEnabled": true,
+    "config": { "since": "daily" }
   },
   {
     "type": "FIXTURE",

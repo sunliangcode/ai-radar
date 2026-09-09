@@ -17,6 +17,7 @@ import com.airadar.persistence.SourceEntity;
 import com.airadar.persistence.SourceRepository;
 import com.airadar.provider.ai.AiService;
 import com.airadar.provider.ai.ScoreResult;
+import com.airadar.provider.webfetch.WebContentFetcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
@@ -48,6 +50,7 @@ public class PipelineOrchestrator {
     private final ExecutorService fetchExecutor;
     private final EventClusterService eventClusterService;
     private final FetchProgress fetchProgress;
+    private final WebContentFetcher webContentFetcher;
 
     public PipelineOrchestrator(
             SourceRepository sourceRepository,
@@ -59,7 +62,8 @@ public class PipelineOrchestrator {
             RadarProperties properties,
             ExecutorService fetchExecutor,
             EventClusterService eventClusterService,
-            FetchProgress fetchProgress
+            FetchProgress fetchProgress,
+            WebContentFetcher webContentFetcher
     ) {
         this.sourceRepository = sourceRepository;
         this.newsItemRepository = newsItemRepository;
@@ -71,6 +75,7 @@ public class PipelineOrchestrator {
         this.fetchExecutor = fetchExecutor;
         this.eventClusterService = eventClusterService;
         this.fetchProgress = fetchProgress;
+        this.webContentFetcher = webContentFetcher;
     }
 
     @Transactional
@@ -88,6 +93,7 @@ public class PipelineOrchestrator {
 
         fetchProgress.setStage(FetchProgress.Stage.normalize);
         List<NewsItem> normalized = NormalizeStage.normalize(fetched, properties);
+        enrichFullText(normalized);
         long tNorm = System.currentTimeMillis();
         log.info("pipeline_stage=normalize count={} durationMs={}", normalized.size(), tNorm - tFetch);
 
@@ -213,6 +219,35 @@ public class PipelineOrchestrator {
             }
         }
         return all;
+    }
+
+    private void enrichFullText(List<NewsItem> items) {
+        if (!webContentFetcher.isEnabled() || items == null || items.isEmpty()) {
+            return;
+        }
+        int enriched = 0;
+        for (NewsItem item : items) {
+            String snippet = item.getContentSnippet();
+            boolean needs = snippet == null || snippet.length() < 80;
+            Map<String, Object> meta = item.getRawMeta();
+            if (meta != null && Boolean.TRUE.equals(meta.get("needsFullText"))) {
+                needs = true;
+            }
+            if (!needs) {
+                continue;
+            }
+            String text = webContentFetcher.fetchArticleText(item.getCanonicalUrl());
+            if (text == null || text.isBlank()) {
+                continue;
+            }
+            item.setContentSnippet(text.length() > properties.getMaxSnippetChars()
+                    ? text.substring(0, properties.getMaxSnippetChars())
+                    : text);
+            enriched++;
+        }
+        if (enriched > 0) {
+            log.info("pipeline_stage=web_fetch enriched={}", enriched);
+        }
     }
 
     private void scoreItems(List<NewsItem> items) {

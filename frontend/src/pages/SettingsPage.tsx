@@ -10,6 +10,7 @@ export default function SettingsPage() {
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings })
   const [form, setForm] = useState<Partial<Settings>>({})
   const [toast, setToast] = useState<string | null>(null)
+  const [packId, setPackId] = useState('ai-core')
 
   useEffect(() => {
     if (settings.data) setForm(settings.data)
@@ -25,7 +26,7 @@ export default function SettingsPage() {
     onError: (e) => setToast((e as Error).message),
   })
   const importPack = useMutation({
-    mutationFn: () => api.importPack({ packId: 'ai-core' }),
+    mutationFn: () => api.importPack({ packId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings'] })
       qc.invalidateQueries({ queryKey: ['sources'] })
@@ -158,10 +159,19 @@ export default function SettingsPage() {
           </p>
         </section>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={save.isPending}>
             {save.isPending ? t('common.saving') : t('common.save')}
           </Button>
+          <select
+            className="rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+            value={packId}
+            onChange={(e) => setPackId(e.target.value)}
+          >
+            <option value="ai-core">ai-core</option>
+            <option value="ai-cn">ai-cn</option>
+            <option value="ai-signals">ai-signals</option>
+          </select>
           <Button
             type="button"
             variant="ghost"

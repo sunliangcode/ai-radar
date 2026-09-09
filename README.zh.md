@@ -110,7 +110,21 @@ Swagger UI：`/swagger-ui.html`
 
 ## 默认源
 
-空库种子：OpenAI Blog RSS、Hacker News、Reddit（ML / LocalLLaMA / artificial）、GitHub search。
+空库种子：OpenAI / Hugging Face / Simon Willison RSS、量子位与新智元微信 RSS、36氪、HN、Reddit、GitHub Search、Google News、GDELT、OSS Insight、GitHub Trending、V2EX。Product Hunt / Twitter / Telegram 示例默认关闭（需 token）。
+
+导入更多 Pack：
+
+```bash
+curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-core"}'
+curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-cn"}'
+curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-signals"}'
+```
+
+### 连接器类型
+
+RSS · Hacker News · Reddit · GitHub · GitHub Trending · Google News · GDELT · OSS Insight · V2EX · Telegram · Product Hunt（`PH_TOKEN`）· Twitter/X via Apify（`APIFY_TOKEN`）· WEB（AI 抽取）· EMAIL（IMAP）· Fixture
+
+可选：`WEB_FETCH_ENABLED=true` 在评分前补全短摘要正文。
 
 ## 目录结构
 
@@ -135,7 +149,7 @@ cd frontend && npm run build
 
 - 情报首页：`GET /api/intelligence/home`（四栏）
 - 事件：`GET /api/events`、`GET /api/events/{id}`；任务 `POST /api/jobs/cluster`
-- Pack：`POST /api/packs/import`（`packs/sources/ai-core.json`）
+- Pack：`POST /api/packs/import`，body `{"packId":"ai-core|ai-cn|ai-signals"}`（`packs/sources/*.json`）
 - 文档：[extending-connectors](docs/extending-connectors.md)、[extending-delivery](docs/extending-delivery.md)、[mcp](docs/mcp.md)
 - MCP sidecar：`mcp/server.mjs`（默认只读）
 - Smoke：`scripts/smoke-extensibility.sh`

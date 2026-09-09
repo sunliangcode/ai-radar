@@ -16,6 +16,29 @@ public interface SourceConnector {
 - Throw unchecked exceptions on hard failures. The orchestrator isolates per-source errors.
 - Return an empty list when there is nothing new.
 - Prefer absolute/canonical URLs; the pipeline will normalize.
+- For token-gated sources (Product Hunt, Twitter, Email), prefer warn + empty list when credentials are missing.
+
+## Built-in connector types
+
+| Type | Mechanism | Notes |
+|------|-----------|-------|
+| `RSS` | Rome RSS/Atom | `feedUrl` |
+| `HACKER_NEWS` | Algolia (+ Firebase fallback) | `query`, `tags` |
+| `REDDIT` | Public JSON / RSS | `subreddits` |
+| `GITHUB` | Search repositories API | optional `GITHUB_TOKEN` |
+| `GITHUB_TRENDING` | HTML scrape | `since`, `language` |
+| `GOOGLE_NEWS` | Google News RSS search | `query`, `hl`, `gl` |
+| `GDELT` | GDELT DOC API | `query`, `timespan` |
+| `OSS_INSIGHT` | Star-velocity trends | `keywords`, `period` |
+| `V2EX` | Official JSON API | `nodes` |
+| `TELEGRAM` | Public `t.me/s` HTML | `channels` |
+| `PRODUCT_HUNT` | GraphQL | requires `PH_TOKEN` |
+| `TWITTER` | Apify actor | requires `APIFY_TOKEN` |
+| `WEB` | HTML + AI extract | `url`, `extractionPrompt` |
+| `EMAIL` | IMAP unread + AI extract | `EMAIL_INGEST_ENABLED` + IMAP_* |
+| `FIXTURE` | Local JSON | demos / offline |
+
+Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.enabled`).
 
 ## Steps to add a connector
 
@@ -34,6 +57,20 @@ public interface SourceConnector {
 ```
 
 See `backend/src/main/java/com/airadar/connector/FixtureConnector.java`.
+
+## Packs
+
+Importable presets under `packs/sources/`:
+
+- `ai-core.json` — English AI blogs + Google News / GDELT / OSS Insight / Trending
+- `ai-cn.json` — WeChat bridges, 36氪, 即刻, V2EX, CN Google News
+- `ai-signals.json` — Product Hunt / Twitter / WEB / EMAIL samples (often disabled until tokens are set)
+
+```bash
+curl -s -X POST http://localhost:8080/api/packs/import \
+  -H 'Content-Type: application/json' \
+  -d '{"packId":"ai-cn"}'
+```
 
 ## Registration
 

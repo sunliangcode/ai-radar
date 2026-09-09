@@ -86,6 +86,19 @@ public class CompositeAiService implements AiService {
         }
     }
 
+    @Override
+    public List<ExtractedItem> extractItems(String content, String extractionPrompt) {
+        if (!hasApiKey()) {
+            return heuristic.extractItems(content, extractionPrompt);
+        }
+        try {
+            return openAi.extractItems(content, extractionPrompt);
+        } catch (Exception e) {
+            log.warn("ai_extract_fallback=heuristic error={}", e.getMessage());
+            return heuristic.extractItems(content, extractionPrompt);
+        }
+    }
+
     private boolean hasApiKey() {
         String key = properties.getOpenai().getApiKey();
         return key != null && !key.isBlank()

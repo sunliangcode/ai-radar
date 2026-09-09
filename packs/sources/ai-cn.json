@@ -1,0 +1,68 @@
+[
+  {
+    "type": "RSS",
+    "name": "量子位 WeChat",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://wechat2rss.xlab.app/feed/7131b577c61365cb47e81000738c10d872685908.xml" }
+  },
+  {
+    "type": "RSS",
+    "name": "新智元 WeChat",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://wechat2rss.xlab.app/feed/ede30346413ea70dbef5d485ea5cbb95cca446e7.xml" }
+  },
+  {
+    "type": "RSS",
+    "name": "36氪",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://36kr.com/feed" }
+  },
+  {
+    "type": "RSS",
+    "name": "少数派",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://sspai.com/feed" }
+  },
+  {
+    "type": "RSS",
+    "name": "开源中国",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.oschina.net/news/rss" }
+  },
+  {
+    "type": "RSS",
+    "name": "即刻 AI 探索站",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://rsshub.umzzz.com/jike/topic/63579abb6724cc583b9bba9a" }
+  },
+  {
+    "type": "RSS",
+    "name": "即刻 AI 讨论",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://rsshub.umzzz.com/jike/topic/55fadac08cc2e30e00e2e42a" }
+  },
+  {
+    "type": "RSS",
+    "name": "即刻工程师",
+    "defaultEnabled": false,
+    "config": { "feedUrl": "https://rsshub.umzzz.com/jike/topic/577c5a122fa95b1100da059f" }
+  },
+  {
+    "type": "GOOGLE_NEWS",
+    "name": "Google News 科技 CN",
+    "defaultEnabled": true,
+    "config": { "query": "人工智能 OR 大模型 OR AI", "hl": "zh-CN", "gl": "CN", "ceid": "CN:zh-Hans", "maxResults": 25 }
+  },
+  {
+    "type": "V2EX",
+    "name": "V2EX create/share",
+    "defaultEnabled": true,
+    "config": { "nodes": ["create", "share", "programmer"], "limit": 20 }
+  },
+  {
+    "type": "TELEGRAM",
+    "name": "Telegram AI sample",
+    "defaultEnabled": false,
+    "config": { "channels": ["zaihuapd"], "fetchLimit": 20 }
+  }
+]

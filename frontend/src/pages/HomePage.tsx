@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { Button, PageHeader, ScorePill, StateBox } from '../components/ui'
 import { FetchProgressPanel } from '../components/FetchProgressPanel'
+import { FetchResultSummary } from '../components/FetchResultSummary'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { dateLocale } from '../i18n'
 
@@ -30,7 +31,7 @@ export default function HomePage() {
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const briefs = useQuery({ queryKey: ['briefs'], queryFn: api.briefs })
 
-  const { fetchJob, progress, showPanel, isPending, error } = useFetchJobWithProgress([
+  const { fetchJob, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['intelligence-home'],
     ['events'],
     ['items'],
@@ -45,6 +46,7 @@ export default function HomePage() {
   const latestBrief = briefs.data?.[0]?.date
   const data = home.data
   const locale = dateLocale(i18n.language)
+  const showContent = phase === 'idle'
 
   return (
     <div>
@@ -54,76 +56,80 @@ export default function HomePage() {
         actions={
           <>
             <Button disabled={isPending} onClick={() => fetchJob.mutate()}>
-              {isPending ? t('common.fetching') : t('common.fetchNow')}
+              {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
             </Button>
-            <Button variant="ghost" disabled={clusterJob.isPending} onClick={() => clusterJob.mutate()}>
+            <Button variant="ghost" disabled={clusterJob.isPending || isPending} onClick={() => clusterJob.mutate()}>
               {clusterJob.isPending ? t('home.clustering') : t('home.cluster')}
             </Button>
-            <Button variant="ghost" disabled={pushJob.isPending} onClick={() => pushJob.mutate()}>
+            <Button variant="ghost" disabled={pushJob.isPending || isPending} onClick={() => pushJob.mutate()}>
               {pushJob.isPending ? t('common.pushing') : t('home.pushNow')}
             </Button>
           </>
         }
       />
 
-      {showPanel ? <FetchProgressPanel progress={progress} /> : null}
+      {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
+      {phase === 'summary' ? <FetchResultSummary progress={progress} onDismiss={() => void dismiss()} /> : null}
 
-      <div className="mb-6 flex flex-wrap gap-4 text-sm text-muted">
-        {latestBrief ? (
-          <Link className="text-moss underline underline-offset-2" to={`/briefs/${latestBrief}`}>
-            {t('home.latestBrief', { date: latestBrief })}
-          </Link>
-        ) : (
-          <span>{t('home.noBrief')}</span>
-        )}
-        <Link className="text-moss underline underline-offset-2" to="/events">
-          {t('home.allEvents')}
-        </Link>
-        {error ? <span className="text-ember">{error.message}</span> : null}
-        {clusterJob.isSuccess ? <span className="text-moss">{t('home.clusterDone')}</span> : null}
-      </div>
+      {showContent ? (
+        <>
+          <div className="mb-6 flex flex-wrap gap-4 text-sm text-muted">
+            {latestBrief ? (
+              <Link className="text-moss underline underline-offset-2" to={`/briefs/${latestBrief}`}>
+                {t('home.latestBrief', { date: latestBrief })}
+              </Link>
+            ) : (
+              <span>{t('home.noBrief')}</span>
+            )}
+            <Link className="text-moss underline underline-offset-2" to="/events">
+              {t('home.allEvents')}
+            </Link>
+            {clusterJob.isSuccess ? <span className="text-moss">{t('home.clusterDone')}</span> : null}
+          </div>
 
-      {home.isLoading ? <StateBox>{t('home.loading')}</StateBox> : null}
-      {home.isError ? (
-        <StateBox>{t('common.loadFailed', { message: (home.error as Error).message })}</StateBox>
-      ) : null}
+          {home.isLoading ? <StateBox>{t('home.loading')}</StateBox> : null}
+          {home.isError ? (
+            <StateBox>{t('common.loadFailed', { message: (home.error as Error).message })}</StateBox>
+          ) : null}
 
-      {data ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Column title={t('home.whatChanged')} empty={t('home.whatChangedEmpty')}>
-            {data.whatChanged.map((row, i) => (
-              <div key={`${row.eventId}-${i}`} className="border-b border-mist/70 pb-2 last:border-0">
-                <Link to={`/events/${row.eventId}`} className="text-sm font-medium text-ink hover:text-moss">
-                  {row.label}
-                </Link>
-                <p className="mt-0.5 font-mono text-xs text-muted">
-                  {row.eventTitle ? `${row.eventTitle} · ` : ''}
-                  {row.at ? new Date(row.at).toLocaleString(locale) : ''}
-                </p>
-              </div>
-            ))}
-          </Column>
-          <Column title={t('home.whatMatters')} empty={t('home.whatMattersEmpty')}>
-            {data.whatMatters.map((e) => (
-              <EventCard key={e.id} id={e.id} title={e.title} score={e.score} summary={e.summary} status={e.status} />
-            ))}
-          </Column>
-          <Column title={t('home.whatsEmerging')} empty={t('home.whatsEmergingEmpty')}>
-            {data.whatsEmerging.map((e) => (
-              <EventCard key={e.id} id={e.id} title={e.title} score={e.score} summary={e.summary} status={e.status} />
-            ))}
-          </Column>
-          <Column title={t('home.whatToWatch')} empty={t('home.whatToWatchEmpty')}>
-            {data.whatToWatch.map((e) => (
-              <div key={e.id} className="border-b border-mist/70 pb-2 last:border-0">
-                <Link to={`/events/${e.id}`} className="text-sm font-medium text-ink hover:text-moss">
-                  {e.title}
-                </Link>
-                <p className="mt-1 text-sm text-muted">{e.watchNext}</p>
-              </div>
-            ))}
-          </Column>
-        </div>
+          {data ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Column title={t('home.whatChanged')} empty={t('home.whatChangedEmpty')}>
+                {data.whatChanged.map((row, i) => (
+                  <div key={`${row.eventId}-${i}`} className="border-b border-mist/70 pb-2 last:border-0">
+                    <Link to={`/events/${row.eventId}`} className="text-sm font-medium text-ink hover:text-moss">
+                      {row.label}
+                    </Link>
+                    <p className="mt-0.5 font-mono text-xs text-muted">
+                      {row.eventTitle ? `${row.eventTitle} · ` : ''}
+                      {row.at ? new Date(row.at).toLocaleString(locale) : ''}
+                    </p>
+                  </div>
+                ))}
+              </Column>
+              <Column title={t('home.whatMatters')} empty={t('home.whatMattersEmpty')}>
+                {data.whatMatters.map((e) => (
+                  <EventCard key={e.id} id={e.id} title={e.title} score={e.score} summary={e.summary} status={e.status} />
+                ))}
+              </Column>
+              <Column title={t('home.whatsEmerging')} empty={t('home.whatsEmergingEmpty')}>
+                {data.whatsEmerging.map((e) => (
+                  <EventCard key={e.id} id={e.id} title={e.title} score={e.score} summary={e.summary} status={e.status} />
+                ))}
+              </Column>
+              <Column title={t('home.whatToWatch')} empty={t('home.whatToWatchEmpty')}>
+                {data.whatToWatch.map((e) => (
+                  <div key={e.id} className="border-b border-mist/70 pb-2 last:border-0">
+                    <Link to={`/events/${e.id}`} className="text-sm font-medium text-ink hover:text-moss">
+                      {e.title}
+                    </Link>
+                    <p className="mt-1 text-sm text-muted">{e.watchNext}</p>
+                  </div>
+                ))}
+              </Column>
+            </div>
+          ) : null}
+        </>
       ) : null}
     </div>
   )

@@ -110,7 +110,21 @@ Optional LAN guard: set `LOCAL_TOKEN` and send header `X-Local-Token`.
 
 ## Default sources
 
-Seeded on empty DB: OpenAI Blog RSS, Hacker News, Reddit (ML / LocalLLaMA / artificial), GitHub search.
+Seeded on empty DB: OpenAI / Hugging Face / Simon Willison RSS, 量子位 & 新智元 WeChat RSS, 36氪, HN, Reddit, GitHub search, Google News, GDELT, OSS Insight, GitHub Trending, V2EX. Token-gated samples (Product Hunt, Twitter, Telegram) are seeded **disabled**.
+
+Import more packs:
+
+```bash
+curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-core"}'
+curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-cn"}'
+curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-signals"}'
+```
+
+### Connector types
+
+RSS · Hacker News · Reddit · GitHub · GitHub Trending · Google News · GDELT · OSS Insight · V2EX · Telegram · Product Hunt (`PH_TOKEN`) · Twitter/X via Apify (`APIFY_TOKEN`) · WEB (AI extract) · EMAIL (IMAP) · Fixture
+
+Optional: `WEB_FETCH_ENABLED=true` to expand short feed snippets before scoring.
 
 ## Layout
 
@@ -135,7 +149,7 @@ cd frontend && npm run build
 
 - Intelligence home: `GET /api/intelligence/home` (four columns)
 - Events: `GET /api/events`, `GET /api/events/{id}`; job `POST /api/jobs/cluster`
-- Packs: `POST /api/packs/import` (`packs/sources/ai-core.json`)
+- Packs: `POST /api/packs/import` with body `{"packId":"ai-core|ai-cn|ai-signals"}` (`packs/sources/*.json`)
 - Docs: [extending-connectors](docs/extending-connectors.md), [extending-delivery](docs/extending-delivery.md), [mcp](docs/mcp.md)
 - MCP sidecar: `mcp/server.mjs` (read-only by default)
 - Smoke: `scripts/smoke-extensibility.sh`

@@ -5,5 +5,15 @@ public enum SourceType {
     HACKER_NEWS,
     REDDIT,
     GITHUB,
-    FIXTURE
+    FIXTURE,
+    GOOGLE_NEWS,
+    GDELT,
+    OSS_INSIGHT,
+    GITHUB_TRENDING,
+    V2EX,
+    TELEGRAM,
+    PRODUCT_HUNT,
+    TWITTER,
+    WEB,
+    EMAIL
 }

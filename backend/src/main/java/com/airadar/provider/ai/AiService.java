@@ -24,4 +24,11 @@ public interface AiService {
     EventAssignResult assignEvent(NewsItem item, List<EventCandidate> candidates);
 
     EventIntelligence refreshEventIntelligence(String eventTitle, List<NewsItem> memberItems);
+
+    /**
+     * Extract news-like items from page or email text using the given instruction prompt.
+     */
+    default List<ExtractedItem> extractItems(String content, String extractionPrompt) {
+        return List.of();
+    }
 }

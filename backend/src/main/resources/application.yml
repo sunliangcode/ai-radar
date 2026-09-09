@@ -60,6 +60,25 @@ radar:
     model: ${OPENAI_MODEL:gpt-4o-mini}
   github:
     token: ${GITHUB_TOKEN:}
+  producthunt:
+    token: ${PH_TOKEN:}
+  twitter:
+    apify-token: ${APIFY_TOKEN:}
+    actor-id: ${APIFY_TWITTER_ACTOR:altimis~scweet}
+  email:
+    enabled: ${EMAIL_INGEST_ENABLED:false}
+    host: ${IMAP_HOST:}
+    port: ${IMAP_PORT:993}
+    username: ${IMAP_USERNAME:}
+    password: ${IMAP_PASSWORD:}
+    protocol: ${IMAP_PROTOCOL:imaps}
+    folder: ${IMAP_FOLDER:INBOX}
+    max-messages: ${IMAP_MAX_MESSAGES:20}
+  web-fetch:
+    enabled: ${WEB_FETCH_ENABLED:false}
+    timeout-ms: 15000
+    max-chars: 12000
+  rsshub-base: ${RSSHUB_BASE:https://rsshub.umzzz.com}
   delivery:
     feishu-webhook-url: ${FEISHU_WEBHOOK_URL:}
     webhook-url: ${WEBHOOK_URL:}

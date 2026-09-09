@@ -1,0 +1,56 @@
+[
+  {
+    "type": "RSS",
+    "name": "vLLM Blog",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://blog.vllm.ai/feed.xml" }
+  },
+  {
+    "type": "RSS",
+    "name": "GitHub Trending Daily RSS",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml" }
+  },
+  {
+    "type": "RSS",
+    "name": "DeepMind Blog",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://deepmind.google/blog/rss.xml" }
+  },
+  {
+    "type": "PRODUCT_HUNT",
+    "name": "Product Hunt ranking",
+    "defaultEnabled": false,
+    "config": { "maxItems": 20 }
+  },
+  {
+    "type": "TWITTER",
+    "name": "Twitter AI researchers",
+    "defaultEnabled": false,
+    "config": { "users": ["karpathy", "sama", "ylecun", "OpenAI"], "fetchLimit": 40 }
+  },
+  {
+    "type": "WEB",
+    "name": "HN frontpage WEB extract",
+    "defaultEnabled": false,
+    "config": {
+      "url": "https://news.ycombinator.com",
+      "extractionPrompt": "Extract the top stories as items with title, url, and a one-line summary. Prefer external article links over comment pages."
+    }
+  },
+  {
+    "type": "EMAIL",
+    "name": "Newsletter IMAP inbox",
+    "defaultEnabled": false,
+    "config": {
+      "extractionPrompt": "Extract distinct AI/tech news stories from this newsletter with title, url, and short content.",
+      "maxMessages": 15
+    }
+  },
+  {
+    "type": "RSS",
+    "name": "Karpathy via X RSS proxy (fallback)",
+    "defaultEnabled": false,
+    "config": { "feedUrl": "https://nitter.privacyredirect.com/karpathy/rss" }
+  }
+]
