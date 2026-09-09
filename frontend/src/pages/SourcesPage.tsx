@@ -232,6 +232,9 @@ export default function SourcesPage() {
           {selected?.id === 'EMAIL' ? (
             <p className="text-xs text-muted sm:col-span-2">{t('sources.emailHint')}</p>
           ) : null}
+          {selected?.id === 'ZHIHU' ? (
+            <p className="text-xs text-muted sm:col-span-2">{t('sources.zhihuHint')}</p>
+          ) : null}
           <div className="sm:col-span-2">
             <Button type="submit" loading={create.isPending}>
               {create.isPending ? t('common.saving') : t('sources.create')}

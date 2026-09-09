@@ -310,7 +310,7 @@ export default function HomePage() {
               {(data.risks ?? []).slice(0, 3).map((o) => (
                 <div key={`risk-${o.id}`} className="border-b border-mist/70 pb-2 last:border-0">
                   <p className="text-sm font-medium text-ink">{o.title}</p>
-                  <p className="mt-1 text-xs text-amber-800">{t('home.risk')}</p>
+                  <p className="mt-1 text-xs font-medium text-ink">{t('home.risk')}</p>
                 </div>
               ))}
               {(data.actions ?? []).map((action) => (

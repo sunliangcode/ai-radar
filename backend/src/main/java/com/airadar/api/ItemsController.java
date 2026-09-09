@@ -44,15 +44,23 @@ public class ItemsController {
     }
 
     @GetMapping
-    public List<Map<String, Object>> list(
+    public Map<String, Object> list(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since,
             @RequestParam(required = false) Double minScore,
             @RequestParam(required = false) Boolean unread,
             @RequestParam(required = false) Long sourceId,
+            @RequestParam(required = false) String sourceType,
             @RequestParam(defaultValue = "score") String sort,
+            @RequestParam(defaultValue = "0") int offset,
             @RequestParam(defaultValue = "50") int limit
     ) {
-        Instant from = since != null ? since : LocalDate.now(ZoneOffset.UTC).minusDays(7).atStartOfDay().toInstant(ZoneOffset.UTC);
+        boolean channelFilter = sourceType != null && !sourceType.isBlank();
+        Instant from = since != null
+                ? since
+                : LocalDate.now(ZoneOffset.UTC)
+                .minusDays(channelFilter ? 365 : 7)
+                .atStartOfDay()
+                .toInstant(ZoneOffset.UTC);
         Stream<NewsItem> stream = newsItemRepository.findByCreatedAtGreaterThanEqualOrderByScoreDesc(from)
                 .stream()
                 .map(entityMapper::toDomain);
@@ -70,16 +78,39 @@ public class ItemsController {
                             || i.getSourceRefs().stream().anyMatch(r -> r.contains(needle))
             );
         }
+        if (channelFilter) {
+            String wanted = sourceType.trim();
+            stream = stream.filter(i ->
+                    i.getPrimarySourceType() != null
+                            && wanted.equalsIgnoreCase(i.getPrimarySourceType().name())
+            );
+        }
 
-        Comparator<NewsItem> comparator = "publishedAt".equalsIgnoreCase(sort)
-                ? Comparator.comparing(NewsItem::getPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                : Comparator.comparing(NewsItem::getScore, Comparator.nullsLast(Comparator.reverseOrder()));
+        Comparator<NewsItem> comparator;
+        if ("publishedAt".equalsIgnoreCase(sort)) {
+            comparator = Comparator.comparing(NewsItem::getPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+        } else if ("createdAt".equalsIgnoreCase(sort)) {
+            comparator = Comparator.comparing(NewsItem::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+        } else {
+            comparator = Comparator.comparing(NewsItem::getScore, Comparator.nullsLast(Comparator.reverseOrder()));
+        }
 
-        return stream
-                .sorted(comparator)
-                .limit(Math.max(1, Math.min(limit, 200)))
+        List<NewsItem> filtered = stream.sorted(comparator).toList();
+        int total = filtered.size();
+        int off = Math.max(0, offset);
+        int lim = Math.max(1, Math.min(limit, 200));
+        List<Map<String, Object>> page = filtered.stream()
+                .skip(off)
+                .limit(lim)
                 .map(this::toDto)
                 .toList();
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("items", page);
+        out.put("total", total);
+        out.put("offset", off);
+        out.put("limit", lim);
+        return out;
     }
 
     @PatchMapping("/{id}")
@@ -113,6 +144,7 @@ public class ItemsController {
         dto.put("score", item.getScore());
         dto.put("scoreReason", item.getScoreReason());
         dto.put("summary", item.getSummary());
+        dto.put("contentSnippet", item.getContentSnippet());
         dto.put("tags", item.getTags());
         dto.put("category", item.getCategory());
         dto.put("status", item.getStatus());

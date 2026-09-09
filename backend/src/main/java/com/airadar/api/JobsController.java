@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
@@ -22,8 +23,10 @@ public class JobsController {
     }
 
     @PostMapping("/fetch")
-    public ResponseEntity<Map<String, Object>> fetch() {
-        PipelineResult result = radarJobs.runFetch();
+    public ResponseEntity<Map<String, Object>> fetch(
+            @RequestParam(required = false) String sourceType
+    ) {
+        PipelineResult result = radarJobs.runFetch(sourceType);
         Map<String, Object> response = new HashMap<>();
         response.put("fetched", result.fetched());
         response.put("deduped", result.deduped());

@@ -34,7 +34,7 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
   }, [onSuccessInvalidate])
 
   const fetchJob = useMutation({
-    mutationFn: api.fetchJob,
+    mutationFn: (opts?: { sourceType?: string }) => api.fetchJob(opts),
     onMutate: () => {
       setPhase('running')
       setSummaryProgress(null)
@@ -97,7 +97,7 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     phase,
     progress,
     dismiss,
-    isPending: phase !== 'idle',
+    isPending: phase === 'running',
     error: jobError,
   }
 }

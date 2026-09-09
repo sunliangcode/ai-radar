@@ -15,5 +15,6 @@ public enum SourceType {
     PRODUCT_HUNT,
     TWITTER,
     WEB,
-    EMAIL
+    EMAIL,
+    ZHIHU
 }

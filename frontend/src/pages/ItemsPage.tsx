@@ -1,19 +1,66 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { Button, EmptyState, ItemRow, PageHeader, StateBox } from '../components/ui'
+import { FetchProgressPanel } from '../components/FetchProgressPanel'
+import { FetchResultSummary } from '../components/FetchResultSummary'
+import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { dateLocale } from '../i18n'
+
+const CHANNEL_PAGE_SIZE = 5
+const DEFAULT_PAGE_SIZE = 40
 
 export default function ItemsPage() {
   const { t, i18n } = useTranslation()
-  const [sort, setSort] = useState<'score' | 'publishedAt'>('score')
+  const [sort, setSort] = useState<'score' | 'publishedAt' | 'createdAt'>('score')
   const [unreadOnly, setUnreadOnly] = useState(false)
+  const [sourceType, setSourceType] = useState('')
+  const [page, setPage] = useState(1)
   const qc = useQueryClient()
-  const q = `?sort=${sort}&limit=80${unreadOnly ? '&unread=true' : ''}`
-  const items = useQuery({ queryKey: ['items', sort, unreadOnly], queryFn: () => api.items(q) })
+  const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
+  const connectors = useQuery({ queryKey: ['connectors'], queryFn: api.connectors })
+  const channelTypes = useMemo(() => {
+    const types = new Set<string>()
+    for (const s of sources.data ?? []) {
+      if (s.type) types.add(s.type)
+    }
+    for (const c of connectors.data ?? []) {
+      if (c.id) types.add(c.id)
+    }
+    return Array.from(types).sort()
+  }, [sources.data, connectors.data])
+
+  const channelMode = Boolean(sourceType)
+  const pageSize = channelMode ? CHANNEL_PAGE_SIZE : DEFAULT_PAGE_SIZE
+  const effectiveSort = channelMode ? 'createdAt' : sort
+  const offset = (page - 1) * pageSize
+
+  useEffect(() => {
+    setPage(1)
+  }, [sourceType, unreadOnly, sort])
+
+  const q =
+    `?sort=${effectiveSort}&limit=${pageSize}&offset=${offset}` +
+    (unreadOnly ? '&unread=true' : '') +
+    (sourceType ? `&sourceType=${encodeURIComponent(sourceType)}` : '')
+  const itemsQuery = useQuery({
+    queryKey: ['items', effectiveSort, unreadOnly, sourceType, page, pageSize],
+    queryFn: () => api.items(q),
+  })
+  const items = itemsQuery.data?.items
+  const total = itemsQuery.data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const locale = dateLocale(i18n.language)
+
+  const { fetchJob, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
+    ['items'],
+    ['sources'],
+    ['intelligence-home'],
+    ['events'],
+    ['briefs'],
+  ])
 
   const patch = useMutation({
     mutationFn: ({ id, read }: { id: number; read: boolean }) => api.patchItem(id, { read }),
@@ -24,6 +71,27 @@ export default function ItemsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['items'] }),
   })
 
+  const updateLabel = phase === 'running' ? t('common.fetching') : t('common.fetchNow')
+
+  function runUpdate() {
+    fetchJob.mutate(sourceType ? { sourceType } : undefined, {
+      onSuccess: async () => {
+        await dismiss()
+        setPage(1)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      },
+      onError: async () => {
+        await dismiss()
+      },
+    })
+  }
+
+  const updateButton = (
+    <Button loading={isPending} onClick={runUpdate}>
+      {updateLabel}
+    </Button>
+  )
+
   return (
     <div>
       <PageHeader
@@ -31,9 +99,28 @@ export default function ItemsPage() {
         subtitle={t('items.subtitle')}
         actions={
           <>
-            <Button variant="ghost" onClick={() => setSort(sort === 'score' ? 'publishedAt' : 'score')}>
-              {sort === 'score' ? t('items.sortScore') : t('items.sortTime')}
-            </Button>
+            <select
+              className="rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+              value={sourceType}
+              onChange={(e) => setSourceType(e.target.value)}
+              aria-label={t('items.filterChannel')}
+            >
+              <option value="">{t('items.allChannels')}</option>
+              {channelTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+            {updateButton}
+            {!channelMode ? (
+              <Button
+                variant="ghost"
+                onClick={() => setSort(sort === 'score' ? 'publishedAt' : 'score')}
+              >
+                {sort === 'score' ? t('items.sortScore') : t('items.sortTime')}
+              </Button>
+            ) : null}
             <Button variant="ghost" onClick={() => setUnreadOnly((v) => !v)}>
               {unreadOnly ? t('items.showAll') : t('items.unreadOnly')}
             </Button>
@@ -44,11 +131,14 @@ export default function ItemsPage() {
         }
       />
 
-      {items.isLoading ? <StateBox>{t('items.loading')}</StateBox> : null}
-      {items.isError ? (
-        <StateBox>{t('common.loadFailed', { message: (items.error as Error).message })}</StateBox>
+      {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
+      {phase === 'summary' ? <FetchResultSummary progress={progress} onDismiss={() => void dismiss()} /> : null}
+
+      {itemsQuery.isLoading ? <StateBox>{t('items.loading')}</StateBox> : null}
+      {itemsQuery.isError ? (
+        <StateBox>{t('common.loadFailed', { message: (itemsQuery.error as Error).message })}</StateBox>
       ) : null}
-      {!items.isLoading && items.data?.length === 0 ? (
+      {!itemsQuery.isLoading && items?.length === 0 ? (
         <EmptyState
           title={t('items.empty')}
           description={t('items.emptyLink')}
@@ -57,37 +147,66 @@ export default function ItemsPage() {
               <Button>{t('nav.sources')}</Button>
             </Link>
           }
-          secondary={
-            <Link to="/">
-              <Button variant="ghost">{t('nav.today')}</Button>
-            </Link>
-          }
+          secondary={updateButton}
         />
       ) : null}
 
-      {items.data && items.data.length > 0 ? (
-      <div className="rounded-xl border border-mist bg-paper/70 px-4">
-        {items.data.map((item) => (
-          <ItemRow
-            key={item.id}
-            title={item.title}
-            score={item.score}
-            summary={item.summary}
-            url={item.canonicalUrl}
-            meta={[
-              item.primarySourceType,
-              item.publishedAt ? new Date(item.publishedAt).toLocaleString(locale) : '',
-              item.eventId ? `${t('nav.events')} #${item.eventId}` : '',
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-            unread={!item.read}
-            onMarkRead={() => patch.mutate({ id: item.id, read: true })}
-          />
-        ))}
-      </div>
+      {items && items.length > 0 ? (
+        <div className="rounded-xl border border-mist bg-paper px-4">
+          {items.map((item) => (
+            <ItemRow
+              key={item.id}
+              title={item.title}
+              score={item.score}
+              summary={item.summary}
+              contentSnippet={item.contentSnippet}
+              url={item.canonicalUrl}
+              meta={[
+                item.primarySourceType,
+                item.publishedAt ? new Date(item.publishedAt).toLocaleString(locale) : '',
+                item.eventId ? `${t('nav.events')} #${item.eventId}` : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              unread={!item.read}
+              onMarkRead={() => patch.mutate({ id: item.id, read: true })}
+            />
+          ))}
+        </div>
       ) : null}
-      {items.data?.some((i) => i.eventId) ? (
+
+      {total > 0 ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              disabled={page <= 1 || isPending}
+              onClick={() => {
+                setPage((p) => Math.max(1, p - 1))
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+            >
+              {t('items.prevPage')}
+            </Button>
+            <span className="font-mono text-sm text-muted">
+              {t('items.pageOf', { page, totalPages, total })}
+            </span>
+            <Button
+              variant="ghost"
+              disabled={page >= totalPages || isPending}
+              onClick={() => {
+                setPage((p) => Math.min(totalPages, p + 1))
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+            >
+              {t('items.nextPage')}
+            </Button>
+          </div>
+          {updateButton}
+        </div>
+      ) : null}
+
+      {items?.some((i) => i.eventId) ? (
         <p className="mt-4 text-sm text-muted">
           {t('items.eventHint')}{' '}
           <Link className="text-moss underline" to="/events">

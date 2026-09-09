@@ -96,7 +96,7 @@ public class PipelineOrchestrator {
         Instant since = Instant.now().minus(lookbackHours, ChronoUnit.HOURS);
 
         fetchProgress.setStage(FetchProgress.Stage.fetch);
-        List<RawItem> fetched = fetchAll(since, lookbackHours);
+        List<RawItem> fetched = fetchAll(since, lookbackHours, request.sourceType());
         long tFetch = System.currentTimeMillis();
         log.info("pipeline_stage=fetch count={} durationMs={}", fetched.size(), tFetch - started);
 
@@ -129,8 +129,10 @@ public class PipelineOrchestrator {
         log.info("pipeline_stage=filter kept={} threshold={} durationMs={}", kept.size(), scoreThreshold, tFilter - tScore);
 
         fetchProgress.setStage(FetchProgress.Stage.summarize);
+        // Summarize kept items; also fill display text for below-threshold items that have full body.
         fetchProgress.setMessage("summarizing " + kept.size() + " items");
         summarizeItems(kept);
+        fillFallbackSummaries(deduped);
         long tSummary = System.currentTimeMillis();
         log.info("pipeline_stage=summary count={} durationMs={}", kept.size(), tSummary - tFilter);
 
@@ -168,8 +170,14 @@ public class PipelineOrchestrator {
         );
     }
 
-    private List<RawItem> fetchAll(Instant since, int lookbackHours) {
+    private List<RawItem> fetchAll(Instant since, int lookbackHours, String sourceTypeFilter) {
         List<SourceEntity> sources = sourceRepository.findByEnabledTrue();
+        if (sourceTypeFilter != null && !sourceTypeFilter.isBlank()) {
+            String wanted = sourceTypeFilter.trim().toUpperCase();
+            sources = sources.stream()
+                    .filter(s -> s.getType() != null && wanted.equals(s.getType().name()))
+                    .toList();
+        }
         List<FetchProgress.SourceSeed> seeds = new ArrayList<>();
         for (SourceEntity entity : sources) {
             if (connectorRegistry.get(entity.getType().name()) == null) {
@@ -347,7 +355,7 @@ public class PipelineOrchestrator {
                     NewsItem item = batch.get(j);
                     String summary = j < summaries.size() ? summaries.get(j) : null;
                     if (summary == null || summary.isBlank()) {
-                        summary = item.getScoreReason() != null ? item.getScoreReason() : "";
+                        summary = fallbackSummary(item);
                     }
                     item.setSummary(summary);
                     item.setUpdatedAt(Instant.now());
@@ -356,10 +364,41 @@ public class PipelineOrchestrator {
                 log.error("ai_summary_batch_failed size={} error={}", batch.size(), e.getMessage());
                 for (NewsItem item : batch) {
                     try {
-                        item.setSummary(aiService.summarize(item));
+                        String summary = aiService.summarize(item);
+                        if (summary == null || summary.isBlank()) {
+                            summary = fallbackSummary(item);
+                        }
+                        item.setSummary(summary);
                     } catch (Exception ex) {
-                        item.setSummary(item.getScoreReason() != null ? item.getScoreReason() : "");
+                        item.setSummary(fallbackSummary(item));
                     }
+                    item.setUpdatedAt(Instant.now());
+                }
+            }
+        }
+    }
+
+    private static String fallbackSummary(NewsItem item) {
+        String snippet = item.getContentSnippet();
+        if (snippet != null && !snippet.isBlank()) {
+            String trimmed = snippet.trim();
+            if (trimmed.length() <= 800) {
+                return trimmed;
+            }
+            return trimmed.substring(0, 800) + "…";
+        }
+        return item.getScoreReason() != null ? item.getScoreReason() : "";
+    }
+
+    private static void fillFallbackSummaries(List<NewsItem> items) {
+        if (items == null) {
+            return;
+        }
+        for (NewsItem item : items) {
+            if (item.getSummary() == null || item.getSummary().isBlank()) {
+                String fallback = fallbackSummary(item);
+                if (!fallback.isBlank()) {
+                    item.setSummary(fallback);
                     item.setUpdatedAt(Instant.now());
                 }
             }

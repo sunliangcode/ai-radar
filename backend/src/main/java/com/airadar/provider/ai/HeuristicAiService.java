@@ -247,6 +247,7 @@ public class HeuristicAiService implements AiService {
             case GITHUB, GITHUB_TRENDING, OSS_INSIGHT -> 6;
             case RSS, GOOGLE_NEWS, GDELT -> 4;
             case REDDIT, V2EX, TELEGRAM -> 3;
+            case ZHIHU -> 8;
             case PRODUCT_HUNT, TWITTER, WEB -> 4;
             case EMAIL -> 3;
             case FIXTURE -> 2;

@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "IBM Plex Serif", ui-serif, Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --color-ink: #1a1f1c;
-  --color-paper: #f3f0e8;
-  --color-mist: #e4e0d4;
-  --color-moss: #2f5d50;
-  --color-moss-deep: #1e3d34;
-  --color-ember: #c45c26;
-  --color-muted: #5c635e;
+  --color-ink: #111111;
+  --color-paper: #ffffff;
+  --color-mist: #d4d4d4;
+  --color-moss: #111111;
+  --color-moss-deep: #000000;
+  --color-ember: #404040;
+  --color-muted: #6b6b6b;
 }
 
 html,
@@ -23,9 +23,7 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   color: var(--color-ink);
-  background:
-    radial-gradient(ellipse 80% 50% at 10% -10%, #dfe8e2 0%, transparent 55%),
-    linear-gradient(180deg, #f7f4ec 0%, #efebe1 100%);
+  background: #ffffff;
 }
 
 .prose-brief h1 {
@@ -38,7 +36,7 @@ body {
   margin: 1.25rem 0 0.5rem;
 }
 .prose-brief a {
-  color: var(--color-moss);
+  color: var(--color-ink);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

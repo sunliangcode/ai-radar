@@ -106,7 +106,11 @@ public class RadarJobs {
     }
 
     public PipelineResult runFetch() {
-        return jobMutex.withFetchLock(this::runPipelineWithProgress);
+        return runFetch(null);
+    }
+
+    public PipelineResult runFetch(String sourceType) {
+        return jobMutex.withFetchLock(() -> runPipelineWithProgress(sourceType));
     }
 
     public Map<String, Object> fetchProgressSnapshot() {
@@ -114,9 +118,13 @@ public class RadarJobs {
     }
 
     private PipelineResult runPipelineWithProgress() {
+        return runPipelineWithProgress(null);
+    }
+
+    private PipelineResult runPipelineWithProgress(String sourceType) {
         fetchProgress.markStarting();
         try {
-            PipelineResult result = orchestrator.run(new PipelineRequest(null, null, null));
+            PipelineResult result = orchestrator.run(new PipelineRequest(null, null, null, sourceType));
             fetchProgress.complete(toResultMap(result));
             return result;
         } catch (Exception e) {

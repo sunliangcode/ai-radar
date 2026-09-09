@@ -56,6 +56,7 @@ export type Item = {
   score?: number
   scoreReason?: string
   summary?: string
+  contentSnippet?: string
   tags?: string[]
   category?: string
   publishedAt?: string
@@ -262,7 +263,20 @@ export type ConnectorDescriptor = {
 
 export const api = {
   health: () => request<{ status: string; db: string }>('/api/health'),
-  items: (q: string = '') => request<Item[]>(`/api/items${q}`),
+  items: async (q: string = '') => {
+    const data = await request<Item[] | { items: Item[]; total: number; offset?: number; limit?: number }>(
+      `/api/items${q}`,
+    )
+    if (Array.isArray(data)) {
+      return { items: data, total: data.length }
+    }
+    return {
+      items: data.items ?? [],
+      total: data.total ?? data.items?.length ?? 0,
+      offset: data.offset,
+      limit: data.limit,
+    }
+  },
   patchItem: (id: number, body: { read?: boolean; saved?: boolean }) =>
     request<Item>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   markAllRead: () => request<{ updated: number }>('/api/items/mark-all-read', { method: 'POST' }),
@@ -280,7 +294,10 @@ export const api = {
   settings: () => request<Settings>('/api/settings'),
   saveSettings: (body: Partial<Settings>) =>
     request<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
-  fetchJob: () => request<Record<string, unknown>>('/api/jobs/fetch', { method: 'POST' }),
+  fetchJob: (opts?: { sourceType?: string }) => {
+    const q = opts?.sourceType ? `?sourceType=${encodeURIComponent(opts.sourceType)}` : ''
+    return request<Record<string, unknown>>(`/api/jobs/fetch${q}`, { method: 'POST' })
+  },
   fetchProgress: () => request<FetchProgress>('/api/jobs/fetch/progress'),
   pushJob: () => request<Record<string, unknown>>('/api/jobs/push', { method: 'POST' }),
   clusterJob: () => request<Record<string, unknown>>('/api/jobs/cluster', { method: 'POST' }),

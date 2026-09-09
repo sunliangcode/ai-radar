@@ -36,6 +36,7 @@ public interface SourceConnector {
 | `TWITTER` | Apify actor | requires `APIFY_TOKEN` |
 | `WEB` | HTML + AI extract | `url`, `extractionPrompt` |
 | `EMAIL` | IMAP unread + AI extract | `EMAIL_INGEST_ENABLED` + IMAP_* |
+| `ZHIHU` | Local `zhihu` CLI (`feeds` + comments) | needs login Cookie; `cliPath` / `ZHIHU_CLI_PATH` |
 | `FIXTURE` | Local JSON | demos / offline |
 
 Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.enabled`), with optional `WEB_FETCH_PARALLELISM` (default 4).

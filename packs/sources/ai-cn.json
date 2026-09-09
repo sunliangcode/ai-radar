@@ -64,5 +64,15 @@
     "name": "Telegram AI sample",
     "defaultEnabled": false,
     "config": { "channels": ["zaihuapd"], "fetchLimit": 20 }
+  },
+  {
+    "type": "ZHIHU",
+    "name": "知乎推荐",
+    "defaultEnabled": true,
+    "config": {
+      "cliPath": "/Users/sunliang/workspace/own/zhihu-cli-go/zhihu",
+      "limit": 5,
+      "commentLimit": 10
+    }
   }
 ]

@@ -53,7 +53,7 @@ export function StatusBadge({ status }: { status?: string }) {
   if (!status) return null
   const label = t(`events.status.${status}`, { defaultValue: status })
   return (
-    <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-moss-deep bg-moss/10">
+    <span className="inline-flex items-center rounded-sm border border-mist px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-ink bg-paper">
       {label}
     </span>
   )
@@ -79,19 +79,19 @@ export function Button({
   const busy = loading || ariaBusy
   const styles =
     variant === 'primary'
-      ? 'bg-moss text-paper hover:bg-moss-deep active:scale-[0.98]'
+      ? 'bg-ink text-paper hover:bg-moss-deep'
       : variant === 'danger'
-        ? 'bg-ember/90 text-paper hover:bg-ember active:scale-[0.98]'
+        ? 'border border-ink bg-ink text-paper hover:bg-moss-deep'
         : variant === 'text'
-          ? 'bg-transparent text-moss underline-offset-2 hover:underline'
-          : 'border border-mist bg-paper text-ink hover:bg-mist/60 active:scale-[0.98]'
+          ? 'bg-transparent text-ink underline-offset-2 hover:underline'
+          : 'border border-mist bg-paper text-ink hover:bg-mist'
   return (
     <button
       type={type}
       disabled={disabled || busy}
       onClick={onClick}
       aria-busy={busy || undefined}
-      className={`rounded-md px-3 py-2 text-sm font-medium transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${styles}`}
+      className={`rounded-sm px-3 py-2 text-sm font-medium tracking-wide transition duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${styles}`}
     >
       {children}
     </button>
@@ -101,7 +101,7 @@ export function Button({
 export function ScorePill({ score }: { score?: number }) {
   if (score == null) return <span className="font-mono text-xs text-muted tabular-nums">—</span>
   return (
-    <span className="inline-flex min-w-10 items-center justify-center rounded bg-moss/10 px-2 py-0.5 font-mono text-xs font-medium tabular-nums text-moss-deep">
+    <span className="inline-flex min-w-10 items-center justify-center rounded-sm border border-mist bg-paper px-2 py-0.5 font-mono text-xs font-medium tabular-nums text-ink">
       {Math.round(score)}
     </span>
   )
@@ -111,6 +111,7 @@ export function ItemRow({
   title,
   score,
   summary,
+  contentSnippet,
   url,
   meta,
   unread,
@@ -119,11 +120,13 @@ export function ItemRow({
   title: string
   score?: number
   summary?: string
+  contentSnippet?: string
   url: string
   meta?: string
   unread?: boolean
   onMarkRead?: () => void
 }) {
+  const body = (contentSnippet && contentSnippet.trim()) || (summary && summary.trim()) || ''
   return (
     <article
       className={`border-b border-mist/80 py-4 last:border-0 ${unread ? '' : 'opacity-70'}`}
@@ -135,11 +138,13 @@ export function ItemRow({
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-ink transition duration-200 hover:text-moss"
+            className="font-medium text-ink transition duration-150 hover:underline"
           >
             {title}
           </a>
-          {summary ? <p className="mt-1 text-sm leading-relaxed text-muted">{summary}</p> : null}
+          {body ? (
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted">{body}</p>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
             {meta ? <span className="font-mono">{meta}</span> : null}
             {onMarkRead && unread ? (
