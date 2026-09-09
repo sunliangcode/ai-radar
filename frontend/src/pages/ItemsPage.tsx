@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { Button, ItemRow, PageHeader, StateBox } from '../components/ui'
+import { Button, EmptyState, ItemRow, PageHeader, StateBox } from '../components/ui'
 import { dateLocale } from '../i18n'
 
 export default function ItemsPage() {
@@ -49,17 +49,25 @@ export default function ItemsPage() {
         <StateBox>{t('common.loadFailed', { message: (items.error as Error).message })}</StateBox>
       ) : null}
       {!items.isLoading && items.data?.length === 0 ? (
-        <StateBox>
-          {t('items.empty')}{' '}
-          <Link className="text-moss underline" to="/sources">
-            {t('items.emptyLink')}
-          </Link>
-          .
-        </StateBox>
+        <EmptyState
+          title={t('items.empty')}
+          description={t('items.emptyLink')}
+          primary={
+            <Link to="/sources">
+              <Button>{t('nav.sources')}</Button>
+            </Link>
+          }
+          secondary={
+            <Link to="/">
+              <Button variant="ghost">{t('nav.today')}</Button>
+            </Link>
+          }
+        />
       ) : null}
 
+      {items.data && items.data.length > 0 ? (
       <div className="rounded-xl border border-mist bg-paper/70 px-4">
-        {items.data?.map((item) => (
+        {items.data.map((item) => (
           <ItemRow
             key={item.id}
             title={item.title}
@@ -69,7 +77,7 @@ export default function ItemsPage() {
             meta={[
               item.primarySourceType,
               item.publishedAt ? new Date(item.publishedAt).toLocaleString(locale) : '',
-              item.eventId ? `event#${item.eventId}` : '',
+              item.eventId ? `${t('nav.events')} #${item.eventId}` : '',
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -78,6 +86,7 @@ export default function ItemsPage() {
           />
         ))}
       </div>
+      ) : null}
       {items.data?.some((i) => i.eventId) ? (
         <p className="mt-4 text-sm text-muted">
           {t('items.eventHint')}{' '}

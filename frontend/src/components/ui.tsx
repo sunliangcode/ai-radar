@@ -5,8 +5,8 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h2 className="font-serif text-3xl font-semibold tracking-tight text-ink">{title}</h2>
-        {subtitle ? <p className="mt-1 max-w-2xl text-sm text-muted">{subtitle}</p> : null}
+        <h2 className="font-serif text-3xl font-semibold tracking-tight text-balance text-ink">{title}</h2>
+        {subtitle ? <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
     </div>
@@ -21,31 +21,77 @@ export function StateBox({ children }: { children: ReactNode }) {
   )
 }
 
+export function EmptyState({
+  title,
+  description,
+  primary,
+  secondary,
+}: {
+  title: string
+  description?: string
+  primary?: ReactNode
+  secondary?: ReactNode
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-mist bg-paper/70 px-6 py-12 text-center">
+      <h3 className="font-serif text-xl text-ink">{title}</h3>
+      {description ? (
+        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">{description}</p>
+      ) : null}
+      {(primary || secondary) && (
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          {primary}
+          {secondary}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function StatusBadge({ status }: { status?: string }) {
+  const { t } = useTranslation()
+  if (!status) return null
+  const label = t(`events.status.${status}`, { defaultValue: status })
+  return (
+    <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-moss-deep bg-moss/10">
+      {label}
+    </span>
+  )
+}
+
 export function Button({
   children,
   onClick,
   variant = 'primary',
   disabled,
   type = 'button',
+  loading,
+  'aria-busy': ariaBusy,
 }: {
   children: ReactNode
   onClick?: () => void
-  variant?: 'primary' | 'ghost' | 'danger'
+  variant?: 'primary' | 'ghost' | 'danger' | 'text'
   disabled?: boolean
   type?: 'button' | 'submit'
+  loading?: boolean
+  'aria-busy'?: boolean
 }) {
+  const busy = loading || ariaBusy
   const styles =
     variant === 'primary'
-      ? 'bg-moss text-paper hover:bg-moss-deep'
+      ? 'bg-moss text-paper hover:bg-moss-deep active:scale-[0.98]'
       : variant === 'danger'
-        ? 'bg-ember/90 text-paper hover:bg-ember'
-        : 'border border-mist bg-paper text-ink hover:bg-mist/60'
+        ? 'bg-ember/90 text-paper hover:bg-ember active:scale-[0.98]'
+        : variant === 'text'
+          ? 'bg-transparent text-moss underline-offset-2 hover:underline'
+          : 'border border-mist bg-paper text-ink hover:bg-mist/60 active:scale-[0.98]'
   return (
     <button
       type={type}
-      disabled={disabled}
+      disabled={disabled || busy}
       onClick={onClick}
-      className={`rounded-md px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${styles}`}
+      aria-busy={busy || undefined}
+      className={`rounded-md px-3 py-2 text-sm font-medium transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${styles}`}
     >
       {children}
     </button>
@@ -53,9 +99,9 @@ export function Button({
 }
 
 export function ScorePill({ score }: { score?: number }) {
-  if (score == null) return <span className="font-mono text-xs text-muted">—</span>
+  if (score == null) return <span className="font-mono text-xs text-muted tabular-nums">—</span>
   return (
-    <span className="inline-flex min-w-10 items-center justify-center rounded bg-moss/10 px-2 py-0.5 font-mono text-xs font-medium text-moss-deep">
+    <span className="inline-flex min-w-10 items-center justify-center rounded bg-moss/10 px-2 py-0.5 font-mono text-xs font-medium tabular-nums text-moss-deep">
       {Math.round(score)}
     </span>
   )
@@ -89,7 +135,7 @@ export function ItemRow({
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-ink hover:text-moss"
+            className="font-medium text-ink transition duration-200 hover:text-moss"
           >
             {title}
           </a>

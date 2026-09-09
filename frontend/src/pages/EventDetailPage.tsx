@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { PageHeader, ScorePill, StateBox } from '../components/ui'
+import { PageHeader, ScorePill, StateBox, StatusBadge } from '../components/ui'
 import { dateLocale } from '../i18n'
 
 export default function EventDetailPage() {
@@ -25,13 +25,19 @@ export default function EventDetailPage() {
     <div>
       <PageHeader
         title={e.title}
-        subtitle={t('events.scoreLabel', { status: e.status, score: e.score ?? '—' })}
+        subtitle={t('events.scoreLabel', {
+          status: t(`events.status.${e.status}`, { defaultValue: e.status }),
+          score: e.score ?? '—',
+        })}
         actions={
           <Link to="/events" className="text-sm text-moss underline underline-offset-2">
             {t('common.backToList')}
           </Link>
         }
       />
+      <div className="mb-4">
+        <StatusBadge status={e.status} />
+      </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-mist bg-paper/70 p-4 md:col-span-2">

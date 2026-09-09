@@ -1,18 +1,18 @@
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FetchProgress, FetchSourceProgress } from '../lib/api'
 import { formatDuration, progressPercent } from '../lib/format'
 
-const POST_FETCH_STAGES = new Set([
-  'normalize',
-  'dedup',
-  'score',
-  'summarize',
-  'persist',
-  'cluster',
-  'brief',
-  'done',
-  'error',
-])
+const COLLECT_STAGES = new Set(['idle', 'fetch'])
+const ORGANIZE_STAGES = new Set(['normalize', 'dedup', 'score', 'summarize', 'persist', 'cluster'])
+const WRITE_STAGES = new Set(['brief', 'done'])
+
+function beginnerStep(stage: string): 'collect' | 'organize' | 'write' | 'error' {
+  if (stage === 'error') return 'error'
+  if (WRITE_STAGES.has(stage)) return 'write'
+  if (ORGANIZE_STAGES.has(stage)) return 'organize'
+  return 'collect'
+}
 
 function statusDot(status: FetchSourceProgress['status']): string {
   if (status === 'running') return 'bg-moss animate-pulse'
@@ -23,6 +23,17 @@ function statusDot(status: FetchSourceProgress['status']): string {
 
 export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
   const { t } = useTranslation()
+  const [showDetails, setShowDetails] = useState(false)
+  const steps = useMemo(
+    () =>
+      [
+        { id: 'collect' as const, label: t('fetchProgress.step.collect') },
+        { id: 'organize' as const, label: t('fetchProgress.step.organize') },
+        { id: 'write' as const, label: t('fetchProgress.step.write') },
+      ] as const,
+    [t],
+  )
+
   if (!progress) {
     return (
       <div className="mb-6 rounded-xl border border-dashed border-mist bg-paper/80 px-4 py-6 text-center text-sm text-muted">
@@ -34,26 +45,54 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
   const pct = progressPercent(progress)
   const remaining = progress.totals?.remaining ?? 0
   const total = progress.totals?.total ?? 0
-  const inFetch = progress.stage === 'fetch' || progress.stage === 'idle'
-  const dimSources = POST_FETCH_STAGES.has(progress.stage) && progress.stage !== 'error'
+  const step = beginnerStep(progress.stage)
+  const inFetch = COLLECT_STAGES.has(progress.stage)
+  const dimSources = !inFetch && progress.stage !== 'error'
+  const stepIndex = step === 'error' ? -1 : steps.findIndex((s) => s.id === step)
 
   return (
     <div className="mb-6 overflow-hidden rounded-xl border border-mist bg-paper/80">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-mist/80 px-4 py-3">
-        <div>
-          <p className="font-serif text-base text-ink">
-            {t(`fetchProgress.stage.${progress.stage}`, { defaultValue: progress.stage })}
-          </p>
-          {progress.message ? (
-            <p className="mt-0.5 text-xs text-muted">{progress.message}</p>
-          ) : null}
+      <div className="border-b border-mist/80 px-4 py-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="font-serif text-lg text-ink">
+              {step === 'error'
+                ? t('fetchProgress.stage.error')
+                : t(`fetchProgress.step.${step}`)}
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              {progress.message ||
+                t(`fetchProgress.stage.${progress.stage}`, { defaultValue: progress.stage })}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-4 font-mono text-xs tabular-nums text-muted">
+            <span>{t('fetchProgress.elapsed', { time: formatDuration(progress.elapsedMs) })}</span>
+            {inFetch || total > 0 ? (
+              <span>{t('fetchProgress.remaining', { remaining, total })}</span>
+            ) : null}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-4 font-mono text-xs text-muted">
-          <span>{t('fetchProgress.elapsed', { time: formatDuration(progress.elapsedMs) })}</span>
-          {inFetch || total > 0 ? (
-            <span>{t('fetchProgress.remaining', { remaining, total })}</span>
-          ) : null}
-        </div>
+
+        <ol className="mt-4 flex flex-wrap gap-2">
+          {steps.map((s, i) => {
+            const active = i === stepIndex
+            const done = stepIndex > i
+            return (
+              <li
+                key={s.id}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition duration-200 ${
+                  active
+                    ? 'bg-moss text-paper'
+                    : done
+                      ? 'bg-moss/15 text-moss-deep'
+                      : 'bg-mist/60 text-muted'
+                }`}
+              >
+                {s.label}
+              </li>
+            )
+          })}
+        </ol>
       </div>
 
       <div
@@ -62,7 +101,7 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={t(`fetchProgress.stage.${progress.stage}`, { defaultValue: progress.stage })}
+        aria-label={t(`fetchProgress.step.${step === 'error' ? 'collect' : step}`)}
       >
         <div
           className={`h-full transition-[width] duration-300 ease-out ${
@@ -72,8 +111,18 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
         />
       </div>
 
-      {progress.sources?.length ? (
-        <ul className={`divide-y divide-mist/60 px-2 py-1 ${dimSources ? 'opacity-55' : ''}`}>
+      <div className="flex justify-end px-4 py-2">
+        <button
+          type="button"
+          className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+          onClick={() => setShowDetails((v) => !v)}
+        >
+          {showDetails ? t('common.hideDetails') : t('common.showDetails')}
+        </button>
+      </div>
+
+      {showDetails && progress.sources?.length ? (
+        <ul className={`divide-y divide-mist/60 px-2 pb-2 ${dimSources ? 'opacity-55' : ''}`}>
           {progress.sources.map((source) => (
             <li
               key={source.id}
@@ -95,7 +144,7 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
                   <p className="mt-0.5 truncate text-xs text-ember">{source.error}</p>
                 ) : null}
               </div>
-              <div className="shrink-0 text-right font-mono text-xs text-muted">
+              <div className="shrink-0 text-right font-mono text-xs tabular-nums text-muted">
                 {source.status === 'pending' ? (
                   <span>{t('fetchProgress.pending')}</span>
                 ) : source.status === 'running' ? (

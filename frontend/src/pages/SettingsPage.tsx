@@ -11,6 +11,7 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<Partial<Settings> | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [packId, setPackId] = useState('ai-core')
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [localToken, setLocalToken] = useState(() => localStorage.getItem('localToken') ?? '')
   const form = draft ?? settings.data ?? {}
 
@@ -98,9 +99,10 @@ export default function SettingsPage() {
       <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
       <form onSubmit={onSubmit} className="grid max-w-3xl gap-4">
         <section className="rounded-xl border border-mist bg-paper/70 p-4">
-          <h3 className="mb-3 font-serif text-lg">{t('settings.interestSection')}</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm sm:col-span-2">
+          <h3 className="mb-1 font-serif text-lg">{t('settings.basicsSection')}</h3>
+          <p className="mb-3 text-xs text-muted">{t('settings.interestHint')}</p>
+          <div className="grid gap-3">
+            <label className="block text-sm">
               <span className="text-muted">{t('settings.interestProfile')}</span>
               <textarea
                 className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2"
@@ -109,34 +111,17 @@ export default function SettingsPage() {
                 onChange={(e) => patchForm({ interestProfile: e.target.value })}
               />
             </label>
-            {field('scoreThreshold', t('settings.scoreThreshold'), 'number')}
-            {field('maxItems', t('settings.maxItems'), 'number')}
-            {field('lookbackHours', t('settings.lookbackHours'), 'number')}
             {field('summaryLanguage', t('settings.summaryLanguage'))}
           </div>
         </section>
 
         <section className="rounded-xl border border-mist bg-paper/70 p-4">
-          <h3 className="mb-3 font-serif text-lg">{t('settings.llmSection')}</h3>
-          <p className="mb-3 text-sm text-muted">
-            {t('settings.apiKeyConfigured')}{' '}
-            <span className="font-mono text-ink">
-              {settings.data?.openaiConfigured ? t('settings.apiKeyYes') : t('settings.apiKeyNo')}
-            </span>
-          </p>
+          <h3 className="mb-3 font-serif text-lg">{t('settings.notifySection')}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
-            {field('openaiBaseUrl', t('settings.baseUrl'))}
-            {field('openaiModel', t('settings.model'))}
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-mist bg-paper/70 p-4">
-          <h3 className="mb-3 font-serif text-lg">{t('settings.scheduleSection')}</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {field('fetchIntervalMs', t('settings.fetchIntervalMs'), 'number')}
-            {field('pushCron', t('settings.pushCron'))}
-            {field('timezone', t('settings.timezone'))}
-            {field('uiBaseUrl', t('settings.uiBaseUrl'))}
+            {field('feishuWebhookUrl', t('settings.feishuWebhook'))}
+            {field('smtpTo', t('settings.smtpTo'))}
+            {field('smtpHost', t('settings.smtpHost'))}
+            {field('smtpFrom', t('settings.smtpFrom'))}
             <label className="flex items-center gap-2 text-sm sm:col-span-2">
               <input
                 type="checkbox"
@@ -146,36 +131,6 @@ export default function SettingsPage() {
               <span>{t('settings.pushOnlyWhenItems')}</span>
             </label>
           </div>
-        </section>
-
-        <section className="rounded-xl border border-mist bg-paper/70 p-4">
-          <h3 className="mb-3 font-serif text-lg">{t('settings.pushSection')}</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {field('feishuWebhookUrl', t('settings.feishuWebhook'))}
-            {field('webhookUrl', t('settings.genericWebhook'))}
-            <label className="block text-sm sm:col-span-2">
-              <span className="text-muted">{t('settings.webhookHeaders')}</span>
-              <input
-                className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2 font-mono text-xs"
-                value={form.webhookHeaders ?? ''}
-                onChange={(e) => patchForm({ webhookHeaders: e.target.value })}
-                placeholder='{"Authorization":"Bearer …"}'
-              />
-            </label>
-            {field('smtpHost', t('settings.smtpHost'))}
-            {field('smtpPort', t('settings.smtpPort'), 'number')}
-            {field('smtpUsername', t('settings.smtpUsername'))}
-            {field('smtpFrom', t('settings.smtpFrom'))}
-            {field('smtpTo', t('settings.smtpTo'))}
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={form.smtpStarttls !== false}
-                onChange={(e) => patchForm({ smtpStarttls: e.target.checked })}
-              />
-              <span>{t('settings.smtpStarttls')}</span>
-            </label>
-          </div>
           <p className="mt-3 text-xs text-muted">
             {t('settings.smtpPasswordHint', {
               status: settings.data?.smtpPasswordConfigured ? t('common.yes') : t('common.no'),
@@ -183,49 +138,127 @@ export default function SettingsPage() {
           </p>
         </section>
 
-        <section className="rounded-xl border border-mist bg-paper/70 p-4">
-          <h3 className="mb-3 font-serif text-lg">{t('settings.securitySection')}</h3>
-          <p className="mb-3 text-sm text-muted">
-            {t('settings.localTokenServer')}{' '}
-            <span className="font-mono text-ink">
-              {settings.data?.localTokenConfigured ? t('common.yes') : t('common.no')}
-            </span>
-          </p>
-          <label className="block text-sm">
-            <span className="text-muted">{t('settings.localToken')}</span>
-            <input
-              type="password"
-              autoComplete="off"
-              className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2 font-mono text-sm"
-              value={localToken}
-              onChange={(e) => setLocalToken(e.target.value)}
-              placeholder={t('settings.localTokenPlaceholder')}
-            />
-          </label>
-          <p className="mt-2 text-xs text-muted">{t('settings.localTokenHint')}</p>
-        </section>
+        <div className="rounded-xl border border-mist bg-paper/70">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            aria-expanded={advancedOpen}
+          >
+            <div>
+              <h3 className="font-serif text-lg text-ink">{t('settings.advanced')}</h3>
+              <p className="mt-0.5 text-xs text-muted">{t('settings.advancedHint')}</p>
+            </div>
+            <span className="font-mono text-sm text-muted">{advancedOpen ? '−' : '+'}</span>
+          </button>
+
+          {advancedOpen ? (
+            <div className="space-y-4 border-t border-mist px-4 pb-4 pt-3">
+              <section>
+                <h4 className="mb-2 text-sm font-medium text-ink">{t('settings.llmSection')}</h4>
+                <p className="mb-3 text-sm text-muted">
+                  {t('settings.apiKeyConfigured')}{' '}
+                  <span className="font-mono text-ink">
+                    {settings.data?.openaiConfigured ? t('settings.apiKeyYes') : t('settings.apiKeyNo')}
+                  </span>
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {field('openaiBaseUrl', t('settings.baseUrl'))}
+                  {field('openaiModel', t('settings.model'))}
+                  {field('scoreThreshold', t('settings.scoreThreshold'), 'number')}
+                  {field('maxItems', t('settings.maxItems'), 'number')}
+                  {field('lookbackHours', t('settings.lookbackHours'), 'number')}
+                </div>
+              </section>
+
+              <section>
+                <h4 className="mb-2 text-sm font-medium text-ink">{t('settings.scheduleSection')}</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {field('fetchIntervalMs', t('settings.fetchIntervalMs'), 'number')}
+                  {field('pushCron', t('settings.pushCron'))}
+                  {field('timezone', t('settings.timezone'))}
+                  {field('uiBaseUrl', t('settings.uiBaseUrl'))}
+                </div>
+              </section>
+
+              <section>
+                <h4 className="mb-2 text-sm font-medium text-ink">{t('settings.pushSection')}</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {field('webhookUrl', t('settings.genericWebhook'))}
+                  <label className="block text-sm sm:col-span-2">
+                    <span className="text-muted">{t('settings.webhookHeaders')}</span>
+                    <input
+                      className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2 font-mono text-xs"
+                      value={form.webhookHeaders ?? ''}
+                      onChange={(e) => patchForm({ webhookHeaders: e.target.value })}
+                      placeholder='{"Authorization":"Bearer …"}'
+                    />
+                  </label>
+                  {field('smtpPort', t('settings.smtpPort'), 'number')}
+                  {field('smtpUsername', t('settings.smtpUsername'))}
+                  <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={form.smtpStarttls !== false}
+                      onChange={(e) => patchForm({ smtpStarttls: e.target.checked })}
+                    />
+                    <span>{t('settings.smtpStarttls')}</span>
+                  </label>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="mb-2 text-sm font-medium text-ink">{t('settings.securitySection')}</h4>
+                <p className="mb-3 text-sm text-muted">
+                  {t('settings.localTokenServer')}{' '}
+                  <span className="font-mono text-ink">
+                    {settings.data?.localTokenConfigured ? t('common.yes') : t('common.no')}
+                  </span>
+                </p>
+                <label className="block text-sm">
+                  <span className="text-muted">{t('settings.localToken')}</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2 font-mono text-sm"
+                    value={localToken}
+                    onChange={(e) => setLocalToken(e.target.value)}
+                    placeholder={t('settings.localTokenPlaceholder')}
+                  />
+                </label>
+                <p className="mt-2 text-xs text-muted">{t('settings.localTokenHint')}</p>
+              </section>
+
+              <section>
+                <h4 className="mb-2 text-sm font-medium text-ink">{t('settings.packSection')}</h4>
+                <div className="flex flex-wrap items-center gap-3">
+                  <select
+                    className="rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+                    value={packId}
+                    onChange={(e) => setPackId(e.target.value)}
+                    aria-label={t('settings.importPack')}
+                  >
+                    <option value="ai-core">{t('settings.pack.ai-core')}</option>
+                    <option value="ai-cn">{t('settings.pack.ai-cn')}</option>
+                    <option value="ai-signals">{t('settings.pack.ai-signals')}</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    loading={importPack.isPending}
+                    onClick={() => importPack.mutate()}
+                  >
+                    {importPack.isPending ? t('settings.importing') : t('settings.importPack')}
+                  </Button>
+                </div>
+              </section>
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={save.isPending}>
+          <Button type="submit" loading={save.isPending}>
             {save.isPending ? t('common.saving') : t('common.save')}
-          </Button>
-          <select
-            className="rounded-md border border-mist bg-paper px-3 py-2 text-sm"
-            value={packId}
-            onChange={(e) => setPackId(e.target.value)}
-            aria-label={t('settings.importPack')}
-          >
-            <option value="ai-core">{t('settings.pack.ai-core')}</option>
-            <option value="ai-cn">{t('settings.pack.ai-cn')}</option>
-            <option value="ai-signals">{t('settings.pack.ai-signals')}</option>
-          </select>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={importPack.isPending}
-            onClick={() => importPack.mutate()}
-          >
-            {importPack.isPending ? t('settings.importing') : t('settings.importPack')}
           </Button>
           {toast ? (
             <span className="text-sm text-moss" role="status">
