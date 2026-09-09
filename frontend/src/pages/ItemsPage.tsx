@@ -16,6 +16,7 @@ export default function ItemsPage() {
   const { t, i18n } = useTranslation()
   const [sort, setSort] = useState<'score' | 'publishedAt' | 'createdAt'>('score')
   const [unreadOnly, setUnreadOnly] = useState(false)
+  const [savedOnly, setSavedOnly] = useState(false)
   const [sourceType, setSourceType] = useState('')
   const [page, setPage] = useState(1)
   const qc = useQueryClient()
@@ -39,20 +40,27 @@ export default function ItemsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [sourceType, unreadOnly, sort])
+  }, [sourceType, unreadOnly, savedOnly, sort])
 
   const q =
     `?sort=${effectiveSort}&limit=${pageSize}&offset=${offset}` +
     (unreadOnly ? '&unread=true' : '') +
+    (savedOnly ? '&saved=true' : '') +
     (sourceType ? `&sourceType=${encodeURIComponent(sourceType)}` : '')
   const itemsQuery = useQuery({
-    queryKey: ['items', effectiveSort, unreadOnly, sourceType, page, pageSize],
+    queryKey: ['items', effectiveSort, unreadOnly, savedOnly, sourceType, page, pageSize],
     queryFn: () => api.items(q),
+  })
+  const keywordsQuery = useQuery({
+    queryKey: ['interest-keywords'],
+    queryFn: api.interestKeywords,
+    enabled: savedOnly,
   })
   const items = itemsQuery.data?.items
   const total = itemsQuery.data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const locale = dateLocale(i18n.language)
+  const keywords = keywordsQuery.data?.keywords ?? []
 
   const { fetchJob, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['items'],
@@ -63,8 +71,12 @@ export default function ItemsPage() {
   ])
 
   const patch = useMutation({
-    mutationFn: ({ id, read }: { id: number; read: boolean }) => api.patchItem(id, { read }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['items'] }),
+    mutationFn: ({ id, read, saved }: { id: number; read?: boolean; saved?: boolean }) =>
+      api.patchItem(id, { read, saved }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['items'] })
+      void qc.invalidateQueries({ queryKey: ['interest-keywords'] })
+    },
   })
   const markAll = useMutation({
     mutationFn: api.markAllRead,
@@ -100,7 +112,7 @@ export default function ItemsPage() {
         actions={
           <>
             <select
-              className="rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+              className="rounded-sm border border-mist bg-paper px-3 py-2 text-sm"
               value={sourceType}
               onChange={(e) => setSourceType(e.target.value)}
               aria-label={t('items.filterChannel')}
@@ -121,7 +133,22 @@ export default function ItemsPage() {
                 {sort === 'score' ? t('items.sortScore') : t('items.sortTime')}
               </Button>
             ) : null}
-            <Button variant="ghost" onClick={() => setUnreadOnly((v) => !v)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSavedOnly((v) => !v)
+                if (!savedOnly) setUnreadOnly(false)
+              }}
+            >
+              {savedOnly ? t('items.showAll') : t('items.savedOnly')}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setUnreadOnly((v) => !v)
+                if (!unreadOnly) setSavedOnly(false)
+              }}
+            >
               {unreadOnly ? t('items.showAll') : t('items.unreadOnly')}
             </Button>
             <Button variant="ghost" onClick={() => markAll.mutate()} disabled={markAll.isPending}>
@@ -134,20 +161,31 @@ export default function ItemsPage() {
       {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
       {phase === 'summary' ? <FetchResultSummary progress={progress} onDismiss={() => void dismiss()} /> : null}
 
+      {savedOnly && keywords.length > 0 ? (
+        <p className="mb-4 text-sm text-muted">
+          {t('items.interestKeywordsHint', { keywords: keywords.join('、') })}
+        </p>
+      ) : null}
+      {savedOnly && !keywordsQuery.isLoading && keywords.length === 0 ? (
+        <p className="mb-4 text-sm text-muted">{t('items.interestKeywordsEmpty')}</p>
+      ) : null}
+
       {itemsQuery.isLoading ? <StateBox>{t('items.loading')}</StateBox> : null}
       {itemsQuery.isError ? (
         <StateBox>{t('common.loadFailed', { message: (itemsQuery.error as Error).message })}</StateBox>
       ) : null}
       {!itemsQuery.isLoading && items?.length === 0 ? (
         <EmptyState
-          title={t('items.empty')}
-          description={t('items.emptyLink')}
+          title={savedOnly ? t('items.emptySaved') : t('items.empty')}
+          description={savedOnly ? t('items.emptySavedHint') : t('items.emptyLink')}
           primary={
-            <Link to="/sources">
-              <Button>{t('nav.sources')}</Button>
-            </Link>
+            savedOnly ? undefined : (
+              <Link to="/sources">
+                <Button>{t('nav.sources')}</Button>
+              </Link>
+            )
           }
-          secondary={updateButton}
+          secondary={savedOnly ? undefined : updateButton}
         />
       ) : null}
 
@@ -169,7 +207,9 @@ export default function ItemsPage() {
                 .filter(Boolean)
                 .join(' · ')}
               unread={!item.read}
+              saved={Boolean(item.saved)}
               onMarkRead={() => patch.mutate({ id: item.id, read: true })}
+              onToggleSaved={() => patch.mutate({ id: item.id, saved: !item.saved })}
             />
           ))}
         </div>
@@ -209,7 +249,7 @@ export default function ItemsPage() {
       {items?.some((i) => i.eventId) ? (
         <p className="mt-4 text-sm text-muted">
           {t('items.eventHint')}{' '}
-          <Link className="text-moss underline" to="/events">
+          <Link className="text-ink underline" to="/events">
             {t('items.eventHintLink')}
           </Link>{' '}
           {t('items.eventHintSuffix')}

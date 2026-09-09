@@ -2,6 +2,7 @@ package com.airadar.provider.ai;
 
 import com.airadar.config.RadarProperties;
 import com.airadar.domain.NewsItem;
+import com.airadar.interest.InterestSignalsService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -27,6 +28,7 @@ public class OpenAiCompatibleAiService implements AiService {
     private final RestClient.Builder restClientBuilder;
     private final ObjectMapper objectMapper;
     private final RadarProperties properties;
+    private final InterestSignalsService interestSignals;
     private final String scorePromptTemplate;
     private final String summarizePromptTemplate;
     private final String summarizeBatchPromptTemplate;
@@ -40,11 +42,13 @@ public class OpenAiCompatibleAiService implements AiService {
     public OpenAiCompatibleAiService(
             RestClient.Builder restClientBuilder,
             ObjectMapper objectMapper,
-            RadarProperties properties
+            RadarProperties properties,
+            InterestSignalsService interestSignals
     ) throws IOException {
         this.restClientBuilder = restClientBuilder;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.interestSignals = interestSignals;
         this.scorePromptTemplate = readPrompt("prompts/score.md");
         this.summarizePromptTemplate = readPrompt("prompts/summarize.md");
         this.summarizeBatchPromptTemplate = readPrompt("prompts/summarize-batch.md");
@@ -54,6 +58,10 @@ public class OpenAiCompatibleAiService implements AiService {
         this.extractContextPromptTemplate = readPrompt("prompts/extract_context.md");
         this.analyzeImpactPromptTemplate = readPrompt("prompts/analyze_impact.md");
         this.suggestOpportunityPromptTemplate = readPrompt("prompts/suggest_opportunity.md");
+    }
+
+    private String interestProfile() {
+        return interestSignals.effectiveInterestProfile();
     }
 
     @Override
@@ -74,7 +82,7 @@ public class OpenAiCompatibleAiService implements AiService {
             payloadItems.add(node);
         }
         String prompt = scorePromptTemplate
-                .replace("{{interestProfile}}", properties.getInterestProfile())
+                .replace("{{interestProfile}}", interestProfile())
                 .replace("{{itemsJson}}", payloadItems.toPrettyString());
 
         JsonNode response = chatJson(prompt, true);
@@ -86,7 +94,7 @@ public class OpenAiCompatibleAiService implements AiService {
         ensureApiKey();
         String prompt = summarizePromptTemplate
                 .replace("{{language}}", properties.getSummaryLanguage())
-                .replace("{{interestProfile}}", properties.getInterestProfile())
+                .replace("{{interestProfile}}", interestProfile())
                 .replace("{{title}}", nullToEmpty(item.getTitle()))
                 .replace("{{url}}", nullToEmpty(item.getCanonicalUrl()))
                 .replace("{{snippet}}", truncate(nullToEmpty(item.getContentSnippet()), 1200))
@@ -121,7 +129,7 @@ public class OpenAiCompatibleAiService implements AiService {
         }
         String prompt = summarizeBatchPromptTemplate
                 .replace("{{language}}", properties.getSummaryLanguage())
-                .replace("{{interestProfile}}", properties.getInterestProfile())
+                .replace("{{interestProfile}}", interestProfile())
                 .replace("{{itemsJson}}", payloadItems.toPrettyString());
         JsonNode response = chatJson(prompt, true);
         List<String> results = new ArrayList<>(items.size());
@@ -161,7 +169,7 @@ public class OpenAiCompatibleAiService implements AiService {
             cand.add(n);
         }
         String prompt = assignEventPromptTemplate
-                .replace("{{interestProfile}}", properties.getInterestProfile())
+                .replace("{{interestProfile}}", interestProfile())
                 .replace("{{title}}", nullToEmpty(item.getTitle()))
                 .replace("{{url}}", nullToEmpty(item.getCanonicalUrl()))
                 .replace("{{snippet}}", truncate(nullToEmpty(item.getContentSnippet()), 500))
@@ -200,7 +208,7 @@ public class OpenAiCompatibleAiService implements AiService {
         }
         String prompt = eventIntelligencePromptTemplate
                 .replace("{{language}}", properties.getSummaryLanguage())
-                .replace("{{interestProfile}}", properties.getInterestProfile())
+                .replace("{{interestProfile}}", interestProfile())
                 .replace("{{title}}", nullToEmpty(eventTitle))
                 .replace("{{itemsJson}}", itemsJson.toPrettyString());
         JsonNode response = chatJson(prompt, true);

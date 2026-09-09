@@ -19,6 +19,7 @@ Understands your work & stack, detects external changes, explains impact, and su
 - ✓ Detects high-impact **Changes** (Event-backed)
 - ✓ Explains **why you should care** (Impact × Context)
 - ✓ Turns insight into **Actions** and measurable **Experiments**
+- ✓ Mark **Interested** items; title keywords boost later relevance scoring (without overwriting Settings interest profile)
 - ✓ 1.0 chassis: connectors, briefs, delivery, packs, read-only MCP
 
 [Install](#3-step-quick-start) · [GitHub](https://github.com/sunliangcode/ai-radar)
@@ -100,7 +101,8 @@ No channels configured → fetch still works; push logs `no_channels` and skips.
 | GET | `/api/health` |
 | POST | `/api/jobs/fetch`, `/api/jobs/push` |
 | CRUD | `/api/sources` |
-| GET/PATCH | `/api/items` |
+| GET/PATCH | `/api/items` (`saved` / `unread` / `sourceType` filters; PATCH `read` / `saved`) |
+| GET | `/api/items/interest-keywords` (keywords from Interested titles) |
 | GET | `/api/briefs`, `/api/briefs/{date}` |
 | GET/PUT | `/api/settings` |
 | POST | `/api/pipeline/run` (legacy alias of fetch pipeline) |
@@ -149,6 +151,7 @@ cd frontend && npm run build
 ## Events, 2.0 & extensibility
 
 - Intelligence home: `GET /api/intelligence/home` (five questions: changed / why care / impact / do / watch)
+- Interested items: Raw feed → Interested / Interested only; keywords from saved titles feed scoring as `effectiveInterest = interestProfile + keywords(saved titles)` (affects later ingest scores only; unsaving drops them next run)
 - Context: `GET/PUT /api/contexts`, extract & GitHub import
 - Impact job: `POST /api/jobs/impact`
 - Events: `GET /api/events`, `GET /api/events/{id}`; job `POST /api/jobs/cluster`

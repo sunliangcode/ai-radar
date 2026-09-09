@@ -3,6 +3,8 @@ package com.airadar.provider.ai;
 import com.airadar.config.RadarProperties;
 import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
+import com.airadar.interest.InterestSignalsService;
+import com.airadar.persistence.NewsItemRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -12,6 +14,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class HeuristicAiServiceTest {
 
@@ -22,7 +26,10 @@ class HeuristicAiServiceTest {
         RadarProperties props = new RadarProperties();
         props.setInterestProfile("开源模型、Agent、推理基建、LLM");
         props.setSummaryLanguage("zh");
-        service = new HeuristicAiService(props);
+        NewsItemRepository repo = mock(NewsItemRepository.class);
+        when(repo.findBySavedTrue()).thenReturn(List.of());
+        InterestSignalsService signals = new InterestSignalsService(props, repo);
+        service = new HeuristicAiService(props, signals);
     }
 
     @Test

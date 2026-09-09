@@ -3,6 +3,8 @@ package com.airadar.event;
 import com.airadar.domain.ItemStatus;
 import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
+import com.airadar.interest.InterestSignalsService;
+import com.airadar.persistence.NewsItemRepository;
 import com.airadar.provider.ai.HeuristicAiService;
 import com.airadar.config.RadarProperties;
 import org.junit.jupiter.api.Test;
@@ -13,13 +15,17 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class EventClusterHeuristicTest {
 
     @Test
     void relatedTitlesAssignToSameCandidate() {
         RadarProperties props = new RadarProperties();
-        HeuristicAiService ai = new HeuristicAiService(props);
+        NewsItemRepository repo = mock(NewsItemRepository.class);
+        when(repo.findBySavedTrue()).thenReturn(List.of());
+        HeuristicAiService ai = new HeuristicAiService(props, new InterestSignalsService(props, repo));
 
         NewsItem a = item("OpenAI releases GPT-5 preview for developers", Instant.parse("2026-09-06T10:00:00Z"));
         NewsItem b = item("GPT-5 preview expands to API customers", Instant.parse("2026-09-07T10:00:00Z"));

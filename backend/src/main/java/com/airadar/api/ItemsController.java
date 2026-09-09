@@ -2,6 +2,7 @@ package com.airadar.api;
 
 import com.airadar.domain.NewsItem;
 import com.airadar.event.EventItemRepository;
+import com.airadar.interest.InterestSignalsService;
 import com.airadar.persistence.EntityMapper;
 import com.airadar.persistence.NewsItemEntity;
 import com.airadar.persistence.NewsItemRepository;
@@ -32,15 +33,27 @@ public class ItemsController {
     private final NewsItemRepository newsItemRepository;
     private final EntityMapper entityMapper;
     private final EventItemRepository eventItemRepository;
+    private final InterestSignalsService interestSignals;
 
     public ItemsController(
             NewsItemRepository newsItemRepository,
             EntityMapper entityMapper,
-            EventItemRepository eventItemRepository
+            EventItemRepository eventItemRepository,
+            InterestSignalsService interestSignals
     ) {
         this.newsItemRepository = newsItemRepository;
         this.entityMapper = entityMapper;
         this.eventItemRepository = eventItemRepository;
+        this.interestSignals = interestSignals;
+    }
+
+    @GetMapping("/interest-keywords")
+    public Map<String, Object> interestKeywords() {
+        List<String> keywords = interestSignals.keywordsFromSaved();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("keywords", keywords);
+        out.put("effectiveInterestProfile", interestSignals.effectiveInterestProfile());
+        return out;
     }
 
     @GetMapping
@@ -48,22 +61,29 @@ public class ItemsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since,
             @RequestParam(required = false) Double minScore,
             @RequestParam(required = false) Boolean unread,
+            @RequestParam(required = false) Boolean saved,
             @RequestParam(required = false) Long sourceId,
             @RequestParam(required = false) String sourceType,
             @RequestParam(defaultValue = "score") String sort,
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(defaultValue = "50") int limit
     ) {
+        boolean savedOnly = Boolean.TRUE.equals(saved);
         boolean channelFilter = sourceType != null && !sourceType.isBlank();
-        Instant from = since != null
-                ? since
-                : LocalDate.now(ZoneOffset.UTC)
-                .minusDays(channelFilter ? 365 : 7)
-                .atStartOfDay()
-                .toInstant(ZoneOffset.UTC);
-        Stream<NewsItem> stream = newsItemRepository.findByCreatedAtGreaterThanEqualOrderByScoreDesc(from)
-                .stream()
-                .map(entityMapper::toDomain);
+        Stream<NewsItem> stream;
+        if (savedOnly) {
+            stream = newsItemRepository.findBySavedTrue().stream().map(entityMapper::toDomain);
+        } else {
+            Instant from = since != null
+                    ? since
+                    : LocalDate.now(ZoneOffset.UTC)
+                    .minusDays(channelFilter ? 365 : 7)
+                    .atStartOfDay()
+                    .toInstant(ZoneOffset.UTC);
+            stream = newsItemRepository.findByCreatedAtGreaterThanEqualOrderByScoreDesc(from)
+                    .stream()
+                    .map(entityMapper::toDomain);
+        }
 
         if (minScore != null) {
             stream = stream.filter(i -> i.getScore() != null && i.getScore() >= minScore);
@@ -86,14 +106,16 @@ public class ItemsController {
             );
         }
 
-        Comparator<NewsItem> comparator;
+        Comparator<NewsItem> secondary;
         if ("publishedAt".equalsIgnoreCase(sort)) {
-            comparator = Comparator.comparing(NewsItem::getPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            secondary = Comparator.comparing(NewsItem::getPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()));
         } else if ("createdAt".equalsIgnoreCase(sort)) {
-            comparator = Comparator.comparing(NewsItem::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            secondary = Comparator.comparing(NewsItem::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
         } else {
-            comparator = Comparator.comparing(NewsItem::getScore, Comparator.nullsLast(Comparator.reverseOrder()));
+            secondary = Comparator.comparing(NewsItem::getScore, Comparator.nullsLast(Comparator.reverseOrder()));
         }
+        // Unread first, then the requested sort within each group.
+        Comparator<NewsItem> comparator = Comparator.comparing(NewsItem::isRead).thenComparing(secondary);
 
         List<NewsItem> filtered = stream.sorted(comparator).toList();
         int total = filtered.size();

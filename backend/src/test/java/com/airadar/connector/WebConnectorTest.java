@@ -4,6 +4,8 @@ import com.airadar.domain.FetchContext;
 import com.airadar.domain.RawItem;
 import com.airadar.domain.Source;
 import com.airadar.domain.SourceType;
+import com.airadar.interest.InterestSignalsService;
+import com.airadar.persistence.NewsItemRepository;
 import com.airadar.provider.ai.ExtractedItem;
 import com.airadar.provider.ai.HeuristicAiService;
 import com.airadar.config.RadarProperties;
@@ -16,12 +18,20 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class WebConnectorTest {
 
     @Test
     void mapsExtractedItemsAndResolvesRelativeUrls() {
-        WebConnector connector = new WebConnector(RestClient.builder(), new HeuristicAiService(new RadarProperties()));
+        RadarProperties props = new RadarProperties();
+        NewsItemRepository repo = mock(NewsItemRepository.class);
+        when(repo.findBySavedTrue()).thenReturn(List.of());
+        WebConnector connector = new WebConnector(
+                RestClient.builder(),
+                new HeuristicAiService(props, new InterestSignalsService(props, repo))
+        );
         Source source = new Source(1L, "web", SourceType.WEB, Map.of(), true, null);
         List<RawItem> items = connector.toRawItems(
                 List.of(new ExtractedItem("Story One", "/post/1", "summary")),

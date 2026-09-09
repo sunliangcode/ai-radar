@@ -19,6 +19,7 @@
 - ✓ 发现高影响 **Change**（以 Event 为证据）
 - ✓ 解释 **为何与你有关**（Impact × Context）
 - ✓ 把洞察变成 **Action** 与可度量 **Experiment**
+- ✓ 标记**感兴趣**条目；标题关键词用于后续相关度评分（不改写设置里的兴趣描述）
 - ✓ 1.0 底盘：连接器、简报、投递、Pack、只读 MCP
 
 [安装](#三步快速开始) · [GitHub](https://github.com/sunliangcode/ai-radar)
@@ -100,7 +101,8 @@ curl -s http://localhost:8080/api/items | jq .
 | GET | `/api/health` |
 | POST | `/api/jobs/fetch`, `/api/jobs/push` |
 | CRUD | `/api/sources` |
-| GET/PATCH | `/api/items` |
+| GET/PATCH | `/api/items`（`saved` / `unread` / `sourceType` 过滤；`PATCH` 可设 `read` / `saved`） |
+| GET | `/api/items/interest-keywords`（从感兴趣标题提取的关键词） |
 | GET | `/api/briefs`, `/api/briefs/{date}` |
 | GET/PUT | `/api/settings` |
 | POST | `/api/pipeline/run`（fetch 流水线遗留别名） |
@@ -149,6 +151,7 @@ cd frontend && npm run build
 ## 事件、2.0 与扩展
 
 - 情报首页：`GET /api/intelligence/home`（五问：变了什么 / 为何关心 / 影响 / 做什么 / 观察）
+- 感兴趣：原始条目 →「感兴趣」/「只看感兴趣」；收藏标题关键词参与评分 `effectiveInterest = interestProfile + keywords(saved titles)`（仅影响后续入库打分；取消后下次评分不再使用）
 - Context：`GET/PUT /api/contexts`，自然语言提取与 GitHub 导入
 - Impact 任务：`POST /api/jobs/impact`
 - 事件：`GET /api/events`、`GET /api/events/{id}`；任务 `POST /api/jobs/cluster`

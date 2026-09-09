@@ -3,6 +3,8 @@ package com.airadar.provider.ai;
 import com.airadar.config.RadarProperties;
 import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
+import com.airadar.interest.InterestSignalsService;
+import com.airadar.persistence.NewsItemRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -17,6 +19,12 @@ import static org.mockito.Mockito.when;
 
 class CompositeAiServiceTest {
 
+    private static HeuristicAiService heuristic(RadarProperties props) {
+        NewsItemRepository repo = mock(NewsItemRepository.class);
+        when(repo.findBySavedTrue()).thenReturn(List.of());
+        return new HeuristicAiService(props, new InterestSignalsService(props, repo));
+    }
+
     @Test
     void usesHeuristicWhenNoApiKey() {
         RadarProperties props = new RadarProperties();
@@ -24,7 +32,7 @@ class CompositeAiServiceTest {
         props.setInterestProfile("LLM,Agent");
         props.setSummaryLanguage("en");
 
-        HeuristicAiService heuristic = new HeuristicAiService(props);
+        HeuristicAiService heuristic = heuristic(props);
         OpenAiCompatibleAiService openAi = mock(OpenAiCompatibleAiService.class);
         CompositeAiService composite = new CompositeAiService(props, openAi, heuristic);
 
@@ -51,7 +59,7 @@ class CompositeAiServiceTest {
         props.setInterestProfile("LLM");
         props.setSummaryLanguage("en");
 
-        HeuristicAiService heuristic = new HeuristicAiService(props);
+        HeuristicAiService heuristic = heuristic(props);
         OpenAiCompatibleAiService openAi = mock(OpenAiCompatibleAiService.class);
         when(openAi.summarizeBatch(anyList())).thenThrow(new IllegalStateException("boom"));
         CompositeAiService composite = new CompositeAiService(props, openAi, heuristic);

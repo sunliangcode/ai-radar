@@ -3,6 +3,7 @@ package com.airadar.provider.ai;
 import com.airadar.config.RadarProperties;
 import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
+import com.airadar.interest.InterestSignalsService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -30,9 +31,11 @@ public class HeuristicAiService implements AiService {
     );
 
     private final RadarProperties properties;
+    private final InterestSignalsService interestSignals;
 
-    public HeuristicAiService(RadarProperties properties) {
+    public HeuristicAiService(RadarProperties properties, InterestSignalsService interestSignals) {
         this.properties = properties;
+        this.interestSignals = interestSignals;
     }
 
     @Override
@@ -40,7 +43,7 @@ public class HeuristicAiService implements AiService {
         if (items == null || items.isEmpty()) {
             return List.of();
         }
-        List<String> interestKeywords = parseInterestKeywords(properties.getInterestProfile());
+        List<String> interestKeywords = parseInterestKeywords(interestSignals.effectiveInterestProfile());
         List<ScoreResult> results = new ArrayList<>(items.size());
         for (NewsItem item : items) {
             results.add(scoreOne(item, interestKeywords));
@@ -271,7 +274,7 @@ public class HeuristicAiService implements AiService {
         return "other";
     }
 
-    static List<String> parseInterestKeywords(String profile) {
+    public static List<String> parseInterestKeywords(String profile) {
         if (profile == null || profile.isBlank()) {
             return List.of();
         }
@@ -322,7 +325,7 @@ public class HeuristicAiService implements AiService {
     public ImpactAnalysisResult analyzeImpact(String contextJson, String title, String summary, String eventImpact, String memoryHints) {
         String blob = ((title == null ? "" : title) + " " + (summary == null ? "" : summary)
                 + " " + (contextJson == null ? "" : contextJson)).toLowerCase(Locale.ROOT);
-        List<String> interestKeywords = parseInterestKeywords(properties.getInterestProfile());
+        List<String> interestKeywords = parseInterestKeywords(interestSignals.effectiveInterestProfile());
         int hits = 0;
         for (String kw : interestKeywords) {
             if (blob.contains(kw.toLowerCase(Locale.ROOT))) {

@@ -280,6 +280,8 @@ export const api = {
   patchItem: (id: number, body: { read?: boolean; saved?: boolean }) =>
     request<Item>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   markAllRead: () => request<{ updated: number }>('/api/items/mark-all-read', { method: 'POST' }),
+  interestKeywords: () =>
+    request<{ keywords: string[]; effectiveInterestProfile?: string }>('/api/items/interest-keywords'),
   sources: () => request<Source[]>('/api/sources'),
   source: (id: number) => request<Source>(`/api/sources/${id}`),
   createSource: (body: unknown) =>

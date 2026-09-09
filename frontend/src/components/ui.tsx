@@ -115,7 +115,9 @@ export function ItemRow({
   url,
   meta,
   unread,
+  saved,
   onMarkRead,
+  onToggleSaved,
 }: {
   title: string
   score?: number
@@ -124,8 +126,11 @@ export function ItemRow({
   url: string
   meta?: string
   unread?: boolean
+  saved?: boolean
   onMarkRead?: () => void
+  onToggleSaved?: () => void
 }) {
+  const { t } = useTranslation()
   const body = (contentSnippet && contentSnippet.trim()) || (summary && summary.trim()) || ''
   return (
     <article
@@ -147,6 +152,11 @@ export function ItemRow({
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
             {meta ? <span className="font-mono">{meta}</span> : null}
+            {onToggleSaved ? (
+              <button type="button" className="underline hover:text-ink" onClick={onToggleSaved}>
+                {saved ? t('common.unsaveInterest') : t('common.saveInterest')}
+              </button>
+            ) : null}
             {onMarkRead && unread ? (
               <MarkReadButton onClick={onMarkRead} />
             ) : null}

@@ -19,5 +19,7 @@ public interface NewsItemRepository extends JpaRepository<NewsItemEntity, Long> 
 
     List<NewsItemEntity> findByReadFlagFalse();
 
+    List<NewsItemEntity> findBySavedTrue();
+
     List<NewsItemEntity> findTop20ByOrderByCreatedAtDesc();
 }
