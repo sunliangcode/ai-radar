@@ -86,6 +86,29 @@ public class IntelligenceHomeService {
         List<Map<String, Object>> opportunities = opportunityService.listByKind("OPPORTUNITY");
         List<Map<String, Object>> risks = opportunityService.listByKind("RISK");
 
+        List<Map<String, Object>> todayChanges = new ArrayList<>();
+        java.util.LinkedHashSet<Long> seenEventIds = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> card : whyCare) {
+            Long eventId = asLong(card.get("eventId"));
+            if (eventId != null && seenEventIds.add(eventId)) {
+                todayChanges.add(card);
+            }
+            if (todayChanges.size() >= 5) {
+                break;
+            }
+        }
+        if (todayChanges.size() < 5) {
+            for (Map<String, Object> card : impacts) {
+                Long eventId = asLong(card.get("eventId"));
+                if (eventId != null && seenEventIds.add(eventId)) {
+                    todayChanges.add(card);
+                }
+                if (todayChanges.size() >= 5) {
+                    break;
+                }
+            }
+        }
+
         List<Map<String, Object>> whatToWatch = new ArrayList<>();
         whatToWatch.addAll(impactService.listByTiers(List.of("LOW")).stream().limit(8).toList());
         eventRepository.findTop50ByOrderByScoreDesc().stream()
@@ -113,6 +136,7 @@ public class IntelligenceHomeService {
                 .toList());
 
         Map<String, Object> out = new LinkedHashMap<>();
+        out.put("todayChanges", todayChanges);
         out.put("whatChanged", whatChanged);
         out.put("whyCare", whyCare);
         out.put("impacts", impacts);
@@ -125,6 +149,20 @@ public class IntelligenceHomeService {
         out.put("whatsEmerging", whatsEmerging);
         out.put("generatedAt", ApiTimes.iso(Instant.now()));
         return out;
+    }
+
+    private static Long asLong(Object value) {
+        if (value instanceof Number n) {
+            return n.longValue();
+        }
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private Map<String, Object> eventSummary(EventEntity e) {

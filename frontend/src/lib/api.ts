@@ -166,7 +166,40 @@ export type UserContext = {
   updatedAt?: string
 }
 
+export type ChangeCard = {
+  id: number
+  eventId: number
+  title: string
+  summary?: string
+  changeType?: string
+  confidence?: number
+  trend?: string
+  status?: string
+  firstDetectedAt?: string
+  lastUpdatedAt?: string
+  sourceCount?: number
+  itemCount?: number
+  score?: number
+  relevance?: number
+  impact?: number
+  urgency?: number
+  analysisConfidence?: number
+  tier?: string
+  why?: string
+  evidence?: string
+  recommendation?: string
+  priority?: number
+  impactAnalysis?: ImpactCard
+  timeline?: { id: number; at: string; label: string; note?: string; newsItemId?: number }[]
+  items?: Item[]
+  watchNext?: string
+  eventImpact?: string
+}
+
+export type FeedbackKind = 'useful' | 'irrelevant' | 'watch' | 'ignore' | 'tried'
+
 export type IntelligenceHome = {
+  todayChanges?: ImpactCard[]
   whatChanged: { eventId: number; eventTitle?: string; at: string; label: string; note?: string }[]
   whyCare?: ImpactCard[]
   impacts?: ImpactCard[]
@@ -306,6 +339,8 @@ export const api = {
   impactJob: () => request<Record<string, unknown>>('/api/jobs/impact', { method: 'POST' }),
   events: (q: string = '') => request<RadarEvent[]>(`/api/events${q}`),
   event: (id: number) => request<RadarEvent>(`/api/events/${id}`),
+  changes: (limit: number = 40) => request<ChangeCard[]>(`/api/changes?limit=${limit}`),
+  change: (id: number) => request<ChangeCard>(`/api/changes/${id}`),
   intelligenceHome: () => request<IntelligenceHome>('/api/intelligence/home'),
   getContext: () => request<UserContext>('/api/contexts'),
   saveContext: (body: unknown) =>
@@ -325,8 +360,11 @@ export const api = {
       '/api/contexts/import/markdown',
       { method: 'POST', body: JSON.stringify({ markdown }) },
     ),
+  actions: () => request<ActionCard[]>('/api/actions'),
   patchAction: (id: number, body: { status: string }) =>
     request<ActionCard>(`/api/actions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  postFeedback: (body: { targetType: 'change' | 'action'; targetId: number; kind: FeedbackKind }) =>
+    request<Record<string, unknown>>('/api/feedback', { method: 'POST', body: JSON.stringify(body) }),
   experiments: () => request<ExperimentCard[]>('/api/experiments'),
   updateExperiment: (id: number, body: Record<string, unknown>) =>
     request<ExperimentCard>(`/api/experiments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

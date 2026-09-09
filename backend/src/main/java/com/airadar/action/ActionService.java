@@ -36,7 +36,7 @@ public class ActionService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listOpen() {
-        return actionRepository.findByStatusInOrderByUpdatedAtDesc(List.of("open", "started", "watching"))
+        return actionRepository.findByStatusInOrderByUpdatedAtDesc(List.of("open", "started", "watching", "useful"))
                 .stream()
                 .map(this::toDto)
                 .toList();
@@ -53,7 +53,7 @@ public class ActionService {
                 .orElseThrow(() -> new NoSuchElementException("action not found"));
         String status = body.get("status") == null ? null : body.get("status").toString();
         if (status != null) {
-            if (!List.of("open", "started", "ignored", "watching").contains(status)) {
+            if (!List.of("open", "started", "ignored", "watching", "useful").contains(status)) {
                 throw new IllegalArgumentException("invalid status");
             }
             action.setStatus(status);
@@ -65,6 +65,9 @@ public class ActionService {
             }
             if ("watching".equals(status)) {
                 memoryService.remember("watch", "action", action.getId(), action.getTitle(), null);
+            }
+            if ("useful".equals(status)) {
+                memoryService.remember("useful", "action", action.getId(), action.getTitle(), null);
             }
         }
         actionRepository.save(action);

@@ -1,15 +1,13 @@
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import ActionsPage from './pages/ActionsPage'
 import BriefDetailPage from './pages/BriefDetailPage'
-import BriefsPage from './pages/BriefsPage'
+import ChangeDetailPage from './pages/ChangeDetailPage'
+import ChangesPage from './pages/ChangesPage'
 import ContextsPage from './pages/ContextsPage'
-import EventDetailPage from './pages/EventDetailPage'
-import EventsPage from './pages/EventsPage'
 import HomePage from './pages/HomePage'
 import ItemsPage from './pages/ItemsPage'
-import SettingsPage from './pages/SettingsPage'
 import SourceDetailPage from './pages/SourceDetailPage'
-import SourcesPage from './pages/SourcesPage'
 
 function LanguageSwitcher() {
   const { t, i18n } = useTranslation()
@@ -39,12 +37,10 @@ export default function App() {
   const { t } = useTranslation()
   const nav = [
     { to: '/', label: t('nav.today'), end: true },
+    { to: '/changes', label: t('nav.changes'), end: false },
     { to: '/contexts', label: t('nav.contexts'), end: false },
-    { to: '/events', label: t('nav.events'), end: false },
+    { to: '/actions', label: t('nav.actions'), end: false },
     { to: '/items', label: t('nav.items'), end: false },
-    { to: '/sources', label: t('nav.sources'), end: false },
-    { to: '/briefs', label: t('nav.briefs'), end: false },
-    { to: '/settings', label: t('nav.settings'), end: false },
   ]
 
   return (
@@ -79,18 +75,26 @@ export default function App() {
         <div className="mx-auto max-w-6xl">
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/events" element={<EventsPage />} />
-            <Route path="/events/:id" element={<EventDetailPage />} />
-            <Route path="/sources" element={<SourcesPage />} />
-            <Route path="/sources/:id" element={<SourceDetailPage />} />
-            <Route path="/items" element={<ItemsPage />} />
-            <Route path="/briefs" element={<BriefsPage />} />
-            <Route path="/briefs/:date" element={<BriefDetailPage />} />
+            <Route path="/changes" element={<ChangesPage />} />
+            <Route path="/changes/:id" element={<ChangeDetailPage />} />
+            <Route path="/actions" element={<ActionsPage />} />
             <Route path="/contexts" element={<ContextsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/items" element={<ItemsPage />} />
+            <Route path="/briefs/:date" element={<BriefDetailPage />} />
+            <Route path="/sources/:id" element={<SourceDetailPage />} />
+            <Route path="/events" element={<Navigate to="/changes" replace />} />
+            <Route path="/events/:id" element={<EventRedirect />} />
+            <Route path="/briefs" element={<Navigate to="/" replace />} />
+            <Route path="/sources" element={<Navigate to="/contexts" replace />} />
+            <Route path="/settings" element={<Navigate to="/contexts" replace />} />
           </Routes>
         </div>
       </main>
     </div>
   )
+}
+
+function EventRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/changes/${id ?? ''}`} replace />
 }

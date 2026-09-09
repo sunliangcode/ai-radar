@@ -34,7 +34,7 @@ export default function SourceDetailPage() {
         title={s.name}
         subtitle={`${s.type} · ${s.enabled ? t('sources.statusEnabled') : t('sources.statusDisabled')}`}
         actions={
-          <Link to="/sources" className="text-sm text-moss underline underline-offset-2">
+          <Link to="/contexts" className="text-sm text-moss underline underline-offset-2">
             {t('common.backToList')}
           </Link>
         }

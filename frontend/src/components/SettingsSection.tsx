@@ -1,0 +1,228 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import { api, type Settings } from '../lib/api'
+import { Button, StateBox } from './ui'
+
+export function SettingsSection() {
+  const { t } = useTranslation()
+  const qc = useQueryClient()
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings })
+  const [draft, setDraft] = useState<Partial<Settings> | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const [packId, setPackId] = useState('ai-core')
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [localToken, setLocalToken] = useState(() => localStorage.getItem('localToken') ?? '')
+  const form = draft ?? settings.data ?? {}
+
+  const save = useMutation({
+    mutationFn: api.saveSettings,
+    onSuccess: (data) => {
+      qc.setQueryData(['settings'], data)
+      setDraft(null)
+      setToast(t('settings.saved'))
+      setTimeout(() => setToast(null), 2000)
+    },
+    onError: (e) => setToast((e as Error).message),
+  })
+  const importPack = useMutation({
+    mutationFn: () => api.importPack({ packId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings'] })
+      qc.invalidateQueries({ queryKey: ['sources'] })
+      setToast(t('settings.packImported'))
+      setTimeout(() => setToast(null), 2000)
+    },
+    onError: (e) => setToast((e as Error).message),
+  })
+
+  function patchForm(patch: Partial<Settings>) {
+    setDraft((prev) => ({ ...(prev ?? settings.data ?? {}), ...patch }))
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    const trimmed = localToken.trim()
+    if (trimmed) {
+      localStorage.setItem('localToken', trimmed)
+    } else {
+      localStorage.removeItem('localToken')
+    }
+    save.mutate({
+      interestProfile: form.interestProfile,
+      summaryLanguage: form.summaryLanguage,
+      scoreThreshold: form.scoreThreshold,
+      maxItems: form.maxItems,
+      lookbackHours: form.lookbackHours,
+      fetchIntervalMs: form.fetchIntervalMs,
+      pushCron: form.pushCron,
+      timezone: form.timezone,
+      uiBaseUrl: form.uiBaseUrl,
+      pushOnlyWhenItems: form.pushOnlyWhenItems,
+      openaiBaseUrl: form.openaiBaseUrl,
+      openaiModel: form.openaiModel,
+      feishuWebhookUrl: form.feishuWebhookUrl,
+      webhookUrl: form.webhookUrl,
+      webhookHeaders: form.webhookHeaders,
+      smtpHost: form.smtpHost,
+      smtpPort: form.smtpPort,
+      smtpUsername: form.smtpUsername,
+      smtpFrom: form.smtpFrom,
+      smtpTo: form.smtpTo,
+      smtpStarttls: form.smtpStarttls,
+    })
+  }
+
+  if (settings.isLoading) return <StateBox>{t('settings.loading')}</StateBox>
+  if (settings.isError) {
+    return <StateBox>{t('common.loadFailed', { message: (settings.error as Error).message })}</StateBox>
+  }
+
+  const field = (key: keyof Settings, label: string, type: string = 'text') => (
+    <label className="block text-sm">
+      <span className="text-muted">{label}</span>
+      <input
+        type={type}
+        className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2"
+        value={String(form[key] ?? '')}
+        onChange={(e) =>
+          patchForm({
+            [key]: type === 'number' ? Number(e.target.value) : e.target.value,
+          } as Partial<Settings>)
+        }
+      />
+    </label>
+  )
+
+  return (
+    <section id="infrastructure" className="space-y-4">
+      <div>
+        <h3 className="font-serif text-lg text-ink">{t('contexts.infraSection')}</h3>
+        <p className="mt-1 text-xs text-muted">{t('settings.subtitle')}</p>
+      </div>
+      <form onSubmit={onSubmit} className="grid gap-4">
+        <section className="rounded-xl border border-mist bg-paper/70 p-4">
+          <h4 className="mb-1 font-serif text-base">{t('settings.basicsSection')}</h4>
+          <p className="mb-3 text-xs text-muted">{t('settings.interestHint')}</p>
+          <div className="grid gap-3">
+            <label className="block text-sm">
+              <span className="text-muted">{t('settings.interestProfile')}</span>
+              <textarea
+                className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2"
+                rows={3}
+                value={form.interestProfile ?? ''}
+                onChange={(e) => patchForm({ interestProfile: e.target.value })}
+              />
+            </label>
+            {field('summaryLanguage', t('settings.summaryLanguage'))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-mist bg-paper/70 p-4">
+          <h4 className="mb-3 font-serif text-base">{t('settings.notifySection')}</h4>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {field('feishuWebhookUrl', t('settings.feishuWebhook'))}
+            {field('smtpTo', t('settings.smtpTo'))}
+            {field('smtpHost', t('settings.smtpHost'))}
+            {field('smtpFrom', t('settings.smtpFrom'))}
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={Boolean(form.pushOnlyWhenItems)}
+                onChange={(e) => patchForm({ pushOnlyWhenItems: e.target.checked })}
+              />
+              <span>{t('settings.pushOnlyWhenItems')}</span>
+            </label>
+          </div>
+        </section>
+
+        <div className="rounded-xl border border-mist bg-paper/70">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            aria-expanded={advancedOpen}
+          >
+            <div>
+              <h4 className="font-serif text-base text-ink">{t('settings.advanced')}</h4>
+              <p className="mt-0.5 text-xs text-muted">{t('settings.advancedHint')}</p>
+            </div>
+            <span className="font-mono text-sm text-muted">{advancedOpen ? '−' : '+'}</span>
+          </button>
+
+          {advancedOpen ? (
+            <div className="space-y-4 border-t border-mist px-4 pb-4 pt-3">
+              <section>
+                <h5 className="mb-2 text-sm font-medium text-ink">{t('settings.llmSection')}</h5>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {field('openaiBaseUrl', t('settings.baseUrl'))}
+                  {field('openaiModel', t('settings.model'))}
+                  {field('scoreThreshold', t('settings.scoreThreshold'), 'number')}
+                  {field('maxItems', t('settings.maxItems'), 'number')}
+                  {field('lookbackHours', t('settings.lookbackHours'), 'number')}
+                </div>
+              </section>
+              <section>
+                <h5 className="mb-2 text-sm font-medium text-ink">{t('settings.scheduleSection')}</h5>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {field('fetchIntervalMs', t('settings.fetchIntervalMs'), 'number')}
+                  {field('pushCron', t('settings.pushCron'))}
+                  {field('timezone', t('settings.timezone'))}
+                  {field('uiBaseUrl', t('settings.uiBaseUrl'))}
+                </div>
+              </section>
+              <section>
+                <h5 className="mb-2 text-sm font-medium text-ink">{t('settings.securitySection')}</h5>
+                <label className="block text-sm">
+                  <span className="text-muted">{t('settings.localToken')}</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2 font-mono text-sm"
+                    value={localToken}
+                    onChange={(e) => setLocalToken(e.target.value)}
+                    placeholder={t('settings.localTokenPlaceholder')}
+                  />
+                </label>
+              </section>
+              <section>
+                <h5 className="mb-2 text-sm font-medium text-ink">{t('settings.packSection')}</h5>
+                <div className="flex flex-wrap items-center gap-3">
+                  <select
+                    className="rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+                    value={packId}
+                    onChange={(e) => setPackId(e.target.value)}
+                    aria-label={t('settings.importPack')}
+                  >
+                    <option value="ai-core">{t('settings.pack.ai-core')}</option>
+                    <option value="ai-cn">{t('settings.pack.ai-cn')}</option>
+                    <option value="ai-signals">{t('settings.pack.ai-signals')}</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    loading={importPack.isPending}
+                    onClick={() => importPack.mutate()}
+                  >
+                    {importPack.isPending ? t('settings.importing') : t('settings.importPack')}
+                  </Button>
+                </div>
+              </section>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" loading={save.isPending}>
+            {save.isPending ? t('common.saving') : t('common.save')}
+          </Button>
+          {toast ? (
+            <span className="text-sm text-moss" role="status">
+              {toast}
+            </span>
+          ) : null}
+        </div>
+      </form>
+    </section>
+  )
+}

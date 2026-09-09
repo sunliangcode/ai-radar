@@ -1,57 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api, type ActionCard, type ExperimentCard, type ImpactCard } from '../lib/api'
+import { useState } from 'react'
+import { api, type ActionCard, type ImpactCard } from '../lib/api'
+import { FeedbackBar } from '../components/FeedbackBar'
 import { Button, PageHeader, ScorePill, StateBox, StatusBadge } from '../components/ui'
 import { FetchProgressPanel } from '../components/FetchProgressPanel'
 import { FetchResultSummary } from '../components/FetchResultSummary'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
-import { dateLocale } from '../i18n'
-import { useState, type ReactNode } from 'react'
-
-function Column({
-  title,
-  empty,
-  emptyAction,
-  children,
-}: {
-  title: string
-  empty: string
-  emptyAction?: ReactNode
-  children: ReactNode
-}) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children)
-  return (
-    <section className="min-h-56 rounded-xl border border-mist bg-paper/70 p-4">
-      <h3 className="mb-3 font-serif text-lg text-ink">{title}</h3>
-      {hasChildren ? (
-        <div className="space-y-3">{children}</div>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-muted">{empty}</p>
-          {emptyAction}
-        </div>
-      )}
-    </section>
-  )
-}
 
 function hasIntel(data: {
-  whatChanged: unknown[]
-  whyCare?: unknown[]
-  impacts?: unknown[]
+  todayChanges?: unknown[]
   actions?: unknown[]
-  whatToWatch: unknown[]
-  whatMatters?: unknown[]
+  whatChanged?: unknown[]
+  impacts?: unknown[]
 } | undefined) {
   if (!data) return false
   return (
-    data.whatChanged.length > 0 ||
-    (data.whyCare?.length ?? 0) > 0 ||
-    (data.impacts?.length ?? 0) > 0 ||
+    (data.todayChanges?.length ?? 0) > 0 ||
     (data.actions?.length ?? 0) > 0 ||
-    data.whatToWatch.length > 0 ||
-    (data.whatMatters?.length ?? 0) > 0
+    (data.whatChanged?.length ?? 0) > 0 ||
+    (data.impacts?.length ?? 0) > 0
   )
 }
 
@@ -61,57 +30,28 @@ export default function HomePage() {
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const briefs = useQuery({ queryKey: ['briefs'], queryFn: api.briefs })
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
-  const experiments = useQuery({ queryKey: ['experiments'], queryFn: api.experiments })
   const [jobToast, setJobToast] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState<number | null>(null)
   const defaultPack = i18n.language.startsWith('zh') ? 'ai-cn' : 'ai-core'
   const [packId, setPackId] = useState(defaultPack)
 
   const { fetchJob, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['intelligence-home'],
-    ['events'],
+    ['changes'],
     ['items'],
     ['briefs'],
     ['sources'],
   ])
-  const pushJob = useMutation({
-    mutationFn: api.pushJob,
-    onSuccess: () => {
-      setJobToast(t('home.pushDone'))
-      setTimeout(() => setJobToast(null), 2500)
-    },
-    onError: (e) => {
-      setJobToast((e as Error).message)
-      setTimeout(() => setJobToast(null), 4000)
-    },
-  })
   const impactJob = useMutation({
     mutationFn: api.impactJob,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      qc.invalidateQueries({ queryKey: ['changes'] })
       setJobToast(t('home.impactDone'))
       setTimeout(() => setJobToast(null), 2500)
     },
     onError: (e) => {
       setJobToast((e as Error).message)
       setTimeout(() => setJobToast(null), 4000)
-    },
-  })
-  const patchAction = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) => api.patchAction(id, { status }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-      qc.invalidateQueries({ queryKey: ['experiments'] })
-    },
-  })
-  const saveExperiment = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) =>
-      api.updateExperiment(id, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['experiments'] })
-      qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-      setJobToast(t('home.experimentSaved'))
-      setTimeout(() => setJobToast(null), 2500)
     },
   })
   const importPack = useMutation({
@@ -130,11 +70,11 @@ export default function HomePage() {
 
   const latestBrief = briefs.data?.[0]?.date
   const data = home.data
-  const locale = dateLocale(i18n.language)
   const sourceCount = sources.data?.length ?? 0
   const ready = hasIntel(data)
   const showGettingStarted = !home.isLoading && !home.isError && !ready
-  const runningExperiments = (experiments.data ?? []).filter((e) => e.status === 'running')
+  const todayChanges = (data?.todayChanges ?? data?.whyCare ?? []).slice(0, 5)
+  const previewActions = (data?.actions ?? []).slice(0, 3)
 
   const updateLabel = phase === 'running' ? t('common.fetching') : t('common.fetchNow')
   const updateButton = (
@@ -152,23 +92,9 @@ export default function HomePage() {
           <>
             {updateButton}
             {!showGettingStarted ? (
-              <>
-                <Button
-                  variant="ghost"
-                  loading={impactJob.isPending}
-                  onClick={() => impactJob.mutate()}
-                >
-                  {t('home.recomputeImpact')}
-                </Button>
-                <Button
-                  variant="text"
-                  disabled={pushJob.isPending || isPending}
-                  loading={pushJob.isPending}
-                  onClick={() => pushJob.mutate()}
-                >
-                  {pushJob.isPending ? t('common.pushing') : t('home.pushNow')}
-                </Button>
-              </>
+              <Button variant="ghost" loading={impactJob.isPending} onClick={() => impactJob.mutate()}>
+                {t('home.recomputeImpact')}
+              </Button>
             ) : null}
           </>
         }
@@ -237,20 +163,38 @@ export default function HomePage() {
 
       {ready && data ? (
         <>
-          {data.outcomeSummary ? (
-            <div className="mb-6 rounded-xl border border-mist bg-paper/70 p-4 text-sm text-muted">
-              <span className="font-medium text-ink">{t('home.roiTitle')}</span>{' '}
-              {t('home.roiLine', {
-                insights: data.outcomeSummary.insights ?? 0,
-                actions: data.outcomeSummary.actions ?? 0,
-                experiments: data.outcomeSummary.experiments ?? 0,
-                hours: data.outcomeSummary.timeSavedHours ?? 0,
-                roi: data.outcomeSummary.roi ?? '—',
-              })}
-            </div>
-          ) : null}
+          <section className="mb-8">
+            <h2 className="mb-4 font-serif text-xl text-ink">{t('home.todayChanges')}</h2>
+            {todayChanges.length === 0 ? (
+              <StateBox>{t('home.todayChangesEmpty')}</StateBox>
+            ) : (
+              <div className="space-y-4">
+                {todayChanges.map((card) => (
+                  <TodayChangeCard key={card.id} card={card} />
+                ))}
+              </div>
+            )}
+          </section>
 
-          <div className="mb-6 flex flex-wrap gap-4 text-sm text-muted">
+          <section className="mb-8">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h2 className="font-serif text-xl text-ink">{t('home.suggestedActions')}</h2>
+              <Link to="/actions" className="text-sm text-moss underline underline-offset-2">
+                {t('home.viewAllActions')}
+              </Link>
+            </div>
+            {previewActions.length === 0 ? (
+              <p className="text-sm text-muted">{t('home.whatShouldIDoEmpty')}</p>
+            ) : (
+              <ul className="space-y-3">
+                {previewActions.map((action) => (
+                  <ActionPreview key={action.id} action={action} />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <div className="flex flex-wrap gap-4 text-sm text-muted">
             {latestBrief ? (
               <Link className="text-moss underline underline-offset-2" to={`/briefs/${latestBrief}`}>
                 {t('home.latestBrief', { date: latestBrief })}
@@ -258,180 +202,66 @@ export default function HomePage() {
             ) : (
               <span>{t('home.noBrief')}</span>
             )}
-            <Link className="text-moss underline underline-offset-2" to="/contexts">
-              {t('nav.contexts')}
-            </Link>
-            <Link className="text-moss underline underline-offset-2" to="/events">
-              {t('home.allEvents')}
+            <Link className="text-moss underline underline-offset-2" to="/changes">
+              {t('home.allChanges')}
             </Link>
           </div>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Column title={t('home.whatChanged')} empty={t('home.whatChangedEmpty')}>
-              {data.whatChanged.map((row, i) => (
-                <div key={`${row.eventId}-${i}`} className="border-b border-mist/70 pb-2 last:border-0">
-                  <Link to={`/events/${row.eventId}`} className="text-sm font-medium text-ink hover:text-moss">
-                    {row.label}
-                  </Link>
-                  <p className="mt-0.5 font-mono text-xs text-muted">
-                    {row.eventTitle ? `${row.eventTitle} · ` : ''}
-                    {row.at ? new Date(row.at).toLocaleString(locale) : ''}
-                  </p>
-                </div>
-              ))}
-            </Column>
-
-            <Column title={t('home.whyCare')} empty={t('home.whyCareEmpty')}>
-              {(data.whyCare ?? []).map((card) => (
-                <ImpactWhyCard key={card.id} card={card} />
-              ))}
-            </Column>
-
-            <Column title={t('home.whatIsImpact')} empty={t('home.whatIsImpactEmpty')}>
-              {(data.impacts ?? []).map((card) => (
-                <ImpactExplainCard
-                  key={card.id}
-                  card={card}
-                  expanded={expanded === card.id}
-                  onToggle={() => setExpanded(expanded === card.id ? null : card.id)}
-                />
-              ))}
-            </Column>
-
-            <Column title={t('home.whatShouldIDo')} empty={t('home.whatShouldIDoEmpty')}>
-              {(data.opportunities ?? []).slice(0, 4).map((o) => (
-                <div key={`opp-${o.id}`} className="border-b border-mist/70 pb-2 last:border-0">
-                  <p className="text-sm font-medium text-ink">{o.title}</p>
-                  <p className="mt-1 text-xs text-muted">
-                    {t('home.estimatedHours', { hours: o.estimatedHours ?? 0 })}
-                  </p>
-                </div>
-              ))}
-              {(data.risks ?? []).slice(0, 3).map((o) => (
-                <div key={`risk-${o.id}`} className="border-b border-mist/70 pb-2 last:border-0">
-                  <p className="text-sm font-medium text-ink">{o.title}</p>
-                  <p className="mt-1 text-xs font-medium text-ink">{t('home.risk')}</p>
-                </div>
-              ))}
-              {(data.actions ?? []).map((action) => (
-                <ActionRow
-                  key={action.id}
-                  action={action}
-                  busy={patchAction.isPending}
-                  onStatus={(status) => patchAction.mutate({ id: action.id, status })}
-                />
-              ))}
-            </Column>
-
-            <Column title={t('home.whatToWatch')} empty={t('home.whatToWatchEmpty')}>
-              {data.whatToWatch.map((item, idx) => (
-                <div key={`${item.id ?? item.eventId}-${idx}`} className="border-b border-mist/70 pb-2 last:border-0">
-                  {item.eventId || item.id ? (
-                    <Link
-                      to={`/events/${item.eventId ?? item.id}`}
-                      className="text-sm font-medium text-ink hover:text-moss"
-                    >
-                      {item.title}
-                    </Link>
-                  ) : (
-                    <p className="text-sm font-medium text-ink">{item.title}</p>
-                  )}
-                  <p className="mt-1 text-sm text-muted">{item.watchNext || item.why || item.recommendation}</p>
-                </div>
-              ))}
-            </Column>
-          </div>
-
-          {runningExperiments.length > 0 ? (
-            <section className="mt-6 rounded-xl border border-mist bg-paper/70 p-4">
-              <h3 className="mb-3 font-serif text-lg text-ink">{t('home.experiments')}</h3>
-              <div className="space-y-4">
-                {runningExperiments.map((exp) => (
-                  <ExperimentForm
-                    key={exp.id}
-                    experiment={exp}
-                    saving={saveExperiment.isPending}
-                    onSave={(body) => saveExperiment.mutate({ id: exp.id, body })}
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null}
         </>
       ) : null}
     </div>
   )
 }
 
-function ImpactWhyCard({ card }: { card: ImpactCard }) {
+function TodayChangeCard({ card }: { card: ImpactCard }) {
+  const { t } = useTranslation()
   return (
-    <div className="border-b border-mist/70 pb-3 last:border-0">
+    <article className="rounded-xl border border-mist bg-paper/70 p-4">
       <div className="flex gap-3">
-        <ScorePill score={card.priority ? Math.min(100, card.priority / 1000) : card.relevance} />
-        <div>
-          <Link to={`/events/${card.eventId}`} className="font-medium text-ink hover:text-moss">
-            {card.title}
-          </Link>
-          {card.tier ? (
-            <div className="mt-1">
-              <StatusBadge status={card.tier} />
-            </div>
+        <ScorePill score={card.priority ? Math.min(100, Math.round(card.priority / 1000)) : card.relevance} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to={`/changes/${card.eventId}`} className="font-medium text-ink hover:text-moss">
+              {card.title}
+            </Link>
+            {card.tier ? <StatusBadge status={card.tier} /> : null}
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            R{Math.round(card.relevance ?? 0)} · I{Math.round(card.impact ?? 0)} · U
+            {Math.round(card.urgency ?? 0)} · C{Math.round(card.confidence ?? 0)}
+          </p>
+          {card.why ? (
+            <p className="mt-2 text-sm text-ink">
+              <span className="text-muted">{t('home.whyMatters')}: </span>
+              {card.why}
+            </p>
           ) : null}
-          <p className="mt-1 text-sm text-muted">{card.why}</p>
+          {card.evidence ? (
+            <p className="mt-1 text-sm text-muted">
+              <span className="text-ink">{t('home.evidence')}: </span>
+              {card.evidence}
+            </p>
+          ) : null}
+          {card.recommendation ? (
+            <p className="mt-1 text-sm text-muted">
+              <span className="text-ink">{t('home.recommendation')}: </span>
+              {card.recommendation}
+            </p>
+          ) : null}
+          <FeedbackBar
+            targetType="change"
+            targetId={card.eventId}
+            invalidateKeys={[['intelligence-home']]}
+          />
         </div>
       </div>
-    </div>
+    </article>
   )
 }
 
-function ImpactExplainCard({
-  card,
-  expanded,
-  onToggle,
-}: {
-  card: ImpactCard
-  expanded: boolean
-  onToggle: () => void
-}) {
+function ActionPreview({ action }: { action: ActionCard }) {
   const { t } = useTranslation()
   return (
-    <div className="border-b border-mist/70 pb-3 last:border-0">
-      <button type="button" className="w-full text-left" onClick={onToggle}>
-        <p className="font-medium text-ink">{card.title}</p>
-        <p className="mt-1 text-xs text-muted">
-          R{Math.round(card.relevance ?? 0)} · I{Math.round(card.impact ?? 0)} · U
-          {Math.round(card.urgency ?? 0)} · {card.tier}
-        </p>
-      </button>
-      {expanded ? (
-        <div className="mt-2 space-y-1 text-sm text-muted">
-          <p>
-            <span className="text-ink">{t('home.evidence')}:</span> {card.evidence}
-          </p>
-          <p>
-            <span className="text-ink">{t('home.reasoning')}:</span> {card.why}
-          </p>
-          <p>
-            <span className="text-ink">{t('home.recommendation')}:</span> {card.recommendation}
-          </p>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function ActionRow({
-  action,
-  busy,
-  onStatus,
-}: {
-  action: ActionCard
-  busy: boolean
-  onStatus: (status: string) => void
-}) {
-  const { t } = useTranslation()
-  return (
-    <div className="rounded-md border border-mist/80 p-3">
+    <li className="rounded-md border border-mist/80 p-3">
       <p className="text-sm font-medium text-ink">{action.title}</p>
       <p className="mt-1 text-xs text-muted">
         {t('home.actionMeta', {
@@ -439,82 +269,7 @@ function ActionRow({
           status: action.status ?? 'open',
         })}
       </p>
-      {action.successCriteria ? (
-        <p className="mt-1 text-xs text-muted">{action.successCriteria}</p>
-      ) : null}
-      <div className="mt-2 flex flex-wrap gap-2">
-        <Button variant="ghost" disabled={busy} onClick={() => onStatus('started')}>
-          {t('home.start')}
-        </Button>
-        <Button variant="text" disabled={busy} onClick={() => onStatus('watching')}>
-          {t('home.watch')}
-        </Button>
-        <Button variant="text" disabled={busy} onClick={() => onStatus('ignored')}>
-          {t('home.ignore')}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function ExperimentForm({
-  experiment,
-  saving,
-  onSave,
-}: {
-  experiment: ExperimentCard
-  saving: boolean
-  onSave: (body: Record<string, unknown>) => void
-}) {
-  const { t } = useTranslation()
-  const [successRate, setSuccessRate] = useState('80')
-  const [tokenCost, setTokenCost] = useState('5')
-  const [reviewTimeMin, setReviewTimeMin] = useState('30')
-
-  return (
-    <div className="rounded-md border border-mist/80 p-3">
-      <p className="text-sm font-medium text-ink">{experiment.title}</p>
-      <div className="mt-2 grid gap-2 sm:grid-cols-3">
-        <label className="text-xs text-muted">
-          {t('home.successRate')}
-          <input
-            className="mt-1 w-full rounded-md border border-mist px-2 py-1 text-sm"
-            value={successRate}
-            onChange={(e) => setSuccessRate(e.target.value)}
-          />
-        </label>
-        <label className="text-xs text-muted">
-          {t('home.tokenCost')}
-          <input
-            className="mt-1 w-full rounded-md border border-mist px-2 py-1 text-sm"
-            value={tokenCost}
-            onChange={(e) => setTokenCost(e.target.value)}
-          />
-        </label>
-        <label className="text-xs text-muted">
-          {t('home.reviewTime')}
-          <input
-            className="mt-1 w-full rounded-md border border-mist px-2 py-1 text-sm"
-            value={reviewTimeMin}
-            onChange={(e) => setReviewTimeMin(e.target.value)}
-          />
-        </label>
-      </div>
-      <div className="mt-2">
-        <Button
-          loading={saving}
-          onClick={() =>
-            onSave({
-              successRate: Number(successRate),
-              tokenCost: Number(tokenCost),
-              reviewTimeMin: Number(reviewTimeMin),
-              status: 'completed',
-            })
-          }
-        >
-          {t('home.saveExperiment')}
-        </Button>
-      </div>
-    </div>
+      <FeedbackBar targetType="action" targetId={action.id} invalidateKeys={[['intelligence-home'], ['actions']]} />
+    </li>
   )
 }

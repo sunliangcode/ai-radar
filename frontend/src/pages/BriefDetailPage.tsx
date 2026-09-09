@@ -23,7 +23,7 @@ export default function BriefDetailPage() {
       <PageHeader
         title={t('briefs.detailTitle', { date: q.data.date })}
         actions={
-          <Link to="/briefs" className="text-sm text-moss underline underline-offset-2">
+          <Link to="/" className="text-sm text-moss underline underline-offset-2">
             {t('common.backToList')}
           </Link>
         }
