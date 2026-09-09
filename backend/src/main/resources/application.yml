@@ -78,6 +78,7 @@ radar:
     enabled: ${WEB_FETCH_ENABLED:false}
     timeout-ms: 15000
     max-chars: 12000
+    parallelism: ${WEB_FETCH_PARALLELISM:4}
   rsshub-base: ${RSSHUB_BASE:https://rsshub.umzzz.com}
   delivery:
     feishu-webhook-url: ${FEISHU_WEBHOOK_URL:}

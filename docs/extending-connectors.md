@@ -38,7 +38,11 @@ public interface SourceConnector {
 | `EMAIL` | IMAP unread + AI extract | `EMAIL_INGEST_ENABLED` + IMAP_* |
 | `FIXTURE` | Local JSON | demos / offline |
 
-Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.enabled`).
+Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.enabled`), with optional `WEB_FETCH_PARALLELISM` (default 4).
+
+Empty databases are seeded from packs `ai-core` + `ai-cn` via `PackImportService` (filesystem `packs/` or classpath). Prefer editing pack JSON rather than hard-coding sources.
+
+The UI loads field schemas from `GET /api/connectors`.
 
 ## Steps to add a connector
 

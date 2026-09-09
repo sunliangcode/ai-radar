@@ -14,6 +14,7 @@ COPY backend/.mvn .mvn
 COPY backend/mvnw .
 RUN chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline
 COPY backend/src ./src
+COPY packs /app/packs
 COPY --from=frontend /app/frontend/dist/ ./src/main/resources/static/
 RUN ./mvnw -q -DskipTests package
 

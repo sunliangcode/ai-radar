@@ -33,6 +33,13 @@ public class RssConnector implements SourceConnector {
     }
 
     @Override
+    public ConnectorDescriptor descriptor() {
+        return ConnectorDescriptor.of("RSS", "RSS / Atom feed", List.of(
+                ConnectorDescriptor.ConfigField.text("feedUrl", "Feed URL", true)
+        ));
+    }
+
+    @Override
     public List<RawItem> fetch(FetchContext ctx) {
         Object feedUrlObj = ctx.source().config().get("feedUrl");
         if (feedUrlObj == null) {

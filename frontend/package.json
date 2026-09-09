@@ -12,7 +12,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "build:embed": "tsc -b && RADAR_EMBED=1 vite build",
+    "lint": "node ./node_modules/oxlint/bin/oxlint src",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -33,6 +35,7 @@
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^3.2.4"
   }
 }

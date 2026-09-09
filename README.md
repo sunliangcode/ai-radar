@@ -5,7 +5,7 @@ English | [中文](README.zh.md)
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3-green)
 
-# AI Intelligence Radar
+# AI Radar
 
 Personal AI intel: multi-source fetch → score/summary → **Event clustering** → daily brief → Feishu / Email / Webhook / Outbox. Single-user Web UI with four-column intelligence home.
 
@@ -49,9 +49,8 @@ cd frontend && npm install && npm run dev
 **Single process (UI baked into Spring)**
 
 ```bash
-cd frontend && npm install && npm run build
-rm -rf ../backend/src/main/resources/static/*
-cp -R dist/. ../backend/src/main/resources/static/
+cd frontend && npm install && npm run build:embed
+# writes into backend/src/main/resources/static/
 cd ../backend && ./mvnw spring-boot:run
 # http://localhost:8080
 ```

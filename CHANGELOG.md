@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Connectors: Google News, GDELT, OSS Insight, GitHub Trending, V2EX, Telegram, Product Hunt, Twitter, WEB, EMAIL
+- Source packs `ai-cn` / `ai-signals`; empty DB seeds from `ai-core` + `ai-cn` packs
+- Web full-text enrich (`WEB_FETCH_*`), batch LLM summarize, `/api/connectors` descriptors
+- Fetch progress / result summary UI; schema-driven Sources form
+
+### Changed
+
+- Pipeline no longer holds one long SQLite transaction across network/LLM I/O
+- Persist uses bulk URL lookup + `saveAll`; web enrich runs with bounded parallelism
+- Frontend `build:embed` writes into Spring `static/`; hashed assets are gitignored
+- Settings exposes push-only-when-items, SMTP STARTTLS, and browser local token
+
+### Fixed
+
+- Home / Sources / Briefs keep content visible while a fetch job runs
+
 ## [0.1.0] - 2026-09-08
 
 ### Added

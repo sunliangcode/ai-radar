@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { FetchProgress, FetchSourceProgress } from '../lib/api'
+import { formatDuration, progressPercent } from '../lib/format'
 
 const POST_FETCH_STAGES = new Set([
   'normalize',
@@ -13,49 +14,11 @@ const POST_FETCH_STAGES = new Set([
   'error',
 ])
 
-function formatDuration(ms?: number | null): string {
-  if (ms == null || Number.isNaN(ms)) return '—'
-  if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`
-  const sec = ms / 1000
-  if (sec < 60) return `${sec.toFixed(1)}s`
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
-}
-
 function statusDot(status: FetchSourceProgress['status']): string {
   if (status === 'running') return 'bg-moss animate-pulse'
   if (status === 'done') return 'bg-moss'
   if (status === 'error') return 'bg-ember'
   return 'bg-mist'
-}
-
-function progressPercent(progress: FetchProgress): number {
-  const { stage, totals } = progress
-  if (stage === 'done') return 100
-  if (stage === 'error') return Math.min(99, stageWeight(stage))
-  if (stage === 'fetch' || stage === 'idle') {
-    if (totals.total <= 0) return 5
-    return Math.min(55, Math.round((totals.done / totals.total) * 55))
-  }
-  return stageWeight(stage)
-}
-
-function stageWeight(stage: string): number {
-  const order = [
-    'fetch',
-    'normalize',
-    'dedup',
-    'score',
-    'summarize',
-    'persist',
-    'cluster',
-    'brief',
-    'done',
-  ]
-  const idx = order.indexOf(stage)
-  if (idx < 0) return 10
-  return Math.round(((idx + 1) / order.length) * 100)
 }
 
 export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
@@ -93,7 +56,14 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
         </div>
       </div>
 
-      <div className="h-1 w-full bg-mist/70">
+      <div
+        className="h-1 w-full bg-mist/70"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={t(`fetchProgress.stage.${progress.stage}`, { defaultValue: progress.stage })}
+      >
         <div
           className={`h-full transition-[width] duration-300 ease-out ${
             progress.stage === 'error' ? 'bg-ember' : 'bg-moss'
@@ -111,7 +81,11 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
                 source.status === 'running' ? 'bg-moss/5' : ''
               }`}
             >
-              <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot(source.status)}`} />
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${statusDot(source.status)}`}
+                title={source.status}
+                aria-label={source.status}
+              />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span className="truncate font-medium text-ink">{source.name}</span>

@@ -71,7 +71,7 @@ node server.mjs
 
 ```bash
 cd backend && ./mvnw test
-cd frontend && npm run build
+cd frontend && npm run lint && npm run test && npm run build
 ```
 
 Optional smoke:

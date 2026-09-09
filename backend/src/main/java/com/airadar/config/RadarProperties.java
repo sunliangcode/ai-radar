@@ -348,6 +348,7 @@ public class RadarProperties {
         private boolean enabled = false;
         private int timeoutMs = 15000;
         private int maxChars = 12000;
+        private int parallelism = 4;
         private String userAgent = "ai-radar/0.1 (+https://github.com/sunliangcode/ai-radar)";
 
         public boolean isEnabled() {
@@ -372,6 +373,14 @@ public class RadarProperties {
 
         public void setMaxChars(int maxChars) {
             this.maxChars = maxChars;
+        }
+
+        public int getParallelism() {
+            return parallelism;
+        }
+
+        public void setParallelism(int parallelism) {
+            this.parallelism = parallelism;
         }
 
         public String getUserAgent() {

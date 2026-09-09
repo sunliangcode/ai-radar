@@ -32,10 +32,7 @@ fi
 
 if command -v npm >/dev/null 2>&1; then
   echo "Building frontend into Spring static…"
-  (cd frontend && npm run build)
-  mkdir -p backend/src/main/resources/static
-  rm -rf backend/src/main/resources/static/*
-  cp -R frontend/dist/. backend/src/main/resources/static/
+  (cd frontend && npm run build:embed)
 fi
 
 echo "Starting backend (background)…"

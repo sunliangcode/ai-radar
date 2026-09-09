@@ -29,6 +29,7 @@ public class OpenAiCompatibleAiService implements AiService {
     private final RadarProperties properties;
     private final String scorePromptTemplate;
     private final String summarizePromptTemplate;
+    private final String summarizeBatchPromptTemplate;
     private final String assignEventPromptTemplate;
     private final String eventIntelligencePromptTemplate;
     private final String webExtractPromptTemplate;
@@ -43,6 +44,7 @@ public class OpenAiCompatibleAiService implements AiService {
         this.properties = properties;
         this.scorePromptTemplate = readPrompt("prompts/score.md");
         this.summarizePromptTemplate = readPrompt("prompts/summarize.md");
+        this.summarizeBatchPromptTemplate = readPrompt("prompts/summarize-batch.md");
         this.assignEventPromptTemplate = readPrompt("prompts/assign_event.md");
         this.eventIntelligencePromptTemplate = readPrompt("prompts/event_intelligence.md");
         this.webExtractPromptTemplate = readPrompt("prompts/web-extract.md");
@@ -89,6 +91,55 @@ public class OpenAiCompatibleAiService implements AiService {
             throw new IllegalStateException("Empty summary from model");
         }
         return summary.asText().trim();
+    }
+
+    @Override
+    public List<String> summarizeBatch(List<NewsItem> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        if (items.size() == 1) {
+            return List.of(summarize(items.getFirst()));
+        }
+        ensureApiKey();
+        ArrayNode payloadItems = objectMapper.createArrayNode();
+        for (int i = 0; i < items.size(); i++) {
+            NewsItem item = items.get(i);
+            ObjectNode node = objectMapper.createObjectNode();
+            node.put("index", i);
+            node.put("title", nullToEmpty(item.getTitle()));
+            node.put("url", nullToEmpty(item.getCanonicalUrl()));
+            node.put("snippet", truncate(nullToEmpty(item.getContentSnippet()), 800));
+            node.put("scoreReason", nullToEmpty(item.getScoreReason()));
+            payloadItems.add(node);
+        }
+        String prompt = summarizeBatchPromptTemplate
+                .replace("{{language}}", properties.getSummaryLanguage())
+                .replace("{{interestProfile}}", properties.getInterestProfile())
+                .replace("{{itemsJson}}", payloadItems.toPrettyString());
+        JsonNode response = chatJson(prompt, true);
+        List<String> results = new ArrayList<>(items.size());
+        for (int i = 0; i < items.size(); i++) {
+            results.add("");
+        }
+        JsonNode arr = response.path("items");
+        if (arr.isArray()) {
+            for (JsonNode node : arr) {
+                int index = node.path("index").asInt(-1);
+                if (index < 0 || index >= items.size()) {
+                    continue;
+                }
+                results.set(index, node.path("summary").asText("").trim());
+            }
+        } else if (response.has("summary") && items.size() == 1) {
+            results.set(0, response.path("summary").asText("").trim());
+        }
+        for (int i = 0; i < results.size(); i++) {
+            if (results.get(i) == null || results.get(i).isBlank()) {
+                results.set(i, summarize(items.get(i)));
+            }
+        }
+        return results;
     }
 
     @Override

@@ -50,6 +50,15 @@ public class RedditConnector implements SourceConnector {
     }
 
     @Override
+    public ConnectorDescriptor descriptor() {
+        return ConnectorDescriptor.of("REDDIT", "Reddit", List.of(
+                ConnectorDescriptor.ConfigField.text("subreddits", "Subreddits (comma-separated)", true),
+                ConnectorDescriptor.ConfigField.text("sort", "Sort (new|hot|…)", false),
+                ConnectorDescriptor.ConfigField.text("limit", "Limit per subreddit", false)
+        ));
+    }
+
+    @Override
     public List<RawItem> fetch(FetchContext ctx) {
         List<String> subreddits = resolveSubreddits(ctx);
         String sort = stringConfig(ctx, "sort", "new");

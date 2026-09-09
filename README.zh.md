@@ -5,7 +5,7 @@
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3-green)
 
-# AI Intelligence Radar
+# AI Radar
 
 个人 AI 情报：多源抓取 → 打分/摘要 → **事件聚类** → 每日简报 → 飞书 / 邮件 / Webhook / Outbox。单用户 Web UI，四栏情报首页。
 
@@ -49,9 +49,8 @@ cd frontend && npm install && npm run dev
 **单进程（UI 打进 Spring）**
 
 ```bash
-cd frontend && npm install && npm run build
-rm -rf ../backend/src/main/resources/static/*
-cp -R dist/. ../backend/src/main/resources/static/
+cd frontend && npm install && npm run build:embed
+# 输出到 backend/src/main/resources/static/
 cd ../backend && ./mvnw spring-boot:run
 # http://localhost:8080
 ```

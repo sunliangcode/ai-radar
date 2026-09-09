@@ -9,6 +9,11 @@ frontend/node_modules/
 frontend/dist/
 mcp/node_modules/
 
+# Baked SPA assets (rebuilt by `npm run build` / Docker / CI)
+backend/src/main/resources/static/assets/
+backend/src/main/resources/static/index.html
+backend/src/main/resources/static/icons.svg
+
 # Runtime data
 backend/data/
 data/

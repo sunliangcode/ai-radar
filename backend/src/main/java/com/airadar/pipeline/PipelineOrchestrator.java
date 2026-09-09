@@ -21,7 +21,7 @@ import com.airadar.provider.webfetch.WebContentFetcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -30,10 +30,13 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class PipelineOrchestrator {
@@ -51,6 +54,7 @@ public class PipelineOrchestrator {
     private final EventClusterService eventClusterService;
     private final FetchProgress fetchProgress;
     private final WebContentFetcher webContentFetcher;
+    private final TransactionTemplate transactionTemplate;
 
     public PipelineOrchestrator(
             SourceRepository sourceRepository,
@@ -63,7 +67,8 @@ public class PipelineOrchestrator {
             ExecutorService fetchExecutor,
             EventClusterService eventClusterService,
             FetchProgress fetchProgress,
-            WebContentFetcher webContentFetcher
+            WebContentFetcher webContentFetcher,
+            TransactionTemplate transactionTemplate
     ) {
         this.sourceRepository = sourceRepository;
         this.newsItemRepository = newsItemRepository;
@@ -76,9 +81,13 @@ public class PipelineOrchestrator {
         this.eventClusterService = eventClusterService;
         this.fetchProgress = fetchProgress;
         this.webContentFetcher = webContentFetcher;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
+    /**
+     * Runs the full pipeline without a single long DB transaction.
+     * Network I/O and LLM calls stay outside TX; persist uses a short transactional boundary.
+     */
     public PipelineResult run(PipelineRequest request) {
         long started = System.currentTimeMillis();
         int lookbackHours = request.lookbackHours() != null ? request.lookbackHours() : properties.getLookbackHours();
@@ -207,25 +216,38 @@ public class PipelineOrchestrator {
         CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
 
         List<RawItem> all = new ArrayList<>();
-        Instant now = Instant.now();
+        List<Long> succeededIds = new ArrayList<>();
         for (CompletableFuture<SourceFetchOutcome> future : futures) {
             SourceFetchOutcome outcome = future.join();
             all.addAll(outcome.items());
             if (outcome.error() == null) {
-                sourceRepository.findById(outcome.sourceId()).ifPresent(entity -> {
+                succeededIds.add(outcome.sourceId());
+            }
+        }
+        touchSourcesFetched(succeededIds);
+        return all;
+    }
+
+    private void touchSourcesFetched(List<Long> sourceIds) {
+        if (sourceIds == null || sourceIds.isEmpty()) {
+            return;
+        }
+        Instant now = Instant.now();
+        transactionTemplate.executeWithoutResult(status -> {
+            for (Long id : sourceIds) {
+                sourceRepository.findById(id).ifPresent(entity -> {
                     entity.setLastFetchedAt(now);
                     sourceRepository.save(entity);
                 });
             }
-        }
-        return all;
+        });
     }
 
     private void enrichFullText(List<NewsItem> items) {
         if (!webContentFetcher.isEnabled() || items == null || items.isEmpty()) {
             return;
         }
-        int enriched = 0;
+        List<NewsItem> needsFetch = new ArrayList<>();
         for (NewsItem item : items) {
             String snippet = item.getContentSnippet();
             boolean needs = snippet == null || snippet.length() < 80;
@@ -233,20 +255,46 @@ public class PipelineOrchestrator {
             if (meta != null && Boolean.TRUE.equals(meta.get("needsFullText"))) {
                 needs = true;
             }
-            if (!needs) {
-                continue;
+            if (needs) {
+                needsFetch.add(item);
             }
-            String text = webContentFetcher.fetchArticleText(item.getCanonicalUrl());
-            if (text == null || text.isBlank()) {
-                continue;
-            }
-            item.setContentSnippet(text.length() > properties.getMaxSnippetChars()
-                    ? text.substring(0, properties.getMaxSnippetChars())
-                    : text);
-            enriched++;
         }
-        if (enriched > 0) {
-            log.info("pipeline_stage=web_fetch enriched={}", enriched);
+        if (needsFetch.isEmpty()) {
+            return;
+        }
+
+        int parallelism = Math.max(1, properties.getWebFetch().getParallelism());
+        Semaphore gate = new Semaphore(parallelism);
+        AtomicInteger enriched = new AtomicInteger();
+        int maxSnippet = properties.getMaxSnippetChars();
+
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        for (NewsItem item : needsFetch) {
+            futures.add(CompletableFuture.runAsync(() -> {
+                try {
+                    gate.acquire();
+                    try {
+                        String text = webContentFetcher.fetchArticleText(item.getCanonicalUrl());
+                        if (text == null || text.isBlank()) {
+                            return;
+                        }
+                        item.setContentSnippet(text.length() > maxSnippet
+                                ? text.substring(0, maxSnippet)
+                                : text);
+                        enriched.incrementAndGet();
+                    } finally {
+                        gate.release();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
+                    log.debug("web_fetch_skip url={} error={}", item.getCanonicalUrl(), e.getMessage());
+                }
+            }, fetchExecutor));
+        }
+        CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+        if (enriched.get() > 0) {
+            log.info("pipeline_stage=web_fetch enriched={} parallelism={}", enriched.get(), parallelism);
         }
     }
 
@@ -284,28 +332,67 @@ public class PipelineOrchestrator {
     }
 
     private void summarizeItems(List<NewsItem> items) {
-        for (NewsItem item : items) {
-            if (item.getSummary() != null && !item.getSummary().isBlank()) {
-                continue;
-            }
+        List<NewsItem> needSummary = items.stream()
+                .filter(i -> i.getSummary() == null || i.getSummary().isBlank())
+                .toList();
+        if (needSummary.isEmpty()) {
+            return;
+        }
+        int batchSize = Math.max(1, properties.getAiBatchSize());
+        for (int i = 0; i < needSummary.size(); i += batchSize) {
+            List<NewsItem> batch = needSummary.subList(i, Math.min(i + batchSize, needSummary.size()));
             try {
-                item.setSummary(aiService.summarize(item));
-                item.setUpdatedAt(Instant.now());
+                List<String> summaries = aiService.summarizeBatch(batch);
+                for (int j = 0; j < batch.size(); j++) {
+                    NewsItem item = batch.get(j);
+                    String summary = j < summaries.size() ? summaries.get(j) : null;
+                    if (summary == null || summary.isBlank()) {
+                        summary = item.getScoreReason() != null ? item.getScoreReason() : "";
+                    }
+                    item.setSummary(summary);
+                    item.setUpdatedAt(Instant.now());
+                }
             } catch (Exception e) {
-                log.error("ai_summary_failed url={} error={}", item.getCanonicalUrl(), e.getMessage());
-                item.setSummary(item.getScoreReason() != null ? item.getScoreReason() : "");
+                log.error("ai_summary_batch_failed size={} error={}", batch.size(), e.getMessage());
+                for (NewsItem item : batch) {
+                    try {
+                        item.setSummary(aiService.summarize(item));
+                    } catch (Exception ex) {
+                        item.setSummary(item.getScoreReason() != null ? item.getScoreReason() : "");
+                    }
+                    item.setUpdatedAt(Instant.now());
+                }
             }
         }
     }
 
     private void persistAll(List<NewsItem> items) {
-        for (NewsItem item : items) {
-            NewsItemEntity entity = newsItemRepository.findByCanonicalUrl(item.getCanonicalUrl())
-                    .orElseGet(NewsItemEntity::new);
-            entityMapper.applyToEntity(item, entity);
-            NewsItemEntity saved = newsItemRepository.save(entity);
-            item.setId(saved.getId());
+        if (items == null || items.isEmpty()) {
+            return;
         }
+        transactionTemplate.executeWithoutResult(status -> {
+            List<String> urls = items.stream()
+                    .map(NewsItem::getCanonicalUrl)
+                    .filter(u -> u != null && !u.isBlank())
+                    .distinct()
+                    .toList();
+            Map<String, NewsItemEntity> existing = new HashMap<>();
+            if (!urls.isEmpty()) {
+                for (NewsItemEntity entity : newsItemRepository.findByCanonicalUrlIn(urls)) {
+                    existing.put(entity.getCanonicalUrl(), entity);
+                }
+            }
+            List<NewsItemEntity> toSave = new ArrayList<>(items.size());
+            for (NewsItem item : items) {
+                NewsItemEntity entity = existing.getOrDefault(item.getCanonicalUrl(), new NewsItemEntity());
+                entityMapper.applyToEntity(item, entity);
+                toSave.add(entity);
+            }
+            List<NewsItemEntity> saved = newsItemRepository.saveAll(toSave);
+            for (int i = 0; i < items.size(); i++) {
+                items.get(i).setId(saved.get(i).getId());
+            }
+        });
     }
 
     private record SourceFetchOutcome(Long sourceId, List<RawItem> items, String error) {

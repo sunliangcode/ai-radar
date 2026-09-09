@@ -26,7 +26,9 @@
     "fetching": "抓取中…",
     "pushing": "推送中…",
     "itemsCount": "{{count}} items",
-    "lastFetched": "last {{time}}"
+    "lastFetched": "last {{time}}",
+    "yes": "是",
+    "no": "否"
   },
   "fetchProgress": {
     "elapsed": "已用时 {{time}}",
@@ -67,6 +69,7 @@
     "noBrief": "尚无日报",
     "allEvents": "全部 Events",
     "clusterDone": "聚类完成",
+    "pushDone": "推送完成",
     "loading": "加载情报…",
     "whatChanged": "What Changed",
     "whatChangedEmpty": "今日尚无新时间线节点。去抓取或聚类。",
@@ -89,7 +92,13 @@
     "timeline": "Timeline",
     "noTimeline": "暂无时间线节点",
     "sourcesItems": "Sources / Items",
-    "scoreLabel": "{{status}} · score {{score}}"
+    "scoreLabel": "{{status}} · score {{score}}",
+    "status": {
+      "ACTIVE": "进行中",
+      "EMERGING": "萌芽",
+      "WATCHING": "关注",
+      "ARCHIVED": "归档"
+    }
   },
   "sources": {
     "title": "Sources",
@@ -147,6 +156,7 @@
     "subtitle": "按日生成的 Markdown 日报。",
     "generate": "生成 / 抓取",
     "pushToday": "推送今日",
+    "pushDone": "推送完成",
     "loading": "加载日报…",
     "empty": "还没有日报文件。",
     "detailTitle": "日报 {{date}}"
@@ -184,6 +194,18 @@
     "smtpFrom": "SMTP from",
     "smtpTo": "SMTP to",
     "smtpPasswordHint": "SMTP 密码已配置：{{status}}（设 SMTP_PASSWORD 环境变量）",
+    "pushOnlyWhenItems": "仅在有条目时推送",
+    "smtpStarttls": "SMTP STARTTLS",
+    "securitySection": "本地访问",
+    "localToken": "浏览器本地 Token（X-Local-Token）",
+    "localTokenPlaceholder": "可选，保存在本浏览器",
+    "localTokenHint": "请求时作为 X-Local-Token 发送；若服务端设置了 LOCAL_TOKEN，需与之匹配。",
+    "localTokenServer": "服务端 LOCAL_TOKEN 已配置：",
+    "pack": {
+      "ai-core": "ai-core（英文核心源）",
+      "ai-cn": "ai-cn（中文源）",
+      "ai-signals": "ai-signals（PH / Twitter / WEB）"
+    },
     "importPack": "导入 Pack",
     "importing": "导入中…"
   }

@@ -48,6 +48,15 @@ public class HackerNewsConnector implements SourceConnector {
     }
 
     @Override
+    public ConnectorDescriptor descriptor() {
+        return ConnectorDescriptor.of("HACKER_NEWS", "Hacker News", List.of(
+                ConnectorDescriptor.ConfigField.text("query", "Search query", true),
+                ConnectorDescriptor.ConfigField.text("tags", "Algolia tags", false),
+                ConnectorDescriptor.ConfigField.text("hitsPerPage", "Hits per page", false)
+        ));
+    }
+
+    @Override
     public List<RawItem> fetch(FetchContext ctx) {
         try {
             return fetchAlgolia(ctx);

@@ -18,6 +18,21 @@ public interface AiService {
     String summarize(NewsItem item);
 
     /**
+     * Batch summarize; default loops {@link #summarize(NewsItem)}.
+     * Implementations may issue a single LLM call for the batch.
+     */
+    default List<String> summarizeBatch(List<NewsItem> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        List<String> out = new java.util.ArrayList<>(items.size());
+        for (NewsItem item : items) {
+            out.add(summarize(item));
+        }
+        return out;
+    }
+
+    /**
      * Decide whether to attach an item to an existing candidate event or create a new one.
      * Low confidence should prefer createNew to avoid bad merges.
      */

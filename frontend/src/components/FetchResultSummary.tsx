@@ -1,16 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { FetchProgress, FetchSourceProgress } from '../lib/api'
+import { formatDuration } from '../lib/format'
 import { Button } from './ui'
-
-function formatDuration(ms?: number | null): string {
-  if (ms == null || Number.isNaN(ms)) return '—'
-  if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`
-  const sec = ms / 1000
-  if (sec < 60) return `${sec.toFixed(1)}s`
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
-}
 
 function statusDot(status: FetchSourceProgress['status']): string {
   if (status === 'done') return 'bg-moss'
@@ -61,7 +52,11 @@ export function FetchResultSummary({
         <ul className="divide-y divide-mist/70">
           {progress.sources.map((source) => (
             <li key={source.id} className="flex items-start gap-3 px-5 py-3.5">
-              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${statusDot(source.status)}`} />
+              <span
+                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${statusDot(source.status)}`}
+                title={source.status}
+                aria-label={source.status}
+              />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="font-medium text-ink">{source.name}</span>

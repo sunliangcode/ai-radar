@@ -26,7 +26,9 @@
     "fetching": "Fetching…",
     "pushing": "Pushing…",
     "itemsCount": "{{count}} items",
-    "lastFetched": "last {{time}}"
+    "lastFetched": "last {{time}}",
+    "yes": "yes",
+    "no": "no"
   },
   "fetchProgress": {
     "elapsed": "elapsed {{time}}",
@@ -67,6 +69,7 @@
     "noBrief": "No briefs yet",
     "allEvents": "All Events",
     "clusterDone": "Clustering complete",
+    "pushDone": "Push complete",
     "loading": "Loading intelligence…",
     "whatChanged": "What Changed",
     "whatChangedEmpty": "No new timeline nodes today. Fetch or cluster.",
@@ -89,7 +92,13 @@
     "timeline": "Timeline",
     "noTimeline": "No timeline nodes yet",
     "sourcesItems": "Sources / Items",
-    "scoreLabel": "{{status}} · score {{score}}"
+    "scoreLabel": "{{status}} · score {{score}}",
+    "status": {
+      "ACTIVE": "Active",
+      "EMERGING": "Emerging",
+      "WATCHING": "Watching",
+      "ARCHIVED": "Archived"
+    }
   },
   "sources": {
     "title": "Sources",
@@ -147,6 +156,7 @@
     "subtitle": "Daily Markdown briefs.",
     "generate": "Generate / Fetch",
     "pushToday": "Push today",
+    "pushDone": "Push complete",
     "loading": "Loading briefs…",
     "empty": "No brief files yet.",
     "detailTitle": "Brief {{date}}"
@@ -184,6 +194,18 @@
     "smtpFrom": "SMTP from",
     "smtpTo": "SMTP to",
     "smtpPasswordHint": "SMTP password configured: {{status}} (set SMTP_PASSWORD env var)",
+    "pushOnlyWhenItems": "Push only when there are items",
+    "smtpStarttls": "SMTP STARTTLS",
+    "securitySection": "Local access",
+    "localToken": "Browser local token (X-Local-Token)",
+    "localTokenPlaceholder": "Optional token stored in this browser",
+    "localTokenHint": "Sent as X-Local-Token. Must match LOCAL_TOKEN on the server when that env is set.",
+    "localTokenServer": "Server LOCAL_TOKEN configured:",
+    "pack": {
+      "ai-core": "ai-core (EN core)",
+      "ai-cn": "ai-cn (China sources)",
+      "ai-signals": "ai-signals (PH / Twitter / WEB)"
+    },
     "importPack": "Import Pack",
     "importing": "Importing…"
   }

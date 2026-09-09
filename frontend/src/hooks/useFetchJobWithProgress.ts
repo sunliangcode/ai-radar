@@ -28,7 +28,10 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
   const [summaryProgress, setSummaryProgress] = useState<FetchProgress | null>(null)
   const [jobError, setJobError] = useState<Error | null>(null)
   const invalidateKeysRef = useRef(onSuccessInvalidate ?? DEFAULT_INVALIDATE)
-  invalidateKeysRef.current = onSuccessInvalidate ?? DEFAULT_INVALIDATE
+
+  useEffect(() => {
+    invalidateKeysRef.current = onSuccessInvalidate ?? DEFAULT_INVALIDATE
+  }, [onSuccessInvalidate])
 
   const fetchJob = useMutation({
     mutationFn: api.fetchJob,
@@ -63,7 +66,7 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     queryKey: PROGRESS_KEY,
     queryFn: api.fetchProgress,
     enabled: polling,
-    refetchInterval: polling ? 300 : false,
+    refetchInterval: polling ? 800 : false,
     refetchIntervalInBackground: true,
     staleTime: 0,
     gcTime: 0,

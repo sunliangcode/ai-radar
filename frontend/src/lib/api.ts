@@ -158,6 +158,19 @@ export type FetchProgress = {
   } | null
 }
 
+export type ConnectorConfigField = {
+  key: string
+  label: string
+  type: string
+  required: boolean
+}
+
+export type ConnectorDescriptor = {
+  id: string
+  displayName: string
+  configFields: ConnectorConfigField[]
+}
+
 export const api = {
   health: () => request<{ status: string; db: string }>('/api/health'),
   items: (q: string = '') => request<Item[]>(`/api/items${q}`),
@@ -172,6 +185,7 @@ export const api = {
     request<Source>(`/api/sources/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteSource: (id: number) =>
     request<void>(`/api/sources/${id}`, { method: 'DELETE' }),
+  connectors: () => request<ConnectorDescriptor[]>('/api/connectors'),
   briefs: () => request<BriefSummary[]>('/api/briefs'),
   brief: (date: string) => request<BriefDetail>(`/api/briefs/${date}`),
   settings: () => request<Settings>('/api/settings'),

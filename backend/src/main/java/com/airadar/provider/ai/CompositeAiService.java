@@ -61,6 +61,22 @@ public class CompositeAiService implements AiService {
     }
 
     @Override
+    public List<String> summarizeBatch(List<NewsItem> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        if (!hasApiKey()) {
+            return heuristic.summarizeBatch(items);
+        }
+        try {
+            return openAi.summarizeBatch(items);
+        } catch (Exception e) {
+            log.warn("ai_summary_batch_fallback=heuristic error={}", e.getMessage());
+            return heuristic.summarizeBatch(items);
+        }
+    }
+
+    @Override
     public EventAssignResult assignEvent(NewsItem item, List<EventCandidate> candidates) {
         if (!hasApiKey()) {
             return heuristic.assignEvent(item, candidates);

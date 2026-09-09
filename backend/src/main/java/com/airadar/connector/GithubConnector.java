@@ -44,6 +44,15 @@ public class GithubConnector implements SourceConnector {
     }
 
     @Override
+    public ConnectorDescriptor descriptor() {
+        return ConnectorDescriptor.of("GITHUB", "GitHub Search", List.of(
+                ConnectorDescriptor.ConfigField.text("query", "Search query", true),
+                ConnectorDescriptor.ConfigField.text("sort", "Sort (stars|updated|…)", false),
+                ConnectorDescriptor.ConfigField.text("perPage", "Per page", false)
+        ));
+    }
+
+    @Override
     public List<RawItem> fetch(FetchContext ctx) {
         String query = stringConfig(ctx, "query", "LLM OR \"large language model\" OR agents in:name,description,topics");
         String sort = stringConfig(ctx, "sort", "updated");

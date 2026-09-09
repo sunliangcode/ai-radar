@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
+
+const embed = process.env.RADAR_EMBED === '1'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -14,7 +17,9 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: embed
+      ? path.resolve(__dirname, '../backend/src/main/resources/static')
+      : 'dist',
     emptyOutDir: true,
   },
 })
