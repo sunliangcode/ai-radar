@@ -2,6 +2,7 @@ import { NavLink, Route, Routes } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import BriefDetailPage from './pages/BriefDetailPage'
 import BriefsPage from './pages/BriefsPage'
+import ContextsPage from './pages/ContextsPage'
 import EventDetailPage from './pages/EventDetailPage'
 import EventsPage from './pages/EventsPage'
 import HomePage from './pages/HomePage'
@@ -38,6 +39,7 @@ export default function App() {
   const { t } = useTranslation()
   const nav = [
     { to: '/', label: t('nav.today'), end: true },
+    { to: '/contexts', label: t('nav.contexts'), end: false },
     { to: '/sources', label: t('nav.sources'), end: false },
     { to: '/briefs', label: t('nav.briefs'), end: false },
     { to: '/settings', label: t('nav.settings'), end: false },
@@ -82,6 +84,7 @@ export default function App() {
             <Route path="/items" element={<ItemsPage />} />
             <Route path="/briefs" element={<BriefsPage />} />
             <Route path="/briefs/:date" element={<BriefDetailPage />} />
+            <Route path="/contexts" element={<ContextsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </div>

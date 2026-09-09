@@ -82,11 +82,100 @@ export type RadarEvent = {
   items?: Item[]
 }
 
+export type ImpactCard = {
+  id: number
+  eventId: number
+  title: string
+  relevance?: number
+  impact?: number
+  urgency?: number
+  confidence?: number
+  effort?: number
+  priority?: number
+  tier?: string
+  why?: string
+  evidence?: string
+  recommendation?: string
+  updatedAt?: string
+  watchNext?: string
+  summary?: string
+  score?: number
+  status?: string
+}
+
+export type ActionCard = {
+  id: number
+  title: string
+  steps?: string[]
+  estimatedMinutes?: number
+  successCriteria?: string
+  status?: string
+  eventId?: number
+  impactId?: number
+}
+
+export type OpportunityCard = {
+  id: number
+  title: string
+  summary?: string
+  estimatedHours?: number
+  coveragePct?: number
+  kind?: string
+  eventId?: number
+}
+
+export type ExperimentCard = {
+  id: number
+  actionId: number
+  title: string
+  goal?: string
+  status?: string
+  successRate?: number
+  latencyMs?: number
+  tokenCost?: number
+  humanIntervention?: number
+  reviewTimeMin?: number
+  notes?: string
+}
+
+export type OutcomeSummary = {
+  monthKey: string
+  insights?: number
+  actions?: number
+  experiments?: number
+  successful?: number
+  timeSavedHours?: number
+  aiCost?: number
+  roi?: number | null
+}
+
+export type UserContext = {
+  id?: number
+  payload: {
+    profile?: { role?: string; summary?: string }
+    projects?: { name?: string; type?: string; stack?: string[]; url?: string }[]
+    technologies?: string[]
+    interests?: string[]
+    goals?: string[]
+    preferences?: Record<string, unknown>
+  }
+  rawText?: string
+  source?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
 export type IntelligenceHome = {
   whatChanged: { eventId: number; eventTitle?: string; at: string; label: string; note?: string }[]
+  whyCare?: ImpactCard[]
+  impacts?: ImpactCard[]
+  actions?: ActionCard[]
+  opportunities?: OpportunityCard[]
+  risks?: OpportunityCard[]
+  whatToWatch: ImpactCard[]
+  outcomeSummary?: OutcomeSummary
   whatMatters: RadarEvent[]
   whatsEmerging: RadarEvent[]
-  whatToWatch: RadarEvent[]
   generatedAt?: string
 }
 
@@ -195,9 +284,34 @@ export const api = {
   fetchProgress: () => request<FetchProgress>('/api/jobs/fetch/progress'),
   pushJob: () => request<Record<string, unknown>>('/api/jobs/push', { method: 'POST' }),
   clusterJob: () => request<Record<string, unknown>>('/api/jobs/cluster', { method: 'POST' }),
+  impactJob: () => request<Record<string, unknown>>('/api/jobs/impact', { method: 'POST' }),
   events: (q: string = '') => request<RadarEvent[]>(`/api/events${q}`),
   event: (id: number) => request<RadarEvent>(`/api/events/${id}`),
   intelligenceHome: () => request<IntelligenceHome>('/api/intelligence/home'),
+  getContext: () => request<UserContext>('/api/contexts'),
+  saveContext: (body: unknown) =>
+    request<UserContext>('/api/contexts', { method: 'PUT', body: JSON.stringify(body) }),
+  extractContext: (text: string) =>
+    request<{ payload: UserContext['payload']; rawText?: string; source?: string }>(
+      '/api/contexts/extract',
+      { method: 'POST', body: JSON.stringify({ text }) },
+    ),
+  importGithubContext: (url: string) =>
+    request<{ payload: UserContext['payload']; rawText?: string; source?: string }>(
+      '/api/contexts/import/github',
+      { method: 'POST', body: JSON.stringify({ url }) },
+    ),
+  importMarkdownContext: (markdown: string) =>
+    request<{ payload: UserContext['payload']; rawText?: string; source?: string }>(
+      '/api/contexts/import/markdown',
+      { method: 'POST', body: JSON.stringify({ markdown }) },
+    ),
+  patchAction: (id: number, body: { status: string }) =>
+    request<ActionCard>(`/api/actions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  experiments: () => request<ExperimentCard[]>('/api/experiments'),
+  updateExperiment: (id: number, body: Record<string, unknown>) =>
+    request<ExperimentCard>(`/api/experiments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  outcomeSummary: () => request<OutcomeSummary>('/api/outcomes/summary'),
   importPack: (body: { packId?: string; path?: string }) =>
     request<Record<string, unknown>>('/api/packs/import', { method: 'POST', body: JSON.stringify(body) }),
 }

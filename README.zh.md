@@ -7,17 +7,19 @@
 
 # AI Radar
 
-个人 AI 情报：多源抓取 → 打分/摘要 → **事件聚类** → 每日简报 → 飞书 / 邮件 / Webhook / Outbox。单用户 Web UI，四栏情报首页。
+**个人 AI 决策系统** — 知道变了什么、为何重要、下一步做什么。
+
+持续理解你的工作与技术栈，发现外部重要变化，判断影响，并给出可执行行动（可选实验与 ROI）。底盘仍是 1.0：多源抓取 → 打分/摘要 → 事件聚类 → 每日简报 → 飞书 / 邮件 / Webhook / Outbox。
 
 **技术栈：** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI 兼容 LLM（可选）
 
 ### 为什么选择 ai-radar？
 
-- ✓ 多源抓取，归一化 / 去重
-- ✓ 开箱启发式打分；可选 LLM 摘要
-- ✓ 事件聚类与四栏情报首页
-- ✓ 每日简报推送到飞书 / 邮件 / Webhook / Outbox
-- ✓ 可扩展连接器、投递、Pack，以及只读 MCP sidecar
+- ✓ AI 理解你的 **Context**（画像、项目、技术栈）
+- ✓ 发现高影响 **Change**（以 Event 为证据）
+- ✓ 解释 **为何与你有关**（Impact × Context）
+- ✓ 把洞察变成 **Action** 与可度量 **Experiment**
+- ✓ 1.0 底盘：连接器、简报、投递、Pack、只读 MCP
 
 [安装](#三步快速开始) · [GitHub](https://github.com/sunliangcode/ai-radar)
 
@@ -144,11 +146,14 @@ cd backend && ./mvnw test
 cd frontend && npm run build
 ```
 
-## 事件与扩展
+## 事件、2.0 与扩展
 
-- 情报首页：`GET /api/intelligence/home`（四栏）
+- 情报首页：`GET /api/intelligence/home`（五问：变了什么 / 为何关心 / 影响 / 做什么 / 观察）
+- Context：`GET/PUT /api/contexts`，自然语言提取与 GitHub 导入
+- Impact 任务：`POST /api/jobs/impact`
 - 事件：`GET /api/events`、`GET /api/events/{id}`；任务 `POST /api/jobs/cluster`
 - Pack：`POST /api/packs/import`，body `{"packId":"ai-core|ai-cn|ai-signals"}`（`packs/sources/*.json`）
+- 领域模型：[ai-radar-2.0-domain](docs/ai-radar-2.0-domain.md) · 计划：[aim/06](aim/06-ai-radar-2.0.md)
 - 文档：[extending-connectors](docs/extending-connectors.md)、[extending-delivery](docs/extending-delivery.md)、[mcp](docs/mcp.md)
 - MCP sidecar：`mcp/server.mjs`（默认只读）
 - Smoke：`scripts/smoke-extensibility.sh`
@@ -159,6 +164,7 @@ cd frontend && npm run build
 - [安全策略](SECURITY.md)
 - [变更日志](CHANGELOG.md)
 - [路线图 / 计划](aim/README.md)
+- [2.0 领域模型](docs/ai-radar-2.0-domain.md)
 
 ## License
 

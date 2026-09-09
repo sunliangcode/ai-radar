@@ -46,4 +46,29 @@ public interface AiService {
     default List<ExtractedItem> extractItems(String content, String extractionPrompt) {
         return List.of();
     }
+
+    /** Extract structured personal Context from free text. */
+    default ContextExtractResult extractContext(String text) {
+        return ContextExtractResult.empty();
+    }
+
+    /** Score how a Change impacts the user Context. */
+    default ImpactAnalysisResult analyzeImpact(String contextJson, String title, String summary, String eventImpact, String memoryHints) {
+        return new ImpactAnalysisResult(50, 50, 40, 50, 50, "Related to your interests.", summary, "Watch for follow-ups.", "MEDIUM");
+    }
+
+    /** Suggest opportunity/risk + action from a high-impact change. */
+    default OpportunitySuggestion suggestOpportunity(String contextJson, String title, String why, String recommendation) {
+        return new OpportunitySuggestion(
+                "OPPORTUNITY",
+                "Explore: " + title,
+                why,
+                4.0,
+                30.0,
+                "Run a small trial",
+                List.of("Pick 3 real tasks", "Try the new approach", "Record success rate"),
+                90,
+                "Useful enough to keep using"
+        );
+    }
 }

@@ -62,12 +62,27 @@ const tools = [
   },
   {
     name: 'get_intelligence_home',
-    description: 'Four-column intelligence home payload',
+    description: 'Five-question intelligence home payload',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'list_sources',
     description: 'List configured sources',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_contexts',
+    description: 'Get the single-user Context profile',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_high_impacts',
+    description: 'List high/medium personal impacts from intelligence home',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_active_experiments',
+    description: 'List running experiments',
     inputSchema: { type: 'object', properties: {} },
   },
 ]
@@ -127,6 +142,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     case 'list_sources':
       data = await api('/api/sources')
       break
+    case 'list_contexts':
+      data = await api('/api/contexts')
+      break
+    case 'list_high_impacts': {
+      const home = await api('/api/intelligence/home')
+      data = home.impacts || home.whyCare || []
+      break
+    }
+    case 'list_active_experiments': {
+      const all = await api('/api/experiments')
+      data = Array.isArray(all) ? all.filter((e) => e.status === 'running') : all
+      break
+    }
     case 'run_fetch':
       data = await api('/api/jobs/fetch', { method: 'POST' })
       break

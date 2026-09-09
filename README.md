@@ -7,17 +7,19 @@ English | [中文](README.zh.md)
 
 # AI Radar
 
-Personal AI intel: multi-source fetch → score/summary → **Event clustering** → daily brief → Feishu / Email / Webhook / Outbox. Single-user Web UI with four-column intelligence home.
+**Personal AI Intelligence** — Know what changed. Know why it matters. Know what to do.
+
+Understands your work & stack, detects external changes, explains impact, and suggests next actions (with optional experiments & ROI). Built on a 1.0 chassis: multi-source fetch → score/summary → Event clustering → daily brief → Feishu / Email / Webhook / Outbox.
 
 **Stack:** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI-compatible LLM (optional)
 
 ### Why ai-radar?
 
-- ✓ Multi-source fetch with normalize / dedup
-- ✓ Heuristic scoring out of the box; optional LLM summarize
-- ✓ Event clustering and a four-column intelligence home
-- ✓ Daily brief push to Feishu / Email / Webhook / Outbox
-- ✓ Extensible connectors, delivery, packs, and a read-only MCP sidecar
+- ✓ AI understands your **Context** (profile, projects, stack)
+- ✓ Detects high-impact **Changes** (Event-backed)
+- ✓ Explains **why you should care** (Impact × Context)
+- ✓ Turns insight into **Actions** and measurable **Experiments**
+- ✓ 1.0 chassis: connectors, briefs, delivery, packs, read-only MCP
 
 [Install](#3-step-quick-start) · [GitHub](https://github.com/sunliangcode/ai-radar)
 
@@ -144,11 +146,14 @@ cd backend && ./mvnw test
 cd frontend && npm run build
 ```
 
-## Events & extensibility
+## Events, 2.0 & extensibility
 
-- Intelligence home: `GET /api/intelligence/home` (four columns)
+- Intelligence home: `GET /api/intelligence/home` (five questions: changed / why care / impact / do / watch)
+- Context: `GET/PUT /api/contexts`, extract & GitHub import
+- Impact job: `POST /api/jobs/impact`
 - Events: `GET /api/events`, `GET /api/events/{id}`; job `POST /api/jobs/cluster`
 - Packs: `POST /api/packs/import` with body `{"packId":"ai-core|ai-cn|ai-signals"}` (`packs/sources/*.json`)
+- Domain: [ai-radar-2.0-domain](docs/ai-radar-2.0-domain.md) · Plan: [aim/06](aim/06-ai-radar-2.0.md)
 - Docs: [extending-connectors](docs/extending-connectors.md), [extending-delivery](docs/extending-delivery.md), [mcp](docs/mcp.md)
 - MCP sidecar: `mcp/server.mjs` (read-only by default)
 - Smoke: `scripts/smoke-extensibility.sh`
@@ -159,6 +164,7 @@ cd frontend && npm run build
 - [Security](SECURITY.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap / plans](aim/README.md)
+- [2.0 domain model](docs/ai-radar-2.0-domain.md)
 
 ## License
 

@@ -33,6 +33,9 @@ public class OpenAiCompatibleAiService implements AiService {
     private final String assignEventPromptTemplate;
     private final String eventIntelligencePromptTemplate;
     private final String webExtractPromptTemplate;
+    private final String extractContextPromptTemplate;
+    private final String analyzeImpactPromptTemplate;
+    private final String suggestOpportunityPromptTemplate;
 
     public OpenAiCompatibleAiService(
             RestClient.Builder restClientBuilder,
@@ -48,6 +51,9 @@ public class OpenAiCompatibleAiService implements AiService {
         this.assignEventPromptTemplate = readPrompt("prompts/assign_event.md");
         this.eventIntelligencePromptTemplate = readPrompt("prompts/event_intelligence.md");
         this.webExtractPromptTemplate = readPrompt("prompts/web-extract.md");
+        this.extractContextPromptTemplate = readPrompt("prompts/extract_context.md");
+        this.analyzeImpactPromptTemplate = readPrompt("prompts/analyze_impact.md");
+        this.suggestOpportunityPromptTemplate = readPrompt("prompts/suggest_opportunity.md");
     }
 
     @Override
@@ -230,6 +236,119 @@ public class OpenAiCompatibleAiService implements AiService {
             }
         }
         return items;
+    }
+
+    @Override
+    public ContextExtractResult extractContext(String text) {
+        ensureApiKey();
+        String prompt = extractContextPromptTemplate.replace("{{text}}", truncate(nullToEmpty(text), 8000));
+        JsonNode response = chatJson(prompt, true);
+        return parseContext(response);
+    }
+
+    @Override
+    public ImpactAnalysisResult analyzeImpact(String contextJson, String title, String summary, String eventImpact, String memoryHints) {
+        ensureApiKey();
+        String prompt = analyzeImpactPromptTemplate
+                .replace("{{memory}}", nullToEmpty(memoryHints))
+                .replace("{{context}}", nullToEmpty(contextJson))
+                .replace("{{title}}", nullToEmpty(title))
+                .replace("{{summary}}", truncate(nullToEmpty(summary), 2000))
+                .replace("{{eventImpact}}", nullToEmpty(eventImpact));
+        JsonNode response = chatJson(prompt, true);
+        return parseImpact(response);
+    }
+
+    @Override
+    public OpportunitySuggestion suggestOpportunity(String contextJson, String title, String why, String recommendation) {
+        ensureApiKey();
+        String prompt = suggestOpportunityPromptTemplate
+                .replace("{{context}}", nullToEmpty(contextJson))
+                .replace("{{title}}", nullToEmpty(title))
+                .replace("{{why}}", nullToEmpty(why))
+                .replace("{{recommendation}}", nullToEmpty(recommendation));
+        JsonNode response = chatJson(prompt, true);
+        List<String> steps = new ArrayList<>();
+        JsonNode stepsNode = response.path("steps");
+        if (stepsNode.isArray()) {
+            stepsNode.forEach(n -> steps.add(n.asText()));
+        }
+        if (steps.isEmpty()) {
+            steps.add("Try a small pilot");
+        }
+        String kind = response.path("kind").asText("OPPORTUNITY");
+        if (!"RISK".equalsIgnoreCase(kind)) {
+            kind = "OPPORTUNITY";
+        } else {
+            kind = "RISK";
+        }
+        return new OpportunitySuggestion(
+                kind,
+                response.path("title").asText("Opportunity"),
+                response.path("summary").asText(""),
+                response.path("estimatedHoursPerMonth").asDouble(4),
+                response.path("coveragePct").asDouble(30),
+                response.path("actionTitle").asText("Start a trial"),
+                steps,
+                response.path("estimatedMinutes").asInt(60),
+                response.path("successCriteria").asText("")
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private ContextExtractResult parseContext(JsonNode response) {
+        Map<String, Object> profile = objectMapper.convertValue(
+                response.path("profile").isMissingNode() ? objectMapper.createObjectNode() : response.path("profile"),
+                Map.class);
+        List<Map<String, Object>> projects = new ArrayList<>();
+        JsonNode projectsNode = response.path("projects");
+        if (projectsNode.isArray()) {
+            for (JsonNode p : projectsNode) {
+                projects.add(objectMapper.convertValue(p, Map.class));
+            }
+        }
+        List<String> technologies = readStringList(response.path("technologies"));
+        List<String> interests = readStringList(response.path("interests"));
+        List<String> goals = readStringList(response.path("goals"));
+        Map<String, Object> preferences = objectMapper.convertValue(
+                response.path("preferences").isMissingNode() ? objectMapper.createObjectNode() : response.path("preferences"),
+                Map.class);
+        return new ContextExtractResult(profile, projects, technologies, interests, goals, preferences);
+    }
+
+    private ImpactAnalysisResult parseImpact(JsonNode response) {
+        String tier = response.path("tier").asText("MEDIUM").toUpperCase();
+        if (!List.of("HIGH", "MEDIUM", "LOW", "IGNORE").contains(tier)) {
+            tier = "MEDIUM";
+        }
+        return new ImpactAnalysisResult(
+                clamp(response.path("relevance").asDouble(50)),
+                clamp(response.path("impact").asDouble(50)),
+                clamp(response.path("urgency").asDouble(40)),
+                clamp(response.path("confidence").asDouble(50)),
+                clamp(response.path("effort").asDouble(50)),
+                response.path("why").asText(""),
+                response.path("evidence").asText(""),
+                response.path("recommendation").asText(""),
+                tier
+        );
+    }
+
+    private static List<String> readStringList(JsonNode node) {
+        List<String> out = new ArrayList<>();
+        if (node != null && node.isArray()) {
+            node.forEach(n -> {
+                String v = n.asText("").trim();
+                if (!v.isBlank()) {
+                    out.add(v);
+                }
+            });
+        }
+        return out;
+    }
+
+    private static double clamp(double v) {
+        return Math.max(0, Math.min(100, v));
     }
 
     private List<ScoreResult> parseScoreResults(JsonNode response, int expected) {

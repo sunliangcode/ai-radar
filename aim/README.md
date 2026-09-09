@@ -1,8 +1,10 @@
 # AI Intelligence Radar — 执行计划总览
 
-> 一句话定位：**持续扫描 AI 信息，把分散消息聚合成持续演化的事件，解释影响，并推送到飞书/邮箱。**
+> 一句话定位（1.0）：**持续扫描 AI 信息，把分散消息聚合成持续演化的事件，解释影响，并推送到飞书/邮箱。**
 >
-> 本目录只放**可执行计划**。步骤 1–5 已在 `backend/` + `frontend/` + `mcp/` + `docs/` 落地。
+> 下一阶段（2.0）：**持续理解你的工作与技术栈，发现外部重要变化，判断影响，并给出下一步行动。** 详见 [06-ai-radar-2.0.md](./06-ai-radar-2.0.md)。
+>
+> 本目录只放**可执行计划**。步骤 1–5 已在 `backend/` + `frontend/` + `mcp/` + `docs/` 落地；步骤 6（AI Radar 2.0）已实现 MVP。
 
 ## 已锁定决策
 
@@ -26,8 +28,9 @@
 4. [03-product-ui.md](./03-product-ui.md) — 产品化 Web UI
 5. [04-event-intelligence.md](./04-event-intelligence.md) — 事件演化与情报
 6. [05-extensibility.md](./05-extensibility.md) — 插件 / MCP / 市场预埋
+7. [06-ai-radar-2.0.md](./06-ai-radar-2.0.md) — AI Radar 2.0（个人决策系统）
 
-**建议实现顺序严格按 01 → 05**；每步通过验收后再进入下一步。
+**建议实现顺序严格按 01 → 05**；每步通过验收后再进入下一步。步骤 6 在 1.0 底盘之上推进，长文背景见 [AI_Radar_新思路.md](./AI_Radar_新思路.md)。
 
 ## 目标架构（个人单机）
 
@@ -128,6 +131,7 @@ ai-intelligence-radar/
 | 3 产品化 UI | [03-product-ui.md](./03-product-ui.md) | 已实现 |
 | 4 事件情报 | [04-event-intelligence.md](./04-event-intelligence.md) | 已实现 |
 | 5 扩展预埋 | [05-extensibility.md](./05-extensibility.md) | 已实现 |
+| 6 AI Radar 2.0 | [06-ai-radar-2.0.md](./06-ai-radar-2.0.md) | 已实现（MVP） |
 
 ## 每个步骤文件的固定结构
 

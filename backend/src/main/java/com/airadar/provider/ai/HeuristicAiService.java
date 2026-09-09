@@ -308,6 +308,74 @@ public class HeuristicAiService implements AiService {
         }
     }
 
+    @Override
+    public ContextExtractResult extractContext(String text) {
+        List<String> interests = parseInterestKeywords(text);
+        Map<String, Object> profile = new java.util.LinkedHashMap<>();
+        profile.put("role", "Practitioner");
+        profile.put("summary", text == null ? "" : truncate(text.trim(), 240));
+        return new ContextExtractResult(profile, List.of(), interests, interests, List.of("stay-current"), Map.of());
+    }
+
+    @Override
+    public ImpactAnalysisResult analyzeImpact(String contextJson, String title, String summary, String eventImpact, String memoryHints) {
+        String blob = ((title == null ? "" : title) + " " + (summary == null ? "" : summary)
+                + " " + (contextJson == null ? "" : contextJson)).toLowerCase(Locale.ROOT);
+        List<String> interestKeywords = parseInterestKeywords(properties.getInterestProfile());
+        int hits = 0;
+        for (String kw : interestKeywords) {
+            if (blob.contains(kw.toLowerCase(Locale.ROOT))) {
+                hits++;
+            }
+        }
+        hits += countHits(blob, AI_KEYWORDS);
+        double relevance = Math.min(95, 35 + hits * 12);
+        double impact = Math.min(90, 30 + hits * 10);
+        double urgency = title != null && title.toLowerCase(Locale.ROOT).contains("release") ? 70 : 45;
+        String tier = relevance >= 75 ? "HIGH" : relevance >= 55 ? "MEDIUM" : relevance >= 40 ? "LOW" : "IGNORE";
+        String why = hits > 0
+                ? "Matches your Context keywords (" + hits + " hits)."
+                : "Limited overlap with your Context; monitor lightly.";
+        if (memoryHints != null && memoryHints.toLowerCase(Locale.ROOT).contains("rejected")) {
+            relevance = Math.max(20, relevance - 15);
+            if ("HIGH".equals(tier)) {
+                tier = "MEDIUM";
+            }
+            why += " Adjusted by Memory (past rejects).";
+        }
+        return new ImpactAnalysisResult(
+                relevance,
+                impact,
+                urgency,
+                60,
+                40,
+                why,
+                eventImpact == null || eventImpact.isBlank() ? truncate(summary == null ? "" : summary, 200) : eventImpact,
+                "Review and decide whether to run a small experiment.",
+                tier
+        );
+    }
+
+    @Override
+    public OpportunitySuggestion suggestOpportunity(String contextJson, String title, String why, String recommendation) {
+        boolean risk = title != null && (title.toLowerCase(Locale.ROOT).contains("cve")
+                || title.toLowerCase(Locale.ROOT).contains("breaking")
+                || title.toLowerCase(Locale.ROOT).contains("deprecat"));
+        return new OpportunitySuggestion(
+                risk ? "RISK" : "OPPORTUNITY",
+                (risk ? "Risk: " : "Opportunity: ") + (title == null ? "Change" : truncate(title, 80)),
+                why == null ? "" : why,
+                risk ? 2.0 : 6.0,
+                risk ? 20.0 : 40.0,
+                risk ? "Assess compatibility" : "Run a 20-task trial",
+                risk
+                        ? List.of("Check dependency versions", "Read release notes", "Plan upgrade window")
+                        : List.of("Pick 5–20 real tasks", "Compare against current workflow", "Record success rate & cost"),
+                risk ? 45 : 120,
+                risk ? "No unexpected breakage in staging" : "Success rate > 70% on sample tasks"
+        );
+    }
+
     private static String truncate(String text, int max) {
         return text.length() <= max ? text : text.substring(0, max) + "…";
     }

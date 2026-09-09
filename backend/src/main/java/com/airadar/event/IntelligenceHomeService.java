@@ -1,6 +1,10 @@
 package com.airadar.event;
 
+import com.airadar.action.ActionService;
 import com.airadar.api.ApiTimes;
+import com.airadar.impact.ImpactService;
+import com.airadar.opportunity.OpportunityService;
+import com.airadar.outcome.OutcomeService;
 import com.airadar.persistence.EntityMapper;
 import com.airadar.persistence.NewsItemRepository;
 import com.airadar.settings.SettingsService;
@@ -24,6 +28,10 @@ public class IntelligenceHomeService {
     private final NewsItemRepository newsItemRepository;
     private final EntityMapper entityMapper;
     private final SettingsService settingsService;
+    private final ImpactService impactService;
+    private final ActionService actionService;
+    private final OpportunityService opportunityService;
+    private final OutcomeService outcomeService;
 
     public IntelligenceHomeService(
             EventRepository eventRepository,
@@ -31,7 +39,11 @@ public class IntelligenceHomeService {
             EventItemRepository eventItemRepository,
             NewsItemRepository newsItemRepository,
             EntityMapper entityMapper,
-            SettingsService settingsService
+            SettingsService settingsService,
+            ImpactService impactService,
+            ActionService actionService,
+            OpportunityService opportunityService,
+            OutcomeService outcomeService
     ) {
         this.eventRepository = eventRepository;
         this.timelineEntryRepository = timelineEntryRepository;
@@ -39,6 +51,10 @@ public class IntelligenceHomeService {
         this.newsItemRepository = newsItemRepository;
         this.entityMapper = entityMapper;
         this.settingsService = settingsService;
+        this.impactService = impactService;
+        this.actionService = actionService;
+        this.opportunityService = opportunityService;
+        this.outcomeService = outcomeService;
     }
 
     @Transactional(readOnly = true)
@@ -64,6 +80,24 @@ public class IntelligenceHomeService {
                 })
                 .toList();
 
+        List<Map<String, Object>> whyCare = impactService.whyCare();
+        List<Map<String, Object>> impacts = impactService.listByTiers(List.of("HIGH", "MEDIUM"));
+        List<Map<String, Object>> actions = actionService.listOpen();
+        List<Map<String, Object>> opportunities = opportunityService.listByKind("OPPORTUNITY");
+        List<Map<String, Object>> risks = opportunityService.listByKind("RISK");
+
+        List<Map<String, Object>> whatToWatch = new ArrayList<>();
+        whatToWatch.addAll(impactService.listByTiers(List.of("LOW")).stream().limit(8).toList());
+        eventRepository.findTop50ByOrderByScoreDesc().stream()
+                .filter(e -> e.getWatchNext() != null && !e.getWatchNext().isBlank())
+                .limit(10)
+                .forEach(e -> {
+                    Map<String, Object> m = eventSummary(e);
+                    m.put("watchNext", e.getWatchNext());
+                    whatToWatch.add(m);
+                });
+
+        // Legacy columns for gradual UI migration
         List<Map<String, Object>> whatMatters = eventRepository
                 .findByStatusOrderByScoreDesc(EventStatus.ACTIVE)
                 .stream()
@@ -77,29 +111,18 @@ public class IntelligenceHomeService {
                 .limit(8)
                 .map(this::eventSummary)
                 .toList());
-        if (whatsEmerging.size() < 5) {
-            eventRepository.findTop50ByOrderByScoreDesc().stream()
-                    .filter(e -> e.getStatus() == EventStatus.EMERGING || e.getStatus() == EventStatus.ACTIVE)
-                    .filter(e -> whatsEmerging.stream().noneMatch(m -> e.getId().equals(m.get("id"))))
-                    .limit(5 - whatsEmerging.size())
-                    .forEach(e -> whatsEmerging.add(eventSummary(e)));
-        }
-
-        List<Map<String, Object>> whatToWatch = eventRepository.findTop50ByOrderByScoreDesc().stream()
-                .filter(e -> e.getWatchNext() != null && !e.getWatchNext().isBlank())
-                .limit(10)
-                .map(e -> {
-                    Map<String, Object> m = eventSummary(e);
-                    m.put("watchNext", e.getWatchNext());
-                    return m;
-                })
-                .toList();
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("whatChanged", whatChanged);
+        out.put("whyCare", whyCare);
+        out.put("impacts", impacts);
+        out.put("actions", actions);
+        out.put("opportunities", opportunities);
+        out.put("risks", risks);
+        out.put("whatToWatch", whatToWatch);
+        out.put("outcomeSummary", outcomeService.summary());
         out.put("whatMatters", whatMatters);
         out.put("whatsEmerging", whatsEmerging);
-        out.put("whatToWatch", whatToWatch);
         out.put("generatedAt", ApiTimes.iso(Instant.now()));
         return out;
     }

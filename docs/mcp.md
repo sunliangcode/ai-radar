@@ -39,8 +39,11 @@ Environment:
 
 - `list_events`, `get_event`
 - `list_briefs`
-- `get_intelligence_home`
+- `get_intelligence_home` (five-question home)
 - `list_sources`
+- `list_contexts`
+- `list_high_impacts`
+- `list_active_experiments`
 - Writes (`run_fetch`, `run_push`) only when `ALLOW_WRITES=true`
 
 With writes disabled, write tool names are not registered (and are rejected if called).

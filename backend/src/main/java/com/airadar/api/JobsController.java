@@ -48,4 +48,9 @@ public class JobsController {
     public ResponseEntity<Map<String, Object>> cluster() {
         return ResponseEntity.ok(radarJobs.runCluster());
     }
+
+    @PostMapping("/impact")
+    public ResponseEntity<Map<String, Object>> impact() {
+        return ResponseEntity.ok(radarJobs.runImpact());
+    }
 }

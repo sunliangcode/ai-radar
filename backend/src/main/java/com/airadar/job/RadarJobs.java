@@ -2,6 +2,7 @@ package com.airadar.job;
 
 import com.airadar.delivery.DeliveryService;
 import com.airadar.event.EventClusterService;
+import com.airadar.impact.ImpactService;
 import com.airadar.pipeline.PipelineOrchestrator;
 import com.airadar.pipeline.PipelineRequest;
 import com.airadar.pipeline.PipelineResult;
@@ -27,8 +28,10 @@ public class RadarJobs {
     private final JobMutex jobMutex;
     private final SettingsService settingsService;
     private final EventClusterService eventClusterService;
+    private final ImpactService impactService;
     private final FetchProgress fetchProgress;
     private final AtomicBoolean clusterRunning = new AtomicBoolean(false);
+    private final AtomicBoolean impactRunning = new AtomicBoolean(false);
 
     public RadarJobs(
             PipelineOrchestrator orchestrator,
@@ -36,6 +39,7 @@ public class RadarJobs {
             JobMutex jobMutex,
             SettingsService settingsService,
             EventClusterService eventClusterService,
+            ImpactService impactService,
             FetchProgress fetchProgress
     ) {
         this.orchestrator = orchestrator;
@@ -43,6 +47,7 @@ public class RadarJobs {
         this.jobMutex = jobMutex;
         this.settingsService = settingsService;
         this.eventClusterService = eventClusterService;
+        this.impactService = impactService;
         this.fetchProgress = fetchProgress;
     }
 
@@ -146,6 +151,17 @@ public class RadarJobs {
             return eventClusterService.linkUnattachedItems(Math.max(hours, 72));
         } finally {
             clusterRunning.set(false);
+        }
+    }
+
+    public Map<String, Object> runImpact() {
+        if (!impactRunning.compareAndSet(false, true)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "impact job already running");
+        }
+        try {
+            return impactService.recomputeAll();
+        } finally {
+            impactRunning.set(false);
         }
     }
 }

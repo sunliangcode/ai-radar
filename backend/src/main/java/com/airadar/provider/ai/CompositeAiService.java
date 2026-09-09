@@ -115,6 +115,45 @@ public class CompositeAiService implements AiService {
         }
     }
 
+    @Override
+    public ContextExtractResult extractContext(String text) {
+        if (!hasApiKey()) {
+            return heuristic.extractContext(text);
+        }
+        try {
+            return openAi.extractContext(text);
+        } catch (Exception e) {
+            log.warn("ai_context_fallback=heuristic error={}", e.getMessage());
+            return heuristic.extractContext(text);
+        }
+    }
+
+    @Override
+    public ImpactAnalysisResult analyzeImpact(String contextJson, String title, String summary, String eventImpact, String memoryHints) {
+        if (!hasApiKey()) {
+            return heuristic.analyzeImpact(contextJson, title, summary, eventImpact, memoryHints);
+        }
+        try {
+            return openAi.analyzeImpact(contextJson, title, summary, eventImpact, memoryHints);
+        } catch (Exception e) {
+            log.warn("ai_impact_fallback=heuristic error={}", e.getMessage());
+            return heuristic.analyzeImpact(contextJson, title, summary, eventImpact, memoryHints);
+        }
+    }
+
+    @Override
+    public OpportunitySuggestion suggestOpportunity(String contextJson, String title, String why, String recommendation) {
+        if (!hasApiKey()) {
+            return heuristic.suggestOpportunity(contextJson, title, why, recommendation);
+        }
+        try {
+            return openAi.suggestOpportunity(contextJson, title, why, recommendation);
+        } catch (Exception e) {
+            log.warn("ai_opportunity_fallback=heuristic error={}", e.getMessage());
+            return heuristic.suggestOpportunity(contextJson, title, why, recommendation);
+        }
+    }
+
     private boolean hasApiKey() {
         String key = properties.getOpenai().getApiKey();
         return key != null && !key.isBlank()

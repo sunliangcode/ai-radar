@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type Settings } from '../lib/api'
 import { Button, PageHeader, StateBox } from '../components/ui'
@@ -101,6 +102,11 @@ export default function SettingsPage() {
         <section className="rounded-xl border border-mist bg-paper/70 p-4">
           <h3 className="mb-1 font-serif text-lg">{t('settings.basicsSection')}</h3>
           <p className="mb-3 text-xs text-muted">{t('settings.interestHint')}</p>
+          <p className="mb-3 text-sm">
+            <Link className="text-moss underline underline-offset-2" to="/contexts">
+              {t('settings.openContexts')}
+            </Link>
+          </p>
           <div className="grid gap-3">
             <label className="block text-sm">
               <span className="text-muted">{t('settings.interestProfile')}</span>
