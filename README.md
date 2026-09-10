@@ -7,167 +7,71 @@ English | [中文](README.zh.md)
 
 # AI Radar
 
-**Personal AI Intelligence** — Know what changed. Know why it matters. Know what to do.
+**Your personal AI intelligence system.**
 
-Understands your work & stack, detects external changes, explains impact, and suggests next actions (with optional experiments & ROI). Built on a 1.0 chassis: multi-source fetch → score/summary → Event clustering → daily brief → Feishu / Email / Webhook / Outbox.
+Know what changed. Know why it matters. Know what to do.
+
+AI Radar turns AI news into decisions for your work — it watches the AI ecosystem, understands your projects and stack, and turns important changes into personalized actions.
+
+[Demo](#demo) · [Quick Start](#quick-start) · [Documentation](#documentation)
 
 **Stack:** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI-compatible LLM (optional)
 
-### Why ai-radar?
+## Demo
 
-- ✓ AI understands your **Context** (profile, projects, stack)
-- ✓ Detects high-impact **Changes** (Event-backed)
-- ✓ Explains **why you should care** (Impact × Context)
-- ✓ Turns insight into **Actions** and measurable **Experiments**
-- ✓ Mark **Interested** items; title keywords boost later relevance scoring (without overwriting Settings interest profile)
-- ✓ 1.0 chassis: connectors, briefs, delivery, packs, read-only MCP
+![AI Radar Intelligence Home](assets/demo/intelligence-home.png)
 
-[Install](#3-step-quick-start) · [GitHub](https://github.com/sunliangcode/ai-radar)
+- **What changed** — What truly mattered in the AI world today?
+- **Why care** — Why does this matter for *your* projects and stack?
+- **What to do** — What should you do next?
 
-## 3-step quick start
+### Demo story
 
-### 1. Configure
+1. Open Settings / Context and describe your role, projects, and tech stack.
+2. Run a fetch — Radar surfaces **Changes** that match your world, not every headline.
+3. Open a change to see **Impact**: why it matters to you, not a generic summary.
+4. Take a recommended **Action** — a concrete next step you can execute or experiment with.
 
-```bash
-cd backend
-cp .env.example .env
-# optional: OPENAI_API_KEY, FEISHU_WEBHOOK_URL, WEBHOOK_URL, SMTP_*
+## Why AI Radar
+
+Most AI news is noise. AI Radar filters that noise against your context and surfaces only changes worth your attention — then tells you what to do about them.
+
+## How it works
+
+```text
+Your Context → Signals → Important Changes → Impact → Actions
 ```
 
-Without `OPENAI_API_KEY`, the pipeline uses **heuristic** scoring (still produces a usable brief).
-
-### 2. Run (pick one)
-
-**Dev (API + UI separately)**
+## Quick start
 
 ```bash
-# terminal 1
-cd backend && ./mvnw spring-boot:run
-
-# terminal 2
-cd frontend && npm install && npm run dev
-# UI: http://localhost:5173  (proxies /api → :8080)
-```
-
-**Single process (UI baked into Spring)**
-
-```bash
-cd frontend && npm install && npm run build:embed
-# writes into backend/src/main/resources/static/
-cd ../backend && ./mvnw spring-boot:run
-# http://localhost:8080
-```
-
-**Docker**
-
-```bash
-cp backend/.env.example backend/.env   # edit as needed
-docker compose up -d --build
-curl -s http://localhost:8080/api/health
-```
-
-**install.sh**
-
-```bash
+git clone https://github.com/sunliangcode/ai-radar.git
+cd ai-radar
 ./install.sh
 ```
 
-### 3. Trigger
+Open [http://localhost:8080](http://localhost:8080).
 
-```bash
-curl -s -X POST http://localhost:8080/api/jobs/fetch | jq .
-curl -s -X POST http://localhost:8080/api/jobs/push | jq .   # needs a delivery channel
-curl -s http://localhost:8080/api/items | jq .
-```
+Docker, dev mode, environment variables, and delivery channels: [docs/installation.md](docs/installation.md).
 
-Open the UI: Sources → Fetch → Items → Briefs → Settings.
+## Core features
 
-## Delivery
-
-| Channel | Env / Settings |
-| --- | --- |
-| Feishu | `FEISHU_WEBHOOK_URL` or Settings |
-| Webhook | `WEBHOOK_URL` (+ optional headers JSON) |
-| Email | `SMTP_HOST`, `SMTP_TO`, `SMTP_PASSWORD`, … |
-
-Push runs daily at `radar.push-cron` (default `08:00` `Asia/Shanghai`). Fetch every `radar.fetch-interval-ms` (default 2h). Overlapping jobs are mutex-blocked (`409`).
-
-No channels configured → fetch still works; push logs `no_channels` and skips.
-
-## Main APIs
-
-| Method | Path |
-| --- | --- |
-| GET | `/api/health` |
-| POST | `/api/jobs/fetch`, `/api/jobs/push` |
-| CRUD | `/api/sources` |
-| GET/PATCH | `/api/items` (`saved` / `unread` / `sourceType` filters; PATCH `read` / `saved`) |
-| GET | `/api/items/interest-keywords` (keywords from Interested titles) |
-| GET | `/api/briefs`, `/api/briefs/{date}` |
-| GET/PUT | `/api/settings` |
-| POST | `/api/pipeline/run` (legacy alias of fetch pipeline) |
-
-Swagger UI: `/swagger-ui.html`
-
-Optional LAN guard: set `LOCAL_TOKEN` and send header `X-Local-Token`.
-
-## Default sources
-
-Seeded on empty DB: OpenAI / Hugging Face / Simon Willison RSS, 量子位 & 新智元 WeChat RSS, 36氪, HN, Reddit, GitHub search, Google News, GDELT, OSS Insight, GitHub Trending, V2EX. Token-gated samples (Product Hunt, Twitter, Telegram) are seeded **disabled**.
-
-Import more packs:
-
-```bash
-curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-core"}'
-curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-cn"}'
-curl -s -X POST http://localhost:8080/api/packs/import -H 'Content-Type: application/json' -d '{"packId":"ai-signals"}'
-```
-
-### Connector types
-
-RSS · Hacker News · Reddit · GitHub · GitHub Trending · Google News · GDELT · OSS Insight · V2EX · Telegram · Product Hunt (`PH_TOKEN`) · Twitter/X via Apify (`APIFY_TOKEN`) · WEB (AI extract) · EMAIL (IMAP) · Fixture
-
-Optional: `WEB_FETCH_ENABLED=true` to expand short feed snippets before scoring.
-
-## Layout
-
-```text
-backend/     Spring Boot API + jobs + delivery + static SPA
-frontend/    React + Vite + Tailwind
-mcp/         Read-only MCP sidecar
-packs/       Source pack manifests
-docs/        Extensibility docs
-aim/         execution plans
-Dockerfile / docker-compose.yml / install.sh
-```
-
-## Tests
-
-```bash
-cd backend && ./mvnw test
-cd frontend && npm run build
-```
-
-## Events, 2.0 & extensibility
-
-- Intelligence home: `GET /api/intelligence/home` (five questions: changed / why care / impact / do / watch)
-- Interested items: Raw feed → Interested / Interested only; keywords from saved titles feed scoring as `effectiveInterest = interestProfile + keywords(saved titles)` (affects later ingest scores only; unsaving drops them next run)
-- Context: `GET/PUT /api/contexts`, extract & GitHub import
-- Impact job: `POST /api/jobs/impact`
-- Events: `GET /api/events`, `GET /api/events/{id}`; job `POST /api/jobs/cluster`
-- Packs: `POST /api/packs/import` with body `{"packId":"ai-core|ai-cn|ai-signals"}` (`packs/sources/*.json`)
-- Domain: [ai-radar-2.0-domain](docs/ai-radar-2.0-domain.md) · Plan: [aim/06](aim/06-ai-radar-2.0.md)
-- Docs: [extending-connectors](docs/extending-connectors.md), [extending-delivery](docs/extending-delivery.md), [mcp](docs/mcp.md)
-- MCP sidecar: `mcp/server.mjs` (read-only by default)
-- Smoke: `scripts/smoke-extensibility.sh`
+- **Personal Context** — Profile, projects, and stack so relevance is about *you*, not global trends.
+- **Change Detection** — Important external shifts, not an endless raw feed.
+- **Impact Analysis** — Why a change matters for your work, in plain language.
+- **Recommended Actions** — Concrete next steps (optional experiments & outcomes).
 
 ## Documentation
 
-- [Contributing](CONTRIBUTING.md)
-- [Security](SECURITY.md)
-- [Changelog](CHANGELOG.md)
-- [Roadmap / plans](aim/README.md)
-- [2.0 domain model](docs/ai-radar-2.0-domain.md)
+- [Docs index](docs/README.md)
+- [Installation & operations](docs/installation.md)
+- [Sources & packs](docs/sources.md)
+- [API](docs/api.md)
+- [Architecture / domain](docs/ai-radar-2.0-domain.md)
+- [Delivery channels](docs/extending-delivery.md)
+- [MCP](docs/mcp.md)
+- [Connector development](docs/extending-connectors.md)
+- [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 ## License
 
