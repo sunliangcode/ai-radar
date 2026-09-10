@@ -91,7 +91,7 @@ export default function WatchingPage() {
                   </Link>
                   <span className="font-mono text-[11px] text-muted">{g.entryCount}</span>
                 </div>
-                <ol className="mt-2 space-y-1.5 border-l-2 border-mist pl-3">
+                <ol className="mt-2 space-y-1.5 border-l-2 border-border pl-3">
                   {g.entries.map((e) => (
                     <li key={e.id} className="relative">
                       <span className="absolute -left-[0.42rem] top-1.5 h-1.5 w-1.5 rounded-full bg-muted" />
@@ -200,7 +200,7 @@ export default function WatchingPage() {
                         <button
                           type="button"
                           onClick={() => patchItem.mutate({ id: item.id, read: true })}
-                          className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-mist hover:text-ink"
+                          className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-border hover:text-ink"
                         >
                           {t('common.markRead')}
                         </button>
@@ -209,7 +209,7 @@ export default function WatchingPage() {
                         type="button"
                         disabled={patchItem.isPending}
                         onClick={() => patchItem.mutate({ id: item.id, saved: false })}
-                        className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-mist hover:text-ink disabled:opacity-50"
+                        className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-border hover:text-ink disabled:opacity-50"
                       >
                         {t('watching.unsave')}
                       </button>

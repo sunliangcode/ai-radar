@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type ActionCard } from '../lib/api'
-import { FeedbackBar } from '../components/FeedbackBar'
+import { FeedbackBar } from '../components/feedback/FeedbackBar'
 import { EmptyState, ListSkeleton, PageHeader, StateBox, StatusBadge, useToast } from '../components/ui'
 
 type Filter = 'open' | 'watching' | 'started' | 'useful' | 'ignored' | 'all'
@@ -45,7 +45,7 @@ export default function ActionsPage() {
             type="button"
             onClick={() => setFilter(f)}
             className={`rounded-sm px-3 py-1.5 text-xs font-medium transition ${
-              filter === f ? 'bg-ink text-paper' : 'bg-mist/60 text-muted hover:text-ink'
+              filter === f ? 'bg-ink text-surface' : 'bg-border/60 text-muted hover:text-ink'
             }`}
           >
             {t(`actions.filter.${f}`)}
@@ -111,7 +111,7 @@ function ActionRow({ action }: { action: ActionCard }) {
   ]
 
   return (
-    <li className="border-b border-mist/80 py-4 first:pt-0 last:border-0">
+    <li className="border-b border-border/80 py-4 first:pt-0 last:border-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -149,8 +149,8 @@ function ActionRow({ action }: { action: ActionCard }) {
                 onClick={() => setDoneSteps((prev) => ({ ...prev, [i]: !prev[i] }))}
                 className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border text-[10px] ${
                   doneSteps[i]
-                    ? 'border-moss bg-moss text-paper'
-                    : 'border-mist text-transparent hover:border-accent'
+                    ? 'border-moss bg-moss text-surface'
+                    : 'border-border text-transparent hover:border-accent'
                 }`}
                 aria-pressed={!!doneSteps[i]}
               >

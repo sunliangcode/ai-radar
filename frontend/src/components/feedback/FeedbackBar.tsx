@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api, type FeedbackKind } from '../lib/api'
+import { api, type FeedbackKind } from '../../lib/api'
+import { Chip } from '../primitives/Chip'
 
 const KINDS: FeedbackKind[] = ['useful', 'irrelevant', 'watch', 'ignore', 'tried']
 
@@ -41,22 +42,16 @@ export function FeedbackBar({
       {KINDS.map((kind) => {
         const active = activeKind === kind
         return (
-          <button
+          <Chip
             key={kind}
-            type="button"
-            aria-pressed={active}
+            shape="pill"
+            tone={kind === 'ignore' ? 'danger' : 'default'}
+            active={active}
             disabled={feedback.isPending}
             onClick={() => feedback.mutate(kind)}
-            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
-              active
-                ? 'border-accent bg-accent-soft text-accent'
-                : kind === 'ignore'
-                  ? 'border-border bg-surface text-muted hover:border-ember/40 hover:text-ember'
-                  : 'border-border bg-surface text-muted hover:border-accent/40 hover:text-ink'
-            } disabled:opacity-50`}
           >
             {t(`feedback.${kind}`)}
-          </button>
+          </Chip>
         )
       })}
       {feedback.isSuccess ? (

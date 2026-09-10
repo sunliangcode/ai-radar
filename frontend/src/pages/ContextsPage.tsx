@@ -93,11 +93,11 @@ export default function ContextsPage() {
       <form className="space-y-6" onSubmit={onSubmit}>
         <section>
           <h3 className="mb-3 font-serif text-lg text-ink">{t('contexts.whoSection')}</h3>
-          <div className="space-y-4 rounded-xl border border-mist bg-paper/70 p-4">
+          <div className="space-y-4 rounded-xl border border-border bg-surface/70 p-4">
             <div>
               <h4 className="mb-2 text-sm font-medium text-ink">{t('contexts.extractTitle')}</h4>
               <textarea
-                className="min-h-28 w-full rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+                className="min-h-28 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
                 placeholder={t('contexts.extractPlaceholder')}
@@ -109,7 +109,7 @@ export default function ContextsPage() {
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <input
-                  className="min-w-64 flex-1 rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+                  className="min-w-64 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
                   value={githubUrl}
                   onChange={(e) => setGithubUrl(e.target.value)}
                   placeholder="https://github.com/owner/repo"
@@ -125,11 +125,11 @@ export default function ContextsPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 border-t border-mist pt-4 md:grid-cols-2">
+            <div className="grid gap-4 border-t border-border pt-4 md:grid-cols-2">
               <label className="block text-sm">
                 <span className="mb-1 block text-muted">{t('contexts.role')}</span>
                 <input
-                  className="w-full rounded-md border border-mist bg-paper px-3 py-2"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
                   value={payload.profile?.role ?? ''}
                   onChange={(e) =>
                     setPayload({
@@ -142,7 +142,7 @@ export default function ContextsPage() {
               <label className="block text-sm">
                 <span className="mb-1 block text-muted">{t('contexts.summary')}</span>
                 <input
-                  className="w-full rounded-md border border-mist bg-paper px-3 py-2"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
                   value={payload.profile?.summary ?? ''}
                   onChange={(e) =>
                     setPayload({
@@ -155,7 +155,7 @@ export default function ContextsPage() {
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-muted">{t('contexts.technologies')}</span>
                 <input
-                  className="w-full rounded-md border border-mist bg-paper px-3 py-2"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
                   value={listToText(payload.technologies)}
                   onChange={(e) => setPayload({ ...payload, technologies: textToList(e.target.value) })}
                 />
@@ -163,7 +163,7 @@ export default function ContextsPage() {
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-muted">{t('contexts.interests')}</span>
                 <input
-                  className="w-full rounded-md border border-mist bg-paper px-3 py-2"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
                   value={listToText(payload.interests)}
                   onChange={(e) => setPayload({ ...payload, interests: textToList(e.target.value) })}
                 />
@@ -171,7 +171,7 @@ export default function ContextsPage() {
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-muted">{t('contexts.goals')}</span>
                 <input
-                  className="w-full rounded-md border border-mist bg-paper px-3 py-2"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
                   value={listToText(payload.goals)}
                   onChange={(e) => setPayload({ ...payload, goals: textToList(e.target.value) })}
                 />
@@ -179,7 +179,7 @@ export default function ContextsPage() {
               <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-muted">{t('contexts.projects')}</span>
                 <textarea
-                  className="min-h-24 w-full rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+                  className="min-h-24 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
                   value={(payload.projects ?? [])
                     .map((p) => `${p.name ?? ''}${p.stack?.length ? ` [${p.stack.join(', ')}]` : ''}`)
                     .join('\n')}

@@ -1,12 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import type { FetchProgress, FetchSourceProgress } from '../lib/api'
-import { formatDuration } from '../lib/format'
-import { Button } from './ui'
+import type { FetchProgress, FetchSourceProgress } from '../../lib/api'
+import { formatDuration } from '../../lib/format'
+import { Button } from '../primitives/Button'
 
 function statusDot(status: FetchSourceProgress['status']): string {
   if (status === 'done') return 'bg-moss'
   if (status === 'error') return 'bg-ember'
-  return 'bg-mist'
+  return 'bg-border'
 }
 
 export function FetchResultSummary({
@@ -33,8 +33,8 @@ export function FetchResultSummary({
     : t('fetchProgress.summary.titleDone')
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-mist bg-paper/90">
-      <div className="border-b border-mist/80 px-5 py-5">
+    <div className="mb-6 overflow-hidden rounded-xl border border-border bg-surface/90">
+      <div className="border-b border-border/80 px-5 py-5">
         <h3 className="font-serif text-2xl text-ink">{title}</h3>
         <p className="mt-2 font-mono text-sm text-muted">
           {t('fetchProgress.summary.overview', {
@@ -54,7 +54,7 @@ export function FetchResultSummary({
       </div>
 
       {progress.sources?.length ? (
-        <ul className="divide-y divide-mist/70">
+        <ul className="divide-y divide-border/70">
           {progress.sources.map((source) => (
             <li key={source.id} className="flex items-start gap-3 px-5 py-3.5">
               <span
@@ -77,7 +77,7 @@ export function FetchResultSummary({
                 ) : (
                   <span>
                     {t('fetchProgress.summary.items', { count: source.itemCount ?? 0 })}
-                    <span className="mx-1.5 text-mist">·</span>
+                    <span className="mx-1.5 text-border">·</span>
                     {formatDuration(source.durationMs)}
                   </span>
                 )}
@@ -89,7 +89,7 @@ export function FetchResultSummary({
         <p className="px-5 py-6 text-sm text-muted">{t('fetchProgress.summary.noSources')}</p>
       )}
 
-      <div className="flex flex-wrap justify-end gap-2 border-t border-mist/80 px-5 py-4">
+      <div className="flex flex-wrap justify-end gap-2 border-t border-border/80 px-5 py-4">
         {failedCount > 0 && onRetryFailed ? (
           <Button
             variant="ghost"

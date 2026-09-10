@@ -9,8 +9,6 @@
 
   /* Light: Yuque-like clean tool palette */
   --color-ink: #1f2329;
-  --color-paper: #ffffff;
-  --color-mist: #f2f3f5;
   --color-moss: #2a6f2f;
   --color-moss-deep: #1f5523;
   --color-ember: #b88300;
@@ -31,8 +29,6 @@
 .dark {
   color-scheme: dark;
   --color-ink: #e3e5e8;
-  --color-paper: #1a1b1e;
-  --color-mist: #2a2b2e;
   --color-moss: #4caf50;
   --color-moss-deep: #3d8b40;
   --color-ember: #d29922;
@@ -93,7 +89,7 @@ body {
 }
 .feed-row { position: relative; }
 .feed-row-detail {
-  background: var(--color-mist);
+  background: var(--color-border);
   border-radius: 0 0 6px 6px;
   margin: 0 -1px -1px -1px;
   border-top: 1px solid var(--color-border);
@@ -102,13 +98,13 @@ body {
 /* Skeleton shimmer */
 @keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 .skeleton {
-  background: var(--color-mist);
+  background: var(--color-border);
   border-radius: 4px;
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
 /* Score bar */
-.score-bar { height: 4px; border-radius: 9999px; background: var(--color-mist); overflow: hidden; }
+.score-bar { height: 4px; border-radius: 9999px; background: var(--color-border); overflow: hidden; }
 .score-bar > span { display: block; height: 100%; background: var(--color-moss); }
 .score-bar.medium > span { background: var(--color-ember); }
 .score-bar.low > span { background: var(--color-muted); }
@@ -183,14 +179,14 @@ kbd {
   font-size: 0.85em;
   padding: 0.1em 0.3em;
   border-radius: 3px;
-  background: var(--color-mist);
+  background: var(--color-border);
 }
 .prose-monitor pre {
   margin: 0.5em 0;
   padding: 0.6em;
   overflow-x: auto;
   border-radius: 6px;
-  background: var(--color-mist);
+  background: var(--color-border);
   font-size: 0.8em;
 }
 .prose-monitor pre code {
@@ -220,16 +216,16 @@ kbd {
 
 /* Thin scrollbars for feed columns */
 .thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.thin-scroll::-webkit-scrollbar-thumb { background: var(--color-mist); border-radius: 4px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
 
 /* Zhihu inline article rendering */
 .zhihu-html p { margin: 0 0 0.75em; }
 .zhihu-html p:last-child { margin-bottom: 0; }
 .zhihu-html img { max-width: 100%; height: auto; border-radius: 4px; margin: 0.5em 0; }
-.zhihu-html blockquote { border-left: 3px solid var(--color-mist); padding-left: 1em; color: var(--color-muted); margin: 0.75em 0; }
+.zhihu-html blockquote { border-left: 3px solid var(--color-border); padding-left: 1em; color: var(--color-muted); margin: 0.75em 0; }
 .zhihu-html a { color: var(--color-accent); text-decoration: underline; }
-.zhihu-html pre { background: var(--color-mist); padding: 0.75em; border-radius: 4px; overflow-x: auto; margin: 0.75em 0; font-size: 0.85em; }
-.zhihu-html code { background: var(--color-mist); padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
+.zhihu-html pre { background: var(--color-border); padding: 0.75em; border-radius: 4px; overflow-x: auto; margin: 0.75em 0; font-size: 0.85em; }
+.zhihu-html code { background: var(--color-border); padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
 .zhihu-html pre code { background: transparent; padding: 0; }
 .zhihu-html ul, .zhihu-html ol { padding-left: 1.5em; margin: 0.5em 0; }
 .zhihu-html h1, .zhihu-html h2, .zhihu-html h3 { font-weight: 600; margin: 0.8em 0 0.4em; }

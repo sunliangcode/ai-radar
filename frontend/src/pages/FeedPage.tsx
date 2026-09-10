@@ -5,22 +5,16 @@ import { useTranslation } from 'react-i18next'
 import { api, type Item } from '../lib/api'
 import { Button, ConfirmDialog, EmptyState, ListSkeleton, PageHeader, StateBox, useToast } from '../components/ui'
 import { FeedRow } from '../components/FeedRow'
-import { FetchProgressPanel } from '../components/FetchProgressPanel'
-import { FetchResultSummary } from '../components/FetchResultSummary'
+import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
+import { useSources } from '../hooks/useSources'
+import { useConnectors } from '../hooks/useConnectors'
 import { patchFeedItemInCache, useMarkItemRead } from '../hooks/useMarkItemRead'
 import { dateLocale } from '../i18n'
-
-type Range = '24h' | '7d' | '30d' | 'all'
-
-function sinceIso(range: Range): string | undefined {
-  if (range === 'all') return undefined
-  const now = Date.now()
-  const ms = range === '24h' ? 86400_000 : range === '7d' ? 7 * 86400_000 : 30 * 86400_000
-  return new Date(now - ms).toISOString()
-}
-
-const PAGE = 40
+import { PAGE, sinceIso, type Range } from './feed/feedQuery'
+import { FeedToolbar } from './feed/FeedToolbar'
+import { FeedPagination } from './feed/FeedPagination'
+import { useFeedKeyboard } from './feed/useFeedKeyboard'
 
 export default function FeedPage() {
   const { t, i18n } = useTranslation()
@@ -40,8 +34,8 @@ export default function FeedPage() {
   const [confirmMarkAllOpen, setConfirmMarkAllOpen] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
-  const connectors = useQuery({ queryKey: ['connectors'], queryFn: api.connectors })
+  const sources = useSources()
+  const connectors = useConnectors()
 
   const channelTypes = useMemo(() => {
     const set = new Set<string>()
@@ -89,7 +83,10 @@ export default function FeedPage() {
     enabled: searchMode,
   })
 
-  const items: Item[] = searchMode ? searchQuery.data?.items ?? [] : feedQuery.data?.items ?? []
+  const items: Item[] = useMemo(
+    () => (searchMode ? searchQuery.data?.items ?? [] : feedQuery.data?.items ?? []),
+    [searchMode, searchQuery.data, feedQuery.data],
+  )
   const total = searchMode ? searchQuery.data?.items.length ?? 0 : feedQuery.data?.total ?? 0
 
   useEffect(() => {
@@ -174,44 +171,30 @@ export default function FeedPage() {
     document.getElementById('feed-search-input')?.focus()
   }, [])
 
+  const toggleSaved = useCallback(
+    (item: Item) => patch.mutate({ id: item.id, saved: !item.saved }),
+    [patch],
+  )
+  const markItemSelectedRead = useCallback(
+    (item: Item) => patch.mutate({ id: item.id, read: true }),
+    [patch],
+  )
+  const expandItem = useCallback(
+    (id: number) => setExpandSignals((m) => ({ ...m, [id]: (m[id] ?? 0) + 1 })),
+    [],
+  )
+
   // Global keyboard navigation
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      const idx = items.findIndex((i) => i.id === selectedId)
-      if (e.key === 'j' || e.key === 'ArrowDown') {
-        e.preventDefault()
-        const next = items[Math.min(items.length - 1, idx + 1)]
-        if (next) setSelectedId(next.id)
-      } else if (e.key === 'k' || e.key === 'ArrowUp') {
-        e.preventDefault()
-        const prev = items[Math.max(0, idx - 1)]
-        if (prev) setSelectedId(prev.id)
-      } else if (e.key === 'o') {
-        const cur = items[idx]
-        if (cur) {
-          e.preventDefault()
-          setExpandSignals((m) => ({ ...m, [cur.id]: (m[cur.id] ?? 0) + 1 }))
-        }
-      } else if (e.key === 'Enter') {
-        const cur = items[idx]
-        if (cur) openExternalAndMarkRead(cur)
-      } else if (e.key === 's') {
-        const cur = items[idx]
-        if (cur) patch.mutate({ id: cur.id, saved: !cur.saved })
-      } else if (e.key === 'm') {
-        const cur = items[idx]
-        if (cur && !cur.read) patch.mutate({ id: cur.id, read: true })
-      } else if (e.key === '/') {
-        e.preventDefault()
-        focusSearch()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [items, selectedId, patch, focusSearch, openExternalAndMarkRead])
+  useFeedKeyboard({
+    items,
+    selectedId,
+    onSelect: setSelectedId,
+    onExpand: expandItem,
+    onOpen: openExternalAndMarkRead,
+    onToggleSaved: toggleSaved,
+    onMarkRead: markItemSelectedRead,
+    onFocusSearch: focusSearch,
+  })
 
   useEffect(() => {
     listRef.current
@@ -234,6 +217,16 @@ export default function FeedPage() {
     () => items.filter((i) => !i.read).length,
     [items],
   )
+
+  const clearSearch = useCallback(() => {
+    setInputQ('')
+    setQ('')
+  }, [])
+
+  const onSourceTypeChange = (v: string) => {
+    if (v) setSearchParams({ sourceType: v }, { replace: true })
+    else setSearchParams({}, { replace: true })
+  }
 
   return (
     <div>
@@ -264,130 +257,30 @@ export default function FeedPage() {
         onCancel={() => setConfirmMarkAllOpen(false)}
       />
 
-      {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
-      {phase === 'summary' ? (
-        <FetchResultSummary
-          progress={progress}
-          onDismiss={() => void dismiss()}
-          retrying={retryFailed.isPending}
-          onRetryFailed={(types) => retryFailed.mutate(types)}
-        />
-      ) : null}
+      <FetchProgressSection
+        phase={phase}
+        progress={progress}
+        onDismiss={() => void dismiss()}
+        retrying={retryFailed.isPending}
+        onRetryFailed={(types) => retryFailed.mutate(types)}
+      />
 
-      {/* Toolbar */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <input
-            id="feed-search-input"
-            value={inputQ}
-            onChange={(e) => setInputQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                setInputQ('')
-                setQ('')
-              }
-            }}
-            placeholder={t('feed.searchPlaceholder')}
-            className="h-9 w-full rounded-md border border-border bg-surface px-3 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/15"
-          />
-          {inputQ ? (
-            <button
-              type="button"
-              aria-label={t('feed.clearSearch')}
-              onClick={() => {
-                setInputQ('')
-                setQ('')
-                document.getElementById('feed-search-input')?.focus()
-              }}
-              className="absolute right-2 top-1.5 flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-mist hover:text-ink"
-            >
-              ×
-            </button>
-          ) : (
-            <kbd className="absolute right-2 top-2">/</kbd>
-          )}
-        </div>
-        <div
-          className={`flex rounded-md border border-border bg-surface p-0.5 ${searchMode ? 'pointer-events-none opacity-45' : ''}`}
-          title={searchMode ? t('feed.searchFiltersDisabled') : undefined}
-        >
-          {(['24h', '7d', '30d', 'all'] as Range[]).map((r) => (
-            <button
-              key={r}
-              type="button"
-              disabled={searchMode}
-              onClick={() => setRange(r)}
-              className={`rounded px-2.5 py-1 text-xs font-medium transition ${range === r ? 'bg-accent text-white' : 'text-muted hover:text-ink'}`}
-            >
-              {t(`feed.range.${r}`)}
-            </button>
-          ))}
-        </div>
-        <select
-          value={sourceType}
-          disabled={searchMode}
-          title={searchMode ? t('feed.searchFiltersDisabled') : undefined}
-          onChange={(e) => {
-            const v = e.target.value
-            if (v) setSearchParams({ sourceType: v }, { replace: true })
-            else setSearchParams({}, { replace: true })
-          }}
-          className={`h-9 rounded-md border border-border bg-surface px-2 text-sm ${searchMode ? 'opacity-45' : ''}`}
-        >
-          <option value="">{t('feed.allSources')}</option>
-          {channelTypes.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={searchMode}
-          title={searchMode ? t('feed.searchFiltersDisabled') : undefined}
-          onClick={() => setUnreadOnly((v) => !v)}
-          className={`h-9 rounded-md border px-3 text-xs font-medium transition ${
-            searchMode ? 'opacity-45' : ''
-          } ${unreadOnly ? 'border-accent bg-accent-soft text-accent' : 'border-border bg-surface text-muted hover:text-ink'}`}
-        >
-          {t('feed.unreadOnly')}
-        </button>
-        <span className="font-mono text-xs text-muted">
-          {searchMode ? t('feed.searchingFor', { q }) : t('feed.count', { count: total })}
-          {unreadCount > 0 && !unreadOnly ? ` · ${t('feed.unreadInline', { count: unreadCount })}` : ''}
-        </span>
-      </div>
-      {searchMode ? (
-        <p className="mb-3 text-xs text-muted">{t('feed.searchFiltersDisabled')}</p>
-      ) : null}
-
-      {channelTypes.length > 0 ? (
-        <div className="mb-3 flex gap-1.5 overflow-x-auto md:hidden" aria-label={t('nav.sources')}>
-          <button
-            type="button"
-            disabled={searchMode}
-            onClick={() => setSearchParams({}, { replace: true })}
-            className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-mono transition ${
-              !sourceType ? 'border-accent bg-accent-soft text-accent' : 'border-border bg-surface text-muted'
-            } ${searchMode ? 'opacity-45' : ''}`}
-          >
-            {t('feed.allSources')}
-          </button>
-          {channelTypes.map((c) => (
-            <button
-              key={c}
-              type="button"
-              disabled={searchMode}
-              onClick={() => setSearchParams({ sourceType: c }, { replace: true })}
-              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-mono transition ${
-                sourceType === c ? 'border-accent bg-accent-soft text-accent' : 'border-border bg-surface text-muted'
-              } ${searchMode ? 'opacity-45' : ''}`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <FeedToolbar
+        inputQ={inputQ}
+        onInputChange={setInputQ}
+        onClearSearch={clearSearch}
+        searchMode={searchMode}
+        q={q}
+        range={range}
+        onRangeChange={setRange}
+        sourceType={sourceType}
+        onSourceTypeChange={onSourceTypeChange}
+        unreadOnly={unreadOnly}
+        onToggleUnreadOnly={() => setUnreadOnly((v) => !v)}
+        total={total}
+        unreadCount={unreadCount}
+        channelTypes={channelTypes}
+      />
 
       {/* List */}
       {feedQuery.isLoading && !searchMode ? <ListSkeleton rows={6} /> : null}
@@ -429,8 +322,8 @@ export default function FeedPage() {
                 selected={item.id === selectedId}
                 onSelect={() => setSelectedId(item.id)}
                 locale={locale}
-                onToggleSaved={() => patch.mutate({ id: item.id, saved: !item.saved })}
-                onMarkRead={() => patch.mutate({ id: item.id, read: true })}
+                onToggleSaved={() => toggleSaved(item)}
+                onMarkRead={() => markItemSelectedRead(item)}
                 onNotInterested={() => patch.mutate({ id: item.id, dismissed: true })}
                 onOpenExternal={() => markReadOnOpen(item)}
                 expandSignal={expandSignals[item.id]}
@@ -441,20 +334,8 @@ export default function FeedPage() {
       ) : null}
 
       {/* Pagination (only in list mode) */}
-      {!searchMode && total > PAGE ? (
-        <div className="mt-3 flex items-center justify-between">
-          <span className="font-mono text-xs text-muted">
-            {t('feed.pageInfo', { page, totalPages: Math.ceil(total / PAGE) })}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="ghost" disabled={page <= 1} onClick={() => changePage(page - 1)}>
-              {t('feed.prev')}
-            </Button>
-            <Button variant="ghost" disabled={page >= Math.ceil(total / PAGE)} onClick={() => changePage(page + 1)}>
-              {t('feed.next')}
-            </Button>
-          </div>
-        </div>
+      {!searchMode ? (
+        <FeedPagination page={page} total={total} pageSize={PAGE} onChange={changePage} />
       ) : null}
 
       <p className="mt-4 text-xs text-muted">

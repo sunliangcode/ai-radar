@@ -1,19 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { api, type ImpactCard } from '../lib/api'
-import { Button, ListSkeleton, PageHeader, StateBox, useToast } from '../components/ui'
-import { FetchProgressPanel } from '../components/FetchProgressPanel'
-import { FetchResultSummary } from '../components/FetchResultSummary'
+import { Button, ListSkeleton, PageHeader, StateBox } from '../components/ui'
+import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
+import { useSources } from '../hooks/useSources'
+import { useImportPack } from '../hooks/useImportPack'
 
 export default function TodayPage() {
   const { t, i18n } = useTranslation()
-  const qc = useQueryClient()
-  const { push: pushToast } = useToast()
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
-  const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
+  const sources = useSources()
   const defaultPack = i18n.language.startsWith('zh') ? 'ai-cn' : 'ai-core'
   const [packId, setPackId] = useState(defaultPack)
 
@@ -25,16 +24,7 @@ export default function TodayPage() {
     ['sources'],
   ])
 
-  const importPack = useMutation({
-    mutationFn: () => api.importPack({ packId }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['sources'] })
-      pushToast('success', t('home.gettingStarted.imported'))
-    },
-    onError: (e) => {
-      pushToast('error', (e as Error).message)
-    },
-  })
+  const importPack = useImportPack({ successMessage: 'home.gettingStarted.imported' })
 
   const data = home.data
   const sourceCount = sources.data?.length ?? 0
@@ -55,15 +45,13 @@ export default function TodayPage() {
         }
       />
 
-      {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
-      {phase === 'summary' ? (
-        <FetchResultSummary
-          progress={progress}
-          onDismiss={() => void dismiss()}
-          retrying={retryFailed.isPending}
-          onRetryFailed={(types) => retryFailed.mutate(types)}
-        />
-      ) : null}
+      <FetchProgressSection
+        phase={phase}
+        progress={progress}
+        onDismiss={() => void dismiss()}
+        retrying={retryFailed.isPending}
+        onRetryFailed={(types) => retryFailed.mutate(types)}
+      />
 
       {home.isLoading ? <ListSkeleton rows={4} /> : null}
       {home.isError ? (
@@ -86,7 +74,7 @@ export default function TodayPage() {
                 <option value="ai-cn">{t('home.pack.ai-cn')}</option>
                 <option value="ai-signals">{t('home.pack.ai-signals')}</option>
               </select>
-              <Button loading={importPack.isPending} onClick={() => importPack.mutate()}>
+              <Button loading={importPack.isPending} onClick={() => importPack.mutate(packId)}>
                 {t('home.gettingStarted.import')}
               </Button>
             </div>

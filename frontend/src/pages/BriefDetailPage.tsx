@@ -28,7 +28,7 @@ export default function BriefDetailPage() {
           </Link>
         }
       />
-      <article className="prose-brief rounded-xl border border-mist bg-paper/80 p-5 md:p-8">
+      <article className="prose-brief rounded-xl border border-border bg-surface/80 p-5 md:p-8">
         <ReactMarkdown>{q.data.markdown}</ReactMarkdown>
       </article>
     </div>

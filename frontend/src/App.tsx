@@ -1,7 +1,5 @@
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import ActionsPage from './pages/ActionsPage'
 import BriefDetailPage from './pages/BriefDetailPage'
 import ChangeDetailPage from './pages/ChangeDetailPage'
@@ -14,79 +12,13 @@ import SourcesPage from './pages/SourcesPage'
 import TodayPage from './pages/TodayPage'
 import WatchingPage from './pages/WatchingPage'
 import AiMonitorPage from './pages/AiMonitorPage'
-import { api } from './lib/api'
-import { PrefsProvider, ToastProvider, usePrefs } from './components/ui'
+import { PrefsProvider, ToastProvider } from './components/ui'
+import { Sidebar } from './components/layout/Sidebar'
 import { CommandPalette } from './components/CommandPalette'
-
-function LanguageSwitcher() {
-  const { i18n } = useTranslation()
-  const current = i18n.language.startsWith('zh') ? 'zh' : 'en'
-  return (
-    <div className="flex gap-0.5">
-      {(['zh', 'en'] as const).map((lng) => (
-        <button
-          key={lng}
-          type="button"
-          onClick={() => void i18n.changeLanguage(lng)}
-          className={`rounded px-1.5 py-0.5 text-[11px] font-mono ${
-            current === lng ? 'bg-ink text-paper' : 'text-muted hover:text-ink'
-          }`}
-        >
-          {lng === 'zh' ? '中' : 'EN'}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function ThemeDensityControls() {
-  const { t } = useTranslation()
-  const { theme, setTheme, density, setDensity } = usePrefs()
-  const themeOrder: Array<'system' | 'light' | 'dark'> = ['system', 'light', 'dark']
-  const themeIcon = theme === 'system' ? '⚙' : theme === 'dark' ? '☾' : '☀'
-  const cycleTheme = () => {
-    const next = themeOrder[(themeOrder.indexOf(theme) + 1) % themeOrder.length]
-    setTheme(next)
-  }
-  const densityIcons: Record<typeof density, string> = {
-    compact: '≡',
-    comfortable: '☰',
-    cozy: '☰',
-  }
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={cycleTheme}
-        className="h-7 w-7 rounded text-xs text-muted hover:bg-mist/60 hover:text-ink"
-        title={`${t('app.theme')}: ${t(`app.themeMode.${theme}`)}`}
-        aria-label={`${t('app.theme')}: ${t(`app.themeMode.${theme}`)}`}
-      >
-        <span aria-hidden>{themeIcon}</span>
-      </button>
-      <div className="flex rounded border border-border p-0.5" role="group" aria-label={t('app.densityLabel')}>
-        {(['compact', 'comfortable', 'cozy'] as const).map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => setDensity(d)}
-            className={`h-6 min-w-6 rounded px-1 text-[11px] font-mono ${
-              density === d ? 'bg-ink text-paper' : 'text-muted hover:text-ink'
-            }`}
-            title={t(`app.density.${d}`)}
-            aria-label={t(`app.density.${d}`)}
-            aria-pressed={density === d}
-          >
-            <span aria-hidden>{densityIcons[d]}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
+import { useSources } from './hooks/useSources'
+import { useUnreadCounts } from './hooks/useUnreadCounts'
 
 function Shell() {
-  const { t } = useTranslation()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const location = useLocation()
   const mainRef = useRef<HTMLElement>(null)
@@ -95,8 +27,8 @@ function Shell() {
     mainRef.current?.focus({ preventScroll: true })
   }, [location.pathname])
 
-  const unread = useQuery({ queryKey: ['unread-counts'], queryFn: api.unreadCounts, refetchInterval: 60_000 })
-  const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
+  const unread = useUnreadCounts()
+  const sources = useSources()
 
   const totalUnread = useMemo(() => {
     const m = unread.data ?? {}
@@ -122,81 +54,14 @@ function Shell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const nav = [
-    { to: '/monitor', label: t('nav.monitor'), end: false, icon: '◎' },
-    { to: '/', label: t('nav.today'), end: true, icon: '◉' },
-    { to: '/feed', label: t('nav.feed'), end: false, icon: '≡' },
-    { to: '/watching', label: t('nav.watching'), end: false, icon: '★' },
-    { to: '/actions', label: t('nav.actions'), end: false, icon: '→' },
-    { to: '/settings', label: t('nav.settings'), end: false, icon: '⚙' },
-  ]
-
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[230px_1fr] bg-bg text-ink">
-      <aside className="border-b border-border md:bg-sidebar px-5 py-5 md:border-b-0 md:border-r md:min-h-dvh flex md:flex-col gap-4 md:gap-0">
-        <div className="md:mb-4 md:border-b md:border-border md:pb-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">{t('nav.product')}</p>
-          <h1 className="mt-1 text-lg font-semibold tracking-tight">{t('nav.brand')}</h1>
-        </div>
-        <nav className="flex md:flex-col gap-1 overflow-x-auto" aria-label={t('nav.main')}>
-          {nav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition ${
-                  isActive ? 'bg-accent-soft text-accent font-medium' : 'text-muted hover:bg-mist hover:text-ink'
-                }`
-              }
-            >
-              <span className="font-mono text-xs opacity-70">{item.icon}</span>
-              <span className="flex-1">{item.label}</span>
-              {item.to === '/feed' && totalUnread > 0 ? (
-                <span className="rounded-full bg-moss/15 px-1.5 py-px font-mono text-[10px] text-moss">
-                  {totalUnread}
-                </span>
-              ) : null}
-            </NavLink>
-          ))}
-          <button
-            onClick={() => setPaletteOpen(true)}
-            className="mt-0.5 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted hover:bg-mist hover:text-ink text-left"
-          >
-            <span className="font-mono text-xs opacity-70">⌘K</span>
-            <span>{t('nav.search')}</span>
-          </button>
-        </nav>
-
-        {sourceTypes.length > 0 ? (
-          <div className="mt-4 hidden md:block">
-            <p className="mb-1 px-2.5 text-[10px] font-mono uppercase tracking-wider text-muted/70">
-              {t('nav.sources')}
-            </p>
-            <div className="flex flex-col gap-0.5">
-              {sourceTypes.slice(0, 10).map(([type]) => {
-                const count = unread.data?.[type] ?? 0
-                return (
-                  <Link
-                    key={type}
-                    to={`/feed?sourceType=${encodeURIComponent(type)}`}
-                    className={`flex items-center gap-2 rounded px-2.5 py-1 text-xs hover:bg-mist ${count > 0 ? 'font-medium text-ink' : 'text-faint'}`}
-                  >
-                    <span className="flex-1 font-mono">{type}</span>
-                    {count > 0 ? (
-                      <span className="font-mono text-[10px] text-moss">{count}</span>
-                    ) : null}
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        ) : null}
-        <div className="ml-auto md:ml-0 md:mt-auto flex items-center gap-3">
-          <LanguageSwitcher />
-          <ThemeDensityControls />
-        </div>
-      </aside>
+      <Sidebar
+        totalUnread={totalUnread}
+        unreadByType={unread.data ?? {}}
+        sourceTypes={sourceTypes}
+        onOpenPalette={() => setPaletteOpen(true)}
+      />
       <main
         ref={mainRef}
         tabIndex={-1}

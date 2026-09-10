@@ -184,7 +184,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                       openItemExternal(it.item)
                       onClose()
                     }}
-                    className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${active ? 'bg-mist/60' : ''}`}
+                    className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${active ? 'bg-border/60' : ''}`}
                   >
                     <span className="truncate text-ink">{it.item.title}</span>
                     <span className="ml-auto shrink-0 font-mono text-[11px] text-muted">
@@ -206,7 +206,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                     cmd.run()
                     onClose()
                   }}
-                  className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${active ? 'bg-mist/60' : ''}`}
+                  className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${active ? 'bg-border/60' : ''}`}
                 >
                   <span className="text-ink">{cmd.label}</span>
                   {cmd.hint ? (

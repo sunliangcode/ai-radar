@@ -240,7 +240,7 @@ function SourceBadge({ type }: { type?: string }) {
     HACKER_NEWS: 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
     REDDIT: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
   }
-  const cls = colors[type] ?? 'bg-mist text-muted'
+  const cls = colors[type] ?? 'bg-border text-muted'
   return (
     <span className={`rounded px-1.5 py-px text-[10px] font-mono ${cls}`}>{type}</span>
   )
@@ -269,7 +269,7 @@ export function RowActions({
           e.stopPropagation()
           onSaved?.()
         }}
-        className="rounded px-1.5 py-0.5 hover:bg-mist text-muted hover:text-ink"
+        className="rounded px-1.5 py-0.5 hover:bg-border text-muted hover:text-ink"
       >
         {item.saved ? t('feed.unsave') : t('feed.save')}
       </button>
@@ -280,7 +280,7 @@ export function RowActions({
             e.stopPropagation()
             onRead?.()
           }}
-          className="rounded px-1.5 py-0.5 hover:bg-mist text-muted hover:text-ink"
+          className="rounded px-1.5 py-0.5 hover:bg-border text-muted hover:text-ink"
         >
           {t('feed.read')}
         </button>
@@ -292,7 +292,7 @@ export function RowActions({
             e.stopPropagation()
             onNotInterested()
           }}
-          className="rounded px-1.5 py-0.5 hover:bg-mist text-muted hover:text-ember"
+          className="rounded px-1.5 py-0.5 hover:bg-border text-muted hover:text-ember"
         >
           {t('feed.notInterested')}
         </button>
@@ -305,7 +305,7 @@ export function RowActions({
           e.stopPropagation()
           onOpenExternal?.()
         }}
-        className="rounded px-1.5 py-0.5 hover:bg-mist text-muted hover:text-ink"
+        className="rounded px-1.5 py-0.5 hover:bg-border text-muted hover:text-ink"
       >
         {t('feed.open')} ↗
       </a>

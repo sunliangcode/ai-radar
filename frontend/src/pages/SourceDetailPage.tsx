@@ -40,7 +40,7 @@ export default function SourceDetailPage() {
         }
       />
 
-      <section className="mb-6 rounded-xl border border-mist bg-paper/80 p-4">
+      <section className="mb-6 rounded-xl border border-border bg-surface/80 p-4">
         <h3 className="mb-3 font-serif text-lg text-ink">{t('sources.config')}</h3>
         {configEntries.length === 0 ? (
           <p className="text-sm text-muted">—</p>
@@ -58,7 +58,7 @@ export default function SourceDetailPage() {
 
       <h3 className="mb-2 font-serif text-xl">{t('sources.sampleItems')}</h3>
       {!s.sampleItems?.length ? <StateBox>{t('sources.noSampleItems')}</StateBox> : null}
-      <div className="rounded-xl border border-mist bg-paper/70 px-4">
+      <div className="rounded-xl border border-border bg-surface/70 px-4">
         {s.sampleItems?.map((item) => (
           <ItemRow
             key={item.id}

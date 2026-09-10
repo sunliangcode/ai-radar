@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { FeedbackBar } from '../components/FeedbackBar'
+import { FeedbackBar } from '../components/feedback/FeedbackBar'
 import { PageHeader, ScorePill, StateBox, StatusBadge } from '../components/ui'
 import { dateLocale } from '../i18n'
 
@@ -62,7 +62,7 @@ export default function ChangeDetailPage() {
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-mist bg-paper/70 p-4 md:col-span-2">
+        <div className="rounded-xl border border-border bg-surface/70 p-4 md:col-span-2">
           <h3 className="mb-2 font-serif text-lg">{t('changes.summary')}</h3>
           <p className="text-sm leading-relaxed text-muted">{c.summary || t('changes.noSummary')}</p>
           {c.why ? (
@@ -85,7 +85,7 @@ export default function ChangeDetailPage() {
           ) : null}
           <FeedbackBar targetType="change" targetId={c.id} invalidateKeys={[['change', changeId], ['changes']]} />
         </div>
-        <div className="rounded-xl border border-mist bg-paper/70 p-4">
+        <div className="rounded-xl border border-border bg-surface/70 p-4">
           <h3 className="mb-2 font-serif text-lg">{t('changes.scores')}</h3>
           <p className="text-sm text-muted">
             R{Math.round(c.relevance ?? 0)} · I{Math.round(c.impact ?? 0)} · U{Math.round(c.urgency ?? 0)} · C
@@ -112,9 +112,9 @@ export default function ChangeDetailPage() {
       </ol>
 
       <h3 className="mb-3 font-serif text-xl">{t('changes.sourcesItems')}</h3>
-      <div className="rounded-xl border border-mist bg-paper/70 px-4">
+      <div className="rounded-xl border border-border bg-surface/70 px-4">
         {c.items?.map((item) => (
-          <article key={item.id} className="flex gap-3 border-b border-mist/80 py-3 last:border-0">
+          <article key={item.id} className="flex gap-3 border-b border-border/80 py-3 last:border-0">
             <ScorePill score={item.score} />
             <div>
               <a href={item.canonicalUrl} target="_blank" rel="noreferrer" className="font-medium hover:text-moss">

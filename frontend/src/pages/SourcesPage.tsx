@@ -1,12 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDescriptor } from '../lib/api'
 import { Button, ConfirmDialog, EmptyState, PageHeader, StateBox, useToast } from '../components/ui'
-import { FetchProgressPanel } from '../components/FetchProgressPanel'
-import { FetchResultSummary } from '../components/FetchResultSummary'
+import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
+import { useSources } from '../hooks/useSources'
+import { useConnectors } from '../hooks/useConnectors'
+import { useImportPack } from '../hooks/useImportPack'
 import { dateLocale } from '../i18n'
 
 const LIST_FIELDS = new Set([
@@ -43,8 +45,8 @@ export default function SourcesPage() {
   const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
-  const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
-  const connectors = useQuery({ queryKey: ['connectors'], queryFn: api.connectors })
+  const sources = useSources()
+  const connectors = useConnectors()
   const [open, setOpen] = useState(false)
   const [showMoreTypes, setShowMoreTypes] = useState(false)
   const [name, setName] = useState('')
@@ -100,16 +102,7 @@ export default function SourcesPage() {
     },
     onError: (e) => pushToast('error', (e as Error).message),
   })
-  const importPack = useMutation({
-    mutationFn: () => api.importPack({ packId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sources'] })
-      pushToast('success', t('settings.packImported'))
-    },
-    onError: (e) => {
-      pushToast('error', (e as Error).message)
-    },
-  })
+  const importPack = useImportPack()
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['sources'],
     ['intelligence-home'],
@@ -166,22 +159,20 @@ export default function SourcesPage() {
         }
       />
 
-      {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
-      {phase === 'summary' ? (
-        <FetchResultSummary
-          progress={progress}
-          onDismiss={() => void dismiss()}
-          retrying={retryFailed.isPending}
-          onRetryFailed={(types) => retryFailed.mutate(types)}
-        />
-      ) : null}
+      <FetchProgressSection
+        phase={phase}
+        progress={progress}
+        onDismiss={() => void dismiss()}
+        retrying={retryFailed.isPending}
+        onRetryFailed={(types) => retryFailed.mutate(types)}
+      />
 
       {open ? (
-        <form onSubmit={onSubmit} className="mb-6 grid gap-3 rounded-xl border border-mist bg-paper/80 p-4 sm:grid-cols-2">
+        <form onSubmit={onSubmit} className="mb-6 grid gap-3 rounded-xl border border-border bg-surface/80 p-4 sm:grid-cols-2">
           <label className="text-sm">
             <span className="text-muted">{t('sources.name')}</span>
             <input
-              className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2"
+              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -191,7 +182,7 @@ export default function SourcesPage() {
             <label className="text-sm">
               <span className="text-muted">{t('sources.type')}</span>
               <select
-                className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2"
+                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2"
                 value={selected?.id ?? type}
                 onChange={(e) => onTypeChange(e.target.value)}
               >
@@ -224,7 +215,7 @@ export default function SourcesPage() {
               </span>
               {field.key.toLowerCase().includes('prompt') ? (
                 <textarea
-                  className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2"
+                  className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2"
                   rows={3}
                   value={fieldValues[field.key] ?? ''}
                   onChange={(e) => setFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
@@ -232,7 +223,7 @@ export default function SourcesPage() {
                 />
               ) : (
                 <input
-                  className="mt-1 w-full rounded-md border border-mist bg-paper px-3 py-2"
+                  className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2"
                   value={fieldValues[field.key] ?? ''}
                   onChange={(e) => setFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
                   required={field.required}
@@ -287,7 +278,7 @@ export default function SourcesPage() {
           primary={
             <div className="flex flex-wrap items-center justify-center gap-3">
               <select
-                className="rounded-md border border-mist bg-paper px-3 py-2 text-sm"
+                className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
                 value={packId}
                 onChange={(e) => setPackId(e.target.value)}
                 aria-label={t('sources.importPack')}
@@ -296,7 +287,7 @@ export default function SourcesPage() {
                 <option value="ai-cn">{t('home.pack.ai-cn')}</option>
                 <option value="ai-signals">{t('home.pack.ai-signals')}</option>
               </select>
-              <Button loading={importPack.isPending} onClick={() => importPack.mutate()}>
+              <Button loading={importPack.isPending} onClick={() => importPack.mutate(packId)}>
                 {importPack.isPending ? t('settings.importing') : t('sources.importPack')}
               </Button>
             </div>
@@ -310,7 +301,7 @@ export default function SourcesPage() {
       ) : null}
 
       {!isEmpty ? (
-        <ul className="divide-y divide-mist rounded-xl border border-mist bg-paper/70">
+        <ul className="divide-y divide-border rounded-xl border border-border bg-surface/70">
           {sources.data?.map((s) => (
             <li key={s.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>

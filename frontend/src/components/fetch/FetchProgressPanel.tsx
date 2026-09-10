@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { FetchProgress, FetchSourceProgress } from '../lib/api'
-import { formatDuration, progressPercent } from '../lib/format'
+import type { FetchProgress, FetchSourceProgress } from '../../lib/api'
+import { formatDuration, progressPercent } from '../../lib/format'
 
 const COLLECT_STAGES = new Set(['idle', 'fetch'])
 const ORGANIZE_STAGES = new Set(['normalize', 'dedup', 'score', 'summarize', 'persist', 'cluster'])
@@ -18,7 +18,7 @@ function statusDot(status: FetchSourceProgress['status']): string {
   if (status === 'running') return 'bg-moss animate-pulse'
   if (status === 'done') return 'bg-moss'
   if (status === 'error') return 'bg-ember'
-  return 'bg-mist'
+  return 'bg-border'
 }
 
 export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
@@ -36,7 +36,7 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
 
   if (!progress) {
     return (
-      <div className="mb-6 rounded-xl border border-dashed border-mist bg-paper/80 px-4 py-6 text-center text-sm text-muted">
+      <div className="mb-6 rounded-xl border border-dashed border-border bg-surface/80 px-4 py-6 text-center text-sm text-muted">
         {t('common.fetching')}
       </div>
     )
@@ -51,8 +51,8 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
   const stepIndex = step === 'error' ? -1 : steps.findIndex((s) => s.id === step)
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-mist bg-paper/80">
-      <div className="border-b border-mist/80 px-4 py-4">
+    <div className="mb-6 overflow-hidden rounded-xl border border-border bg-surface/80">
+      <div className="border-b border-border/80 px-4 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="font-serif text-lg text-ink">
@@ -96,10 +96,10 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
                 key={s.id}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition duration-200 ${
                   active
-                    ? 'bg-moss text-paper'
+                    ? 'bg-moss text-surface'
                     : done
                       ? 'bg-moss/15 text-moss-deep'
-                      : 'bg-mist/60 text-muted'
+                      : 'bg-border/60 text-muted'
                 }`}
               >
                 {s.label}
@@ -110,7 +110,7 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
       </div>
 
       <div
-        className="h-1 w-full bg-mist/70"
+        className="h-1 w-full bg-border/70"
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
@@ -136,7 +136,7 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
       </div>
 
       {showDetails && progress.sources?.length ? (
-        <ul className={`divide-y divide-mist/60 px-2 pb-2 ${dimSources ? 'opacity-55' : ''}`}>
+        <ul className={`divide-y divide-border/60 px-2 pb-2 ${dimSources ? 'opacity-55' : ''}`}>
           {progress.sources.map((source) => (
             <li
               key={source.id}
