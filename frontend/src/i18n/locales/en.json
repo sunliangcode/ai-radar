@@ -5,6 +5,9 @@
     "tagline": "Which changes are approaching you — and should you act?",
     "main": "Main navigation",
     "today": "Today",
+    "feed": "Feed",
+    "watching": "Watching",
+    "search": "Search / Go to",
     "changes": "Changes",
     "contexts": "Context",
     "actions": "Actions",
@@ -39,7 +42,97 @@
     "no": "No",
     "relevance": "Relevance",
     "showDetails": "Show details",
-    "hideDetails": "Hide details"
+    "hideDetails": "Hide details",
+    "unread": "Unread"
+  },
+  "app": {
+    "theme": "Toggle theme",
+    "density": {
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "cozy": "Cozy"
+    }
+  },
+  "score": {
+    "rule": "rule",
+    "ai": "AI"
+  },
+  "palette": {
+    "placeholder": "Search articles, or type to jump…",
+    "empty": "No matches"
+  },
+  "feed": {
+    "title": "Feed",
+    "subtitle": "The full signal stream. J/K to move, O to open, S to save, M to read.",
+    "searchPlaceholder": "Search title or body (Enter)…",
+    "range": {
+      "24h": "24h",
+      "7d": "7d",
+      "30d": "30d",
+      "all": "All"
+    },
+    "allSources": "All sources",
+    "unreadOnly": "Unread",
+    "count": "{{count}} items",
+    "searchingFor": "Search: {{q}}",
+    "unreadInline": "{{count}} unread",
+    "markAllRead": "Mark all read",
+    "empty": "Nothing here yet",
+    "emptyHint": "Import a starter pack or add an RSS feed, then hit Update now.",
+    "noSearchResult": "No matches",
+    "noSearchResultHint": "Try a different keyword.",
+    "prev": "Prev",
+    "next": "Next",
+    "pageInfo": "Page {{page}} / {{totalPages}}",
+    "shortcuts": "Shortcuts:",
+    "save": "Save",
+    "unsave": "Unsave",
+    "read": "Read",
+    "open": "Open",
+    "expand": "Expand details",
+    "detailLoading": "Loading Zhihu details…",
+    "detailError": "Failed to load: ",
+    "by": "by",
+    "comments": "comments"
+  },
+  "watching": {
+    "title": "Watching",
+    "subtitle": "High-impact changes you track, plus your saved items.",
+    "trackedChanges": "Tracked changes",
+    "noTracked": "No tracked changes yet",
+    "noTrackedHint": "Mark important items as Watch in Feed, or let rule/AI ranking surface high-impact changes here.",
+    "timeline": "Latest activity on what you watch",
+    "savedItems": "Saved",
+    "savedCount": "{{count}} items",
+    "noSaved": "Nothing saved yet",
+    "noSavedHint": "Press S on any item in Feed to save it for later.",
+    "goFeed": "Go to Feed"
+  },
+  "today": {
+    "title": "Today",
+    "subtitle": "The most important changes from the last stretch — why they matter and what to do next.",
+    "statShown": "Showing",
+    "statHigh": "of which HIGH",
+    "goFeed": "Open full feed",
+    "hint": "Ranking comes from rules or AI.",
+    "configureContext": "tune your stack / interests"
+  },
+  "settingsHub": {
+    "title": "Settings",
+    "subtitle": "Tell AI Radar who you are, where to pull news from, and whether to attach an LLM.",
+    "context": "My stack / interests",
+    "contextDesc": "Role, projects, tech. Relevance is about you, not a global leaderboard.",
+    "sources": "Sources",
+    "sourcesDesc": "RSS, Hacker News, GitHub, Reddit, V2EX, Zhihu and more — toggle any time.",
+    "llm": "AI model",
+    "llmReady": "OpenAI-compatible endpoint configured",
+    "llmNotReady": "Not configured — rule scoring only (fully usable)",
+    "on": "ON",
+    "off": "OFF",
+    "aiOn": "AI is on: impact, summaries and recommendations come from the LLM; items are tagged AI.",
+    "aiOff": "AI is not configured: all scores are rule-based (keyword hits + source weight + heat) and tagged rule. Add an OpenAI-compatible endpoint under AI model to enable.",
+    "howItWorks": "How scoring works",
+    "howItWorksBody": "Each item's score stacks two layers: (1) rules — interest-keyword hits, source weight (GitHub/HN boosted), and heat (log stars/points); (2) AI — once an LLM is configured, impact analysis runs on changes. Rule scores are always explainable; the bonus reasons are listed under each item. Without an LLM, the system only ranks and clusters — it will not fabricate templated 'why this matters to you' copy."
   },
   "fetchProgress": {
     "elapsed": "{{time}} elapsed",
@@ -369,6 +462,8 @@
       "ai-signals": "Signals (PH / Twitter / web)"
     },
     "importPack": "Import pack",
-    "importing": "Importing…"
+    "importing": "Importing…",
+    "weightsSection": "Source weights (rule-score boost)",
+    "weightsHint": "Drag sliders to set the score boost per source (0–20). Leave at 0 for defaults. Save at the bottom to apply immediately."
   }
 }

@@ -62,7 +62,33 @@ public class SettingsService {
         dto.put("smtpPasswordConfigured", notBlank(properties.getDelivery().getSmtp().getPassword()));
         dto.put("emailConfigured", notBlank(s.smtpHost()) && notBlank(s.smtpTo()));
         dto.put("localTokenConfigured", notBlank(properties.getLocalToken()));
+        dto.put("sourceWeights", parseWeights(s.sourceWeightsJson()));
         return dto;
+    }
+
+    /** Public, mutable map of sourceType -> weight boost. Never null. */
+    @Transactional(readOnly = true)
+    public Map<String, Integer> effectiveSourceWeights() {
+        return parseWeights(effective().sourceWeightsJson());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Integer> parseWeights(String json) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        if (json == null || json.isBlank()) {
+            return out;
+        }
+        try {
+            var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+            var fields = node.fields();
+            while (fields.hasNext()) {
+                var e = fields.next();
+                out.put(e.getKey(), e.getValue().asInt(0));
+            }
+        } catch (Exception ignored) {
+            /* malformed JSON -> empty overrides */
+        }
+        return out;
     }
 
     @Transactional
@@ -135,6 +161,22 @@ public class SettingsService {
         }
         if (body.containsKey("smtpStarttls")) {
             row.setSmtpStarttls(asBool(body.get("smtpStarttls")));
+        }
+        if (body.containsKey("sourceWeights")) {
+            Object w = body.get("sourceWeights");
+            if (w instanceof Map<?, ?> map) {
+                Map<String, Object> clean = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> e : map.entrySet()) {
+                    clean.put(String.valueOf(e.getKey()), asInt(e.getValue()));
+                }
+                try {
+                    row.setSourceWeightsJson(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(clean));
+                } catch (Exception ex) {
+                    throw new IllegalArgumentException("invalid sourceWeights: " + ex.getMessage());
+                }
+            } else {
+                row.setSourceWeightsJson(null);
+            }
         }
         repository.save(row);
         applyLiveOverrides(effective());
@@ -233,7 +275,8 @@ public class SettingsService {
                 first(row != null ? row.getSmtpUsername() : null, blankToNull(smtp.getUsername())),
                 first(row != null ? row.getSmtpFrom() : null, blankToNull(smtp.getFrom())),
                 firstNonBlank(envOrDb(smtp.getTo(), row != null ? row.getSmtpTo() : null)),
-                firstBool(row != null ? row.getSmtpStarttls() : null, smtp.isStarttls())
+                firstBool(row != null ? row.getSmtpStarttls() : null, smtp.isStarttls()),
+                row != null ? row.getSourceWeightsJson() : null
         );
     }
 
@@ -331,7 +374,8 @@ public class SettingsService {
             String smtpUsername,
             String smtpFrom,
             String smtpTo,
-            Boolean smtpStarttls
+            Boolean smtpStarttls,
+            String sourceWeightsJson
     ) {
     }
 }

@@ -4,6 +4,7 @@ import com.airadar.config.RadarProperties;
 import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
 import com.airadar.interest.InterestSignalsService;
+import com.airadar.settings.SettingsService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -32,10 +33,13 @@ public class HeuristicAiService implements AiService {
 
     private final RadarProperties properties;
     private final InterestSignalsService interestSignals;
+    private final SettingsService settingsService;
 
-    public HeuristicAiService(RadarProperties properties, InterestSignalsService interestSignals) {
+    public HeuristicAiService(RadarProperties properties, InterestSignalsService interestSignals,
+                              SettingsService settingsService) {
         this.properties = properties;
         this.interestSignals = interestSignals;
+        this.settingsService = settingsService;
     }
 
     @Override
@@ -241,9 +245,13 @@ public class HeuristicAiService implements AiService {
         return boost;
     }
 
-    private static double sourceBoost(SourceType type) {
+    private double sourceBoost(SourceType type) {
         if (type == null) {
             return 0;
+        }
+        Integer override = settingsService.effectiveSourceWeights().get(type.name().toLowerCase(Locale.ROOT));
+        if (override != null) {
+            return override;
         }
         return switch (type) {
             case HACKER_NEWS -> 5;

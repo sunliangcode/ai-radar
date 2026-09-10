@@ -52,6 +52,12 @@ cd ai-radar
 
 Open [http://localhost:8080](http://localhost:8080).
 
+Stop the background process started by `install.sh`:
+
+```bash
+./stop.sh
+```
+
 Docker, dev mode, environment variables, and delivery channels: [docs/installation.md](docs/installation.md).
 
 ## Core features

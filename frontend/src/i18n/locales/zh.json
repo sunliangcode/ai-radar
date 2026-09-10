@@ -5,6 +5,9 @@
     "tagline": "哪些变化正在靠近你，以及你是否应该行动。",
     "main": "主导航",
     "today": "Today",
+    "feed": "Feed",
+    "watching": "关注",
+    "search": "搜索 / 跳转",
     "changes": "Changes",
     "contexts": "Context",
     "actions": "Actions",
@@ -39,7 +42,97 @@
     "no": "否",
     "relevance": "相关度",
     "showDetails": "查看详情",
-    "hideDetails": "收起详情"
+    "hideDetails": "收起详情",
+    "unread": "未读"
+  },
+  "app": {
+    "theme": "切换主题",
+    "density": {
+      "comfortable": "舒适",
+      "compact": "紧凑",
+      "cozy": "宽松"
+    }
+  },
+  "score": {
+    "rule": "规则",
+    "ai": "AI"
+  },
+  "palette": {
+    "placeholder": "搜索条目，或输入以跳转…",
+    "empty": "没有匹配结果"
+  },
+  "feed": {
+    "title": "Feed",
+    "subtitle": "全部信号流。按 J/K 上下移动，O 打开原文，S 收藏，M 已读。",
+    "searchPlaceholder": "搜索标题或正文（回车）…",
+    "range": {
+      "24h": "24 小时",
+      "7d": "7 天",
+      "30d": "30 天",
+      "all": "全部"
+    },
+    "allSources": "全部来源",
+    "unreadOnly": "仅未读",
+    "count": "共 {{count}} 条",
+    "searchingFor": "搜索：{{q}}",
+    "unreadInline": "{{count}} 未读",
+    "markAllRead": "全部已读",
+    "empty": "还没有条目",
+    "emptyHint": "先导入推荐源或添加 RSS，再点「立即更新」。",
+    "noSearchResult": "没有匹配",
+    "noSearchResultHint": "换个关键词试试。",
+    "prev": "上一页",
+    "next": "下一页",
+    "pageInfo": "第 {{page}} / {{totalPages}} 页",
+    "shortcuts": "快捷键：",
+    "save": "收藏",
+    "unsave": "取消收藏",
+    "read": "已读",
+    "open": "打开",
+    "expand": "展开详情",
+    "detailLoading": "加载知乎详情…",
+    "detailError": "加载失败：",
+    "by": "作者",
+    "comments": "条评论"
+  },
+  "watching": {
+    "title": "关注",
+    "subtitle": "你在追的高影响变化，以及收藏的条目。",
+    "trackedChanges": "我关注的变化",
+    "noTracked": "还没有在跟踪的变化",
+    "noTrackedHint": "在 Feed 里给重要条目打「关注」，或等规则/AI 把高影响变化排到这里。",
+    "timeline": "我关注的最新动静",
+    "savedItems": "我的收藏",
+    "savedCount": "{{count}} 条",
+    "noSaved": "还没有收藏",
+    "noSavedHint": "在 Feed 按 S 收藏条目，稍后在这里集中回看。",
+    "goFeed": "去 Feed"
+  },
+  "today": {
+    "title": "Today",
+    "subtitle": "过去一段时间最重要的变化——为什么有关，以及接下来该做什么。",
+    "statShown": "展示",
+    "statHigh": "其中 HIGH",
+    "goFeed": "看完整 Feed",
+    "hint": "排序由规则或 AI 给出。",
+    "configureContext": "调整你的技术栈 / 兴趣"
+  },
+  "settingsHub": {
+    "title": "设置",
+    "subtitle": "告诉 AI Radar 你是谁、从哪里取新闻、以及是否接 LLM。",
+    "context": "我的技术栈 / 兴趣",
+    "contextDesc": "角色、项目、技术栈。相关性围绕你，而不是全球热榜。",
+    "sources": "情报源",
+    "sourcesDesc": "RSS、Hacker News、GitHub、Reddit、V2EX、知乎等连接器，随时开关。",
+    "llm": "AI 模型",
+    "llmReady": "已配置 OpenAI 兼容接口",
+    "llmNotReady": "未配置 — 当前使用规则打分（仍可正常使用）",
+    "on": "ON",
+    "off": "OFF",
+    "aiOn": "AI 已启用：Impact / 摘要 / 推荐由 LLM 生成，条目上会带「AI」标签。",
+    "aiOff": "AI 未配置：当前所有分数均为规则打分（关键词命中 + 来源权重 + 热度），条目上带「规则」标签。在「AI 模型」里填 OpenAI 兼容地址即可开启。",
+    "howItWorks": "评分是怎么来的",
+    "howItWorksBody": "每条条目分数由两部分叠加：(1) 规则——命中你的兴趣词、来源权重（GitHub/HN 加权）、热度（star/points 对数）；(2) AI——配置 LLM 后对变化做影响分析。规则分始终可解释，分数下方会列出加分原因。AI 未配置时，系统只做规则排序与聚类，不会生成模板化的「为什么对你重要」。"
   },
   "fetchProgress": {
     "elapsed": "已用时 {{time}}",
@@ -369,6 +462,8 @@
       "ai-signals": "信号源（PH / Twitter / 网页）"
     },
     "importPack": "导入推荐源",
-    "importing": "导入中…"
+    "importing": "导入中…",
+    "weightsSection": "来源权重（规则分加分）",
+    "weightsHint": "拖动滑块调整每个来源对分数的加分（0–20）。留 0 用默认值。改完点底部保存，立即生效。"
   }
 }

@@ -55,6 +55,9 @@ export type Item = {
   canonicalUrl: string
   score?: number
   scoreReason?: string
+  scoreSource?: 'rule' | 'ai' | 'unknown'
+  stars?: number
+  starsDelta7d?: number
   summary?: string
   contentSnippet?: string
   tags?: string[]
@@ -216,6 +219,20 @@ export type IntelligenceHome = {
 export type BriefSummary = { date: string; size?: number; modifiedAt?: string }
 export type BriefDetail = { date: string; markdown: string; items: Item[] }
 
+export type WatchingEntry = {
+  id: number
+  at?: string
+  label: string
+  note?: string
+}
+export type WatchingGroup = {
+  eventId: number
+  title: string
+  status?: string
+  entryCount: number
+  entries: WatchingEntry[]
+}
+
 export type Settings = {
   interestProfile: string
   summaryLanguage: string
@@ -244,6 +261,7 @@ export type Settings = {
   smtpPasswordConfigured: boolean
   emailConfigured: boolean
   localTokenConfigured: boolean
+  sourceWeights?: Record<string, number>
 }
 
 export type FetchSourceProgress = {
@@ -313,6 +331,33 @@ export const api = {
   patchItem: (id: number, body: { read?: boolean; saved?: boolean }) =>
     request<Item>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   markAllRead: () => request<{ updated: number }>('/api/items/mark-all-read', { method: 'POST' }),
+  batchItems: (body: { ids: number[]; read?: boolean; saved?: boolean }) =>
+    request<{ updated: number }>('/api/items/batch', { method: 'POST', body: JSON.stringify(body) }),
+  unreadCounts: () => request<Record<string, number>>('/api/items/unread-counts'),
+  watchingTimeline: () =>
+    request<{ groups: WatchingGroup[]; count: number }>('/api/watching/timeline'),
+  itemDetail: (id: number) =>
+    request<{
+      id: number
+      url: string
+      title: string
+      kind: 'zhihu' | 'plain'
+      html?: string
+      text?: string
+      author?: string
+      authorHeadline?: string
+      voteup?: number
+      commentCount?: number
+      questionTitle?: string
+      questionId?: number
+      comments?: Array<{ author: string; content: string }>
+    }>(`/api/items/${id}/detail`),
+  searchItems: async (q: string, limit = 50) => {
+    const data = await request<{ items: Item[]; total: number }>(
+      `/api/items/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+    )
+    return data
+  },
   interestKeywords: () =>
     request<{ keywords: string[]; effectiveInterestProfile?: string }>('/api/items/interest-keywords'),
   sources: () => request<Source[]>('/api/sources'),

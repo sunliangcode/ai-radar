@@ -12,6 +12,14 @@ cd ai-radar
 
 Open [http://localhost:8080](http://localhost:8080). `install.sh` copies `backend/.env.example` → `backend/.env` if missing, embeds the frontend into Spring static resources, and starts the backend.
 
+Stop:
+
+```bash
+./stop.sh
+```
+
+`stop.sh` reads `data/ai-radar.pid` (and frees port `8080` if a leftover Java process is still listening).
+
 ---
 
 ## Configure
@@ -56,10 +64,11 @@ docker compose up -d --build
 curl -s http://localhost:8080/api/health
 ```
 
-### install.sh
+### install.sh / stop.sh
 
 ```bash
-./install.sh
+./install.sh   # build embed UI + start backend in background
+./stop.sh      # stop process from data/ai-radar.pid (+ free :8080 if needed)
 ```
 
 ## Trigger jobs manually
@@ -95,7 +104,7 @@ mcp/         Read-only MCP sidecar
 packs/       Source pack manifests
 docs/        Documentation
 aim/         execution plans
-Dockerfile / docker-compose.yml / install.sh
+Dockerfile / docker-compose.yml / install.sh / stop.sh
 ```
 
 ## Tests
@@ -120,6 +129,14 @@ cd ai-radar
 ```
 
 打开 [http://localhost:8080](http://localhost:8080)。`install.sh` 会在缺少时复制 `.env`、把前端打进 Spring 静态资源并启动后端。
+
+停止：
+
+```bash
+./stop.sh
+```
+
+`stop.sh` 读取 `data/ai-radar.pid`（若仍有进程占用 `8080` 也会一并释放）。
 
 ### 配置
 

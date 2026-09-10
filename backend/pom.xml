@@ -15,7 +15,7 @@
     <artifactId>backend</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>ai-radar-backend</name>
-    <description>AI Intelligence Radar — pipeline backend</description>
+    <description>AI Radar — pipeline backend</description>
     <url>https://github.com/sunliangcode/ai-radar</url>
 
     <licenses>

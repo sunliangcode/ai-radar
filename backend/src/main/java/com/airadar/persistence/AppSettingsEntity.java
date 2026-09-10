@@ -78,6 +78,9 @@ public class AppSettingsEntity {
     @Column(name = "smtp_starttls")
     private Boolean smtpStarttls;
 
+    @Column(name = "source_weights_json")
+    private String sourceWeightsJson;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -261,6 +264,14 @@ public class AppSettingsEntity {
 
     public void setSmtpStarttls(Boolean smtpStarttls) {
         this.smtpStarttls = smtpStarttls;
+    }
+
+    public String getSourceWeightsJson() {
+        return sourceWeightsJson;
+    }
+
+    public void setSourceWeightsJson(String sourceWeightsJson) {
+        this.sourceWeightsJson = sourceWeightsJson;
     }
 
     public Instant getUpdatedAt() {

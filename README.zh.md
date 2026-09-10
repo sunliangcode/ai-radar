@@ -52,6 +52,12 @@ cd ai-radar
 
 打开 [http://localhost:8080](http://localhost:8080)。
 
+停止由 `install.sh` 拉起的后台进程：
+
+```bash
+./stop.sh
+```
+
 Docker、开发模式、环境变量与推送渠道见：[docs/installation.md](docs/installation.md)。
 
 ## 核心能力
