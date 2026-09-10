@@ -15,8 +15,10 @@ import com.airadar.persistence.NewsItemEntity;
 import com.airadar.persistence.NewsItemRepository;
 import com.airadar.persistence.SourceEntity;
 import com.airadar.persistence.SourceRepository;
+import com.airadar.provider.ai.AiCallMonitor;
 import com.airadar.provider.ai.AiService;
 import com.airadar.provider.ai.ScoreResult;
+import com.airadar.provider.ai.SummarizeResult;
 import com.airadar.provider.webfetch.WebContentFetcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +32,6 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -55,6 +56,7 @@ public class PipelineOrchestrator {
     private final FetchProgress fetchProgress;
     private final WebContentFetcher webContentFetcher;
     private final TransactionTemplate transactionTemplate;
+    private final AiCallMonitor aiCallMonitor;
 
     public PipelineOrchestrator(
             SourceRepository sourceRepository,
@@ -68,7 +70,8 @@ public class PipelineOrchestrator {
             EventClusterService eventClusterService,
             FetchProgress fetchProgress,
             WebContentFetcher webContentFetcher,
-            TransactionTemplate transactionTemplate
+            TransactionTemplate transactionTemplate,
+            AiCallMonitor aiCallMonitor
     ) {
         this.sourceRepository = sourceRepository;
         this.newsItemRepository = newsItemRepository;
@@ -82,6 +85,7 @@ public class PipelineOrchestrator {
         this.fetchProgress = fetchProgress;
         this.webContentFetcher = webContentFetcher;
         this.transactionTemplate = transactionTemplate;
+        this.aiCallMonitor = aiCallMonitor;
     }
 
     /**
@@ -128,16 +132,14 @@ public class PipelineOrchestrator {
         long tFilter = System.currentTimeMillis();
         log.info("pipeline_stage=filter kept={} threshold={} durationMs={}", kept.size(), scoreThreshold, tFilter - tScore);
 
-        fetchProgress.setStage(FetchProgress.Stage.summarize);
-        // Summarize kept items; also fill display text for below-threshold items that have full body.
-        fetchProgress.setMessage("summarizing " + kept.size() + " items");
-        summarizeItems(kept);
-        fillFallbackSummaries(deduped);
-        long tSummary = System.currentTimeMillis();
-        log.info("pipeline_stage=summary count={} durationMs={}", kept.size(), tSummary - tFilter);
+        java.util.Set<NewsItem> keptSet = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        keptSet.addAll(kept);
 
-        fetchProgress.setStage(FetchProgress.Stage.persist);
-        persistAll(deduped);
+        fetchProgress.setStage(FetchProgress.Stage.summarize);
+        summarizeAndPersistIncremental(deduped, keptSet);
+        long tSummary = System.currentTimeMillis();
+        log.info("pipeline_stage=summary_persist count={} durationMs={}", deduped.size(), tSummary - tFilter);
+
         try {
             fetchProgress.setStage(FetchProgress.Stage.cluster);
             eventClusterService.linkNewItems(kept.stream().filter(i -> i.getId() != null).toList());
@@ -241,14 +243,8 @@ public class PipelineOrchestrator {
             return;
         }
         Instant now = Instant.now();
-        transactionTemplate.executeWithoutResult(status -> {
-            for (Long id : sourceIds) {
-                sourceRepository.findById(id).ifPresent(entity -> {
-                    entity.setLastFetchedAt(now);
-                    sourceRepository.save(entity);
-                });
-            }
-        });
+        transactionTemplate.executeWithoutResult(status ->
+                sourceRepository.touchLastFetchedAt(sourceIds, now));
     }
 
     private void enrichFullText(List<NewsItem> items) {
@@ -307,74 +303,149 @@ public class PipelineOrchestrator {
     }
 
     private void scoreItems(List<NewsItem> items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
         int batchSize = Math.max(1, properties.getAiBatchSize());
+        List<List<NewsItem>> batches = new ArrayList<>();
         for (int i = 0; i < items.size(); i += batchSize) {
-            List<NewsItem> batch = items.subList(i, Math.min(i + batchSize, items.size()));
-            for (NewsItem item : batch) {
-                item.setStatus(ItemStatus.SCORING);
+            batches.add(items.subList(i, Math.min(i + batchSize, items.size())));
+        }
+        fetchProgress.beginAnalysisQueue(items.size(), 1, 1);
+        fetchProgress.setMessage("scoring 0/" + items.size());
+        pushAnalysisQueue();
+        // LLM is single-threaded: score batches sequentially.
+        for (List<NewsItem> batch : batches) {
+            if (!batch.isEmpty()) {
+                fetchProgress.markItemAnalyzing(batch.get(0).getTitle());
+                pushAnalysisQueue();
             }
-            try {
-                List<ScoreResult> results = aiService.score(batch);
-                for (int j = 0; j < batch.size(); j++) {
-                    NewsItem item = batch.get(j);
-                    ScoreResult result = j < results.size()
-                            ? results.get(j)
-                            : new ScoreResult(0, "missing", List.of(), "other");
-                    item.setScore(result.score());
-                    item.setScoreReason(result.reason());
-                    item.setTags(result.tags());
-                    item.setCategory(result.category());
-                    item.setStatus(ItemStatus.DONE);
-                    item.setUpdatedAt(Instant.now());
-                }
-            } catch (Exception e) {
-                log.error("ai_score_batch_failed size={} error={}", batch.size(), e.getMessage());
-                for (NewsItem item : batch) {
-                    item.setStatus(ItemStatus.ERROR);
-                    item.setScore(0.0);
-                    item.setScoreReason("scoring failed: " + e.getMessage());
-                    item.setUpdatedAt(Instant.now());
-                }
+            scoreBatch(batch);
+            for (NewsItem item : batch) {
+                fetchProgress.markItemDone(item.getTitle());
+            }
+            pushAnalysisQueue();
+        }
+    }
+
+    private void scoreBatch(List<NewsItem> batch) {
+        for (NewsItem item : batch) {
+            item.setStatus(ItemStatus.SCORING);
+        }
+        try {
+            List<ScoreResult> results = aiService.score(batch);
+            for (int j = 0; j < batch.size(); j++) {
+                NewsItem item = batch.get(j);
+                ScoreResult result = j < results.size()
+                        ? results.get(j)
+                        : new ScoreResult(0, "missing", List.of(), "other");
+                item.setScore(result.score());
+                item.setScoreReason(result.reason());
+                item.setTags(result.tags());
+                item.setCategory(result.category());
+                item.setStatus(ItemStatus.DONE);
+                item.setUpdatedAt(Instant.now());
+            }
+        } catch (Exception e) {
+            log.error("ai_score_batch_failed size={} error={}", batch.size(), e.getMessage());
+            for (NewsItem item : batch) {
+                item.setStatus(ItemStatus.ERROR);
+                item.setScore(0.0);
+                item.setScoreReason("scoring failed: " + e.getMessage());
+                item.setUpdatedAt(Instant.now());
             }
         }
     }
 
-    private void summarizeItems(List<NewsItem> items) {
-        List<NewsItem> needSummary = items.stream()
-                .filter(i -> i.getSummary() == null || i.getSummary().isBlank())
-                .toList();
-        if (needSummary.isEmpty()) {
+    private void summarizeAndPersistIncremental(List<NewsItem> items, java.util.Set<NewsItem> kept) {
+        if (items == null || items.isEmpty()) {
             return;
         }
-        int batchSize = Math.max(1, properties.getAiBatchSize());
-        for (int i = 0; i < needSummary.size(); i += batchSize) {
-            List<NewsItem> batch = needSummary.subList(i, Math.min(i + batchSize, needSummary.size()));
-            try {
-                List<String> summaries = aiService.summarizeBatch(batch);
-                for (int j = 0; j < batch.size(); j++) {
-                    NewsItem item = batch.get(j);
-                    String summary = j < summaries.size() ? summaries.get(j) : null;
-                    if (summary == null || summary.isBlank()) {
-                        summary = fallbackSummary(item);
-                    }
-                    item.setSummary(summary);
-                    item.setUpdatedAt(Instant.now());
-                }
-            } catch (Exception e) {
-                log.error("ai_summary_batch_failed size={} error={}", batch.size(), e.getMessage());
-                for (NewsItem item : batch) {
-                    try {
-                        String summary = aiService.summarize(item);
-                        if (summary == null || summary.isBlank()) {
-                            summary = fallbackSummary(item);
-                        }
-                        item.setSummary(summary);
-                    } catch (Exception ex) {
-                        item.setSummary(fallbackSummary(item));
-                    }
-                    item.setUpdatedAt(Instant.now());
-                }
+
+        // Resolve already-translated rows from DB up front so queue total is accurate and we skip LLM.
+        List<NewsItem> needTranslate = new ArrayList<>();
+        for (NewsItem item : items) {
+            if (needsAiTranslate(item, kept)) {
+                needTranslate.add(item);
             }
+        }
+
+        fetchProgress.beginAnalysisQueue(needTranslate.size(), 1, 1);
+        fetchProgress.setMessage("translating 0/" + needTranslate.size());
+        pushAnalysisQueue();
+
+        java.util.Set<NewsItem> needSet = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        needSet.addAll(needTranslate);
+
+        // LLM is single-threaded: process one item at a time.
+        for (NewsItem item : items) {
+            boolean translating = needSet.contains(item);
+            if (translating) {
+                fetchProgress.markItemAnalyzing(item.getTitle());
+                pushAnalysisQueue();
+                try {
+                    SummarizeResult result = aiService.summarizeDetailed(item);
+                    item.setSummary(result.summary());
+                    if (result.titleDisplay() != null && !result.titleDisplay().isBlank()) {
+                        item.setTitleDisplay(result.titleDisplay());
+                    }
+                } catch (Exception e) {
+                    log.warn("ai_summary_item_failed title={} error={}", item.getTitle(), e.getMessage());
+                    item.setSummary(fallbackSummary(item));
+                }
+            } else if (item.getSummary() == null || item.getSummary().isBlank()) {
+                item.setSummary(fallbackSummary(item));
+            }
+            item.setUpdatedAt(Instant.now());
+            persistOne(item);
+            if (translating) {
+                fetchProgress.markItemPersisted(item.getId(), item.getTitle());
+                pushAnalysisQueue();
+            }
+        }
+        log.info("pipeline_stage=incremental_persist count={} translated={}", items.size(), needTranslate.size());
+    }
+
+    /**
+     * True when this kept item still needs an LLM summarize/translate call.
+     * Hydrates summary/titleDisplay from DB when present so repeats are skipped.
+     */
+    private boolean needsAiTranslate(NewsItem item, java.util.Set<NewsItem> kept) {
+        if (item == null || !kept.contains(item)) {
+            return false;
+        }
+        if (item.getSummary() != null && !item.getSummary().isBlank()) {
+            return false;
+        }
+        String url = item.getCanonicalUrl();
+        if (url == null || url.isBlank()) {
+            return true;
+        }
+        return newsItemRepository.findByCanonicalUrlIn(List.of(url)).stream()
+                .findFirst()
+                .map(entity -> {
+                    String existingSummary = entity.getSummary();
+                    if (existingSummary != null && !existingSummary.isBlank()) {
+                        item.setSummary(existingSummary);
+                        if (entity.getTitleDisplay() != null && !entity.getTitleDisplay().isBlank()) {
+                            item.setTitleDisplay(entity.getTitleDisplay());
+                        }
+                        if (item.getId() == null) {
+                            item.setId(entity.getId());
+                        }
+                        return false;
+                    }
+                    return true;
+                })
+                .orElse(true);
+    }
+
+    private void pushAnalysisQueue() {
+        Object analysis = fetchProgress.snapshot().get("analysis");
+        if (analysis instanceof Map<?, ?> m) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> queue = (Map<String, Object>) m;
+            aiCallMonitor.setQueue(queue);
         }
     }
 
@@ -382,55 +453,36 @@ public class PipelineOrchestrator {
         String snippet = item.getContentSnippet();
         if (snippet != null && !snippet.isBlank()) {
             String trimmed = snippet.trim();
-            if (trimmed.length() <= 800) {
+            // One-sentence style fallback: first ~120 chars
+            if (trimmed.length() <= 120) {
                 return trimmed;
             }
-            return trimmed.substring(0, 800) + "…";
+            return trimmed.substring(0, 120) + "…";
         }
         return item.getScoreReason() != null ? item.getScoreReason() : "";
     }
 
-    private static void fillFallbackSummaries(List<NewsItem> items) {
-        if (items == null) {
-            return;
-        }
-        for (NewsItem item : items) {
-            if (item.getSummary() == null || item.getSummary().isBlank()) {
-                String fallback = fallbackSummary(item);
-                if (!fallback.isBlank()) {
-                    item.setSummary(fallback);
-                    item.setUpdatedAt(Instant.now());
-                }
-            }
-        }
-    }
-
-    private void persistAll(List<NewsItem> items) {
-        if (items == null || items.isEmpty()) {
+    private void persistOne(NewsItem item) {
+        if (item == null || item.getCanonicalUrl() == null || item.getCanonicalUrl().isBlank()) {
             return;
         }
         transactionTemplate.executeWithoutResult(status -> {
-            List<String> urls = items.stream()
-                    .map(NewsItem::getCanonicalUrl)
-                    .filter(u -> u != null && !u.isBlank())
-                    .distinct()
-                    .toList();
-            Map<String, NewsItemEntity> existing = new HashMap<>();
-            if (!urls.isEmpty()) {
-                for (NewsItemEntity entity : newsItemRepository.findByCanonicalUrlIn(urls)) {
-                    existing.put(entity.getCanonicalUrl(), entity);
-                }
+            NewsItemEntity entity = newsItemRepository.findByCanonicalUrlIn(List.of(item.getCanonicalUrl()))
+                    .stream()
+                    .findFirst()
+                    .orElseGet(NewsItemEntity::new);
+            // Preserve user flags on update
+            boolean prevRead = entity.getId() != null && entity.isReadFlag();
+            boolean prevSaved = entity.getId() != null && entity.isSaved();
+            boolean prevDismissed = entity.getId() != null && entity.isDismissed();
+            entityMapper.applyToEntity(item, entity);
+            if (entity.getId() != null) {
+                entity.setReadFlag(prevRead || item.isRead());
+                entity.setSaved(prevSaved || item.isSaved());
+                entity.setDismissed(prevDismissed || item.isDismissed());
             }
-            List<NewsItemEntity> toSave = new ArrayList<>(items.size());
-            for (NewsItem item : items) {
-                NewsItemEntity entity = existing.getOrDefault(item.getCanonicalUrl(), new NewsItemEntity());
-                entityMapper.applyToEntity(item, entity);
-                toSave.add(entity);
-            }
-            List<NewsItemEntity> saved = newsItemRepository.saveAll(toSave);
-            for (int i = 0; i < items.size(); i++) {
-                items.get(i).setId(saved.get(i).getId());
-            }
+            NewsItemEntity saved = newsItemRepository.save(entity);
+            item.setId(saved.getId());
         });
     }
 

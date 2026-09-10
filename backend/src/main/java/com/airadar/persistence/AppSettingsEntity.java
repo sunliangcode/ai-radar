@@ -51,6 +51,18 @@ public class AppSettingsEntity {
     @Column(name = "openai_model")
     private String openaiModel;
 
+    @Column(name = "context_window_tokens")
+    private Integer contextWindowTokens;
+
+    @Column(name = "max_completion_tokens")
+    private Integer maxCompletionTokens;
+
+    @Column(name = "fetch_timeout_ms")
+    private Integer fetchTimeoutMs;
+
+    @Column(name = "ai_parallelism")
+    private Integer aiParallelism;
+
     @Column(name = "feishu_webhook_url")
     private String feishuWebhookUrl;
 
@@ -192,6 +204,38 @@ public class AppSettingsEntity {
 
     public void setOpenaiModel(String openaiModel) {
         this.openaiModel = openaiModel;
+    }
+
+    public Integer getContextWindowTokens() {
+        return contextWindowTokens;
+    }
+
+    public void setContextWindowTokens(Integer contextWindowTokens) {
+        this.contextWindowTokens = contextWindowTokens;
+    }
+
+    public Integer getMaxCompletionTokens() {
+        return maxCompletionTokens;
+    }
+
+    public void setMaxCompletionTokens(Integer maxCompletionTokens) {
+        this.maxCompletionTokens = maxCompletionTokens;
+    }
+
+    public Integer getFetchTimeoutMs() {
+        return fetchTimeoutMs;
+    }
+
+    public void setFetchTimeoutMs(Integer fetchTimeoutMs) {
+        this.fetchTimeoutMs = fetchTimeoutMs;
+    }
+
+    public Integer getAiParallelism() {
+        return aiParallelism;
+    }
+
+    public void setAiParallelism(Integer aiParallelism) {
+        this.aiParallelism = aiParallelism;
     }
 
     public String getFeishuWebhookUrl() {

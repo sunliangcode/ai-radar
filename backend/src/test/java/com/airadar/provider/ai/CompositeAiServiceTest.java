@@ -5,9 +5,12 @@ import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
 import com.airadar.interest.InterestSignalsService;
 import com.airadar.persistence.NewsItemRepository;
+import com.airadar.preference.PreferenceKeywordRepository;
+import com.airadar.settings.SettingsService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,13 +25,19 @@ class CompositeAiServiceTest {
     private static HeuristicAiService heuristic(RadarProperties props) {
         NewsItemRepository repo = mock(NewsItemRepository.class);
         when(repo.findBySavedTrue()).thenReturn(List.of());
-        return new HeuristicAiService(props, new InterestSignalsService(props, repo));
+        PreferenceKeywordRepository prefRepo = mock(PreferenceKeywordRepository.class);
+        when(prefRepo.findByKindOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyString())).thenReturn(List.of());
+        SettingsService settings = mock(SettingsService.class);
+        when(settings.effectiveSourceWeights()).thenReturn(Map.of());
+        return new HeuristicAiService(props, new InterestSignalsService(props, repo, prefRepo), settings);
     }
 
     @Test
-    void usesHeuristicWhenNoApiKey() {
+    void usesHeuristicWhenRemoteWithoutApiKey() {
         RadarProperties props = new RadarProperties();
         props.getOpenai().setApiKey("");
+        props.getOpenai().setBaseUrl("https://api.openai.com/v1");
+        props.getOpenai().setModel("gpt-4o-mini");
         props.setInterestProfile("LLM,Agent");
         props.setSummaryLanguage("en");
 

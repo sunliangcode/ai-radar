@@ -52,6 +52,7 @@ export type Source = {
 export type Item = {
   id: number
   title: string
+  titleDisplay?: string | null
   canonicalUrl: string
   score?: number
   scoreReason?: string
@@ -67,6 +68,7 @@ export type Item = {
   primarySourceType?: string
   read?: boolean
   saved?: boolean
+  dismissed?: boolean
   createdAt?: string
   eventId?: number
 }
@@ -116,6 +118,16 @@ export type ActionCard = {
   status?: string
   eventId?: number
   impactId?: number
+  newsItemId?: number
+}
+
+export type PreferenceKeyword = {
+  id: number
+  kind: 'like' | 'dislike'
+  text: string
+  source?: string
+  itemId?: number | null
+  createdAt?: string
 }
 
 export type OpportunityCard = {
@@ -246,7 +258,12 @@ export type Settings = {
   pushOnlyWhenItems: boolean
   openaiBaseUrl: string
   openaiModel: string
+  contextWindowTokens: number
+  maxCompletionTokens: number
+  aiParallelism: number
+  fetchTimeoutMs: number
   openaiConfigured: boolean
+  openaiApiKeyConfigured?: boolean
   feishuWebhookUrl: string
   feishuConfigured: boolean
   webhookUrl: string
@@ -262,6 +279,63 @@ export type Settings = {
   emailConfigured: boolean
   localTokenConfigured: boolean
   sourceWeights?: Record<string, number>
+}
+
+export type AiMonitorCall = {
+  ts: string
+  operation: string
+  model: string
+  promptTokens: number
+  completionTokens: number
+  contextWindow: number
+  contextUsedPct: number
+  latencyMs: number
+  tokensPerSec: number | null
+  truncated: boolean
+  ok: boolean
+  error: string | null
+  promptPreview?: string | null
+  responsePreview?: string | null
+}
+
+export type AiMonitorInFlight = {
+  id: string
+  operation: string
+  model: string
+  startedAt: string
+  elapsedMs: number
+  progressPct: number
+  promptPreview: string
+  responseSoFar?: string
+  contextWindow: number
+}
+
+export type AiMonitorQueue = {
+  itemsTotal?: number
+  itemsDone?: number
+  itemsRemaining?: number
+  itemsPersisted?: number
+  currentItemTitle?: string | null
+  lastItemId?: number | null
+  callsExpectedPerItem?: number
+  aiParallelism?: number
+}
+
+export type AiMonitor = {
+  callCount: number
+  errorCount: number
+  contextWindow: number | null
+  lastTokensPerSec: number | null
+  avgTokensPerSec: number | null
+  lastContextUsed: number | null
+  lastContextWindow: number | null
+  lastContextUsedPct: number | null
+  lastLatencyMs: number | null
+  inFlight?: AiMonitorInFlight | null
+  inFlights?: AiMonitorInFlight[]
+  recent: AiMonitorCall[]
+  queue?: AiMonitorQueue
+  streaming?: boolean
 }
 
 export type FetchSourceProgress = {
@@ -289,6 +363,7 @@ export type FetchProgress = {
     running: number
     remaining: number
   }
+  analysis?: AiMonitorQueue
   result?: {
     fetched?: number
     deduped?: number
@@ -328,7 +403,7 @@ export const api = {
       limit: data.limit,
     }
   },
-  patchItem: (id: number, body: { read?: boolean; saved?: boolean }) =>
+  patchItem: (id: number, body: { read?: boolean; saved?: boolean; dismissed?: boolean; notInterested?: boolean }) =>
     request<Item>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   markAllRead: () => request<{ updated: number }>('/api/items/mark-all-read', { method: 'POST' }),
   batchItems: (body: { ids: number[]; read?: boolean; saved?: boolean }) =>
@@ -360,6 +435,17 @@ export const api = {
   },
   interestKeywords: () =>
     request<{ keywords: string[]; effectiveInterestProfile?: string }>('/api/items/interest-keywords'),
+  preferenceKeywords: (kind?: 'like' | 'dislike') => {
+    const q = kind ? `?kind=${kind}` : ''
+    return request<{ keywords: PreferenceKeyword[] }>(`/api/preferences/keywords${q}`)
+  },
+  addPreferenceKeyword: (body: { kind: 'like' | 'dislike'; text: string }) =>
+    request<PreferenceKeyword>('/api/preferences/keywords', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deletePreferenceKeyword: (id: number) =>
+    request<{ ok: boolean }>(`/api/preferences/keywords/${id}`, { method: 'DELETE' }),
   sources: () => request<Source[]>('/api/sources'),
   source: (id: number) => request<Source>(`/api/sources/${id}`),
   createSource: (body: unknown) =>
@@ -374,6 +460,12 @@ export const api = {
   settings: () => request<Settings>('/api/settings'),
   saveSettings: (body: Partial<Settings>) =>
     request<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  aiMonitor: () => request<AiMonitor>('/api/ai/monitor'),
+  aiMonitorStreamUrl: () => {
+    const token = localStorage.getItem('localToken')
+    const base = `${BASE}/api/ai/monitor/stream`
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base
+  },
   fetchJob: (opts?: { sourceType?: string }) => {
     const q = opts?.sourceType ? `?sourceType=${encodeURIComponent(opts.sourceType)}` : ''
     return request<Record<string, unknown>>(`/api/jobs/fetch${q}`, { method: 'POST' })

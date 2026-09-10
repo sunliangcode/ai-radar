@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { api, type ImpactCard } from '../lib/api'
-import { Button, PageHeader, StateBox } from '../components/ui'
+import { Button, ListSkeleton, PageHeader, StateBox, useToast } from '../components/ui'
 import { FetchProgressPanel } from '../components/FetchProgressPanel'
 import { FetchResultSummary } from '../components/FetchResultSummary'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
@@ -11,13 +11,13 @@ import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 export default function TodayPage() {
   const { t, i18n } = useTranslation()
   const qc = useQueryClient()
+  const { push: pushToast } = useToast()
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
-  const [jobToast, setJobToast] = useState<string | null>(null)
   const defaultPack = i18n.language.startsWith('zh') ? 'ai-cn' : 'ai-core'
   const [packId, setPackId] = useState(defaultPack)
 
-  const { fetchJob, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
+  const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['intelligence-home'],
     ['changes-watching'],
     ['feed'],
@@ -29,12 +29,10 @@ export default function TodayPage() {
     mutationFn: () => api.importPack({ packId }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['sources'] })
-      setJobToast(t('home.gettingStarted.imported'))
-      setTimeout(() => setJobToast(null), 2500)
+      pushToast('success', t('home.gettingStarted.imported'))
     },
     onError: (e) => {
-      setJobToast((e as Error).message)
-      setTimeout(() => setJobToast(null), 4000)
+      pushToast('error', (e as Error).message)
     },
   })
 
@@ -58,14 +56,16 @@ export default function TodayPage() {
       />
 
       {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
-      {phase === 'summary' ? <FetchResultSummary progress={progress} onDismiss={() => void dismiss()} /> : null}
-      {jobToast ? (
-        <p className="mb-4 text-sm text-moss" role="status">
-          {jobToast}
-        </p>
+      {phase === 'summary' ? (
+        <FetchResultSummary
+          progress={progress}
+          onDismiss={() => void dismiss()}
+          retrying={retryFailed.isPending}
+          onRetryFailed={(types) => retryFailed.mutate(types)}
+        />
       ) : null}
 
-      {home.isLoading ? <StateBox>{t('common.loading')}</StateBox> : null}
+      {home.isLoading ? <ListSkeleton rows={4} /> : null}
       {home.isError ? (
         <StateBox>{t('common.loadFailed', { message: (home.error as Error).message })}</StateBox>
       ) : null}
@@ -127,6 +127,10 @@ export default function TodayPage() {
             <Link to="/settings" className="text-accent hover:underline">
               {t('today.configureContext')}
             </Link>
+            {' · '}
+            <Link to="/actions" className="text-accent hover:underline">
+              {t('nav.actions')}
+            </Link>
           </p>
         </>
       ) : null}
@@ -147,7 +151,11 @@ function TodayRow({ card }: { card: ImpactCard }) {
           ) : null}
         </div>
         <div className="min-w-0 flex-1">
-          <Link to={`/changes/${card.eventId}`} className="font-medium text-ink hover:underline">
+          <Link
+            to={`/changes/${card.eventId}`}
+            state={{ from: '/' }}
+            className="font-medium text-ink hover:underline"
+          >
             {card.title}
           </Link>
           {card.why ? <p className="mt-1 text-sm text-muted">{card.why}</p> : null}

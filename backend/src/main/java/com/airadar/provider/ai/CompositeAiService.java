@@ -34,8 +34,8 @@ public class CompositeAiService implements AiService {
         if (items == null || items.isEmpty()) {
             return List.of();
         }
-        if (!hasApiKey()) {
-            log.info("ai_mode=heuristic reason=no_api_key items={}", items.size());
+        if (!llmReady()) {
+            log.info("ai_mode=heuristic reason=llm_not_ready items={}", items.size());
             return heuristic.score(items);
         }
         try {
@@ -49,7 +49,7 @@ public class CompositeAiService implements AiService {
 
     @Override
     public String summarize(NewsItem item) {
-        if (!hasApiKey()) {
+        if (!llmReady()) {
             return heuristic.summarize(item);
         }
         try {
@@ -61,11 +61,24 @@ public class CompositeAiService implements AiService {
     }
 
     @Override
+    public SummarizeResult summarizeDetailed(NewsItem item) {
+        if (!llmReady()) {
+            return heuristic.summarizeDetailed(item);
+        }
+        try {
+            return openAi.summarizeDetailed(item);
+        } catch (Exception e) {
+            log.warn("ai_summary_fallback=heuristic error={}", e.getMessage());
+            return heuristic.summarizeDetailed(item);
+        }
+    }
+
+    @Override
     public List<String> summarizeBatch(List<NewsItem> items) {
         if (items == null || items.isEmpty()) {
             return List.of();
         }
-        if (!hasApiKey()) {
+        if (!llmReady()) {
             return heuristic.summarizeBatch(items);
         }
         try {
@@ -77,8 +90,50 @@ public class CompositeAiService implements AiService {
     }
 
     @Override
+    public List<SummarizeResult> summarizeDetailedBatch(List<NewsItem> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        if (!llmReady()) {
+            return heuristic.summarizeDetailedBatch(items);
+        }
+        try {
+            return openAi.summarizeDetailedBatch(items);
+        } catch (Exception e) {
+            log.warn("ai_summary_batch_fallback=heuristic error={}", e.getMessage());
+            return heuristic.summarizeDetailedBatch(items);
+        }
+    }
+
+    @Override
+    public String extractPreferenceKeyword(String title, String summary, String kind) {
+        if (!llmReady()) {
+            return heuristic.extractPreferenceKeyword(title, summary, kind);
+        }
+        try {
+            return openAi.extractPreferenceKeyword(title, summary, kind);
+        } catch (Exception e) {
+            log.warn("ai_pref_fallback=heuristic error={}", e.getMessage());
+            return heuristic.extractPreferenceKeyword(title, summary, kind);
+        }
+    }
+
+    @Override
+    public ItemActionSuggestion suggestItemAction(String title, String url, String summary) {
+        if (!llmReady()) {
+            return heuristic.suggestItemAction(title, url, summary);
+        }
+        try {
+            return openAi.suggestItemAction(title, url, summary);
+        } catch (Exception e) {
+            log.warn("ai_item_action_fallback=heuristic error={}", e.getMessage());
+            return heuristic.suggestItemAction(title, url, summary);
+        }
+    }
+
+    @Override
     public EventAssignResult assignEvent(NewsItem item, List<EventCandidate> candidates) {
-        if (!hasApiKey()) {
+        if (!llmReady()) {
             return heuristic.assignEvent(item, candidates);
         }
         try {
@@ -91,7 +146,7 @@ public class CompositeAiService implements AiService {
 
     @Override
     public EventIntelligence refreshEventIntelligence(String eventTitle, List<NewsItem> memberItems) {
-        if (!hasApiKey()) {
+        if (!llmReady()) {
             return heuristic.refreshEventIntelligence(eventTitle, memberItems);
         }
         try {
@@ -104,7 +159,7 @@ public class CompositeAiService implements AiService {
 
     @Override
     public List<ExtractedItem> extractItems(String content, String extractionPrompt) {
-        if (!hasApiKey()) {
+        if (!llmReady()) {
             return heuristic.extractItems(content, extractionPrompt);
         }
         try {
@@ -117,7 +172,7 @@ public class CompositeAiService implements AiService {
 
     @Override
     public ContextExtractResult extractContext(String text) {
-        if (!hasApiKey()) {
+        if (!llmReady()) {
             return heuristic.extractContext(text);
         }
         try {
@@ -130,7 +185,7 @@ public class CompositeAiService implements AiService {
 
     @Override
     public ImpactAnalysisResult analyzeImpact(String contextJson, String title, String summary, String eventImpact, String memoryHints) {
-        if (!hasApiKey()) {
+        if (!llmReady()) {
             return heuristic.analyzeImpact(contextJson, title, summary, eventImpact, memoryHints);
         }
         try {
@@ -143,7 +198,7 @@ public class CompositeAiService implements AiService {
 
     @Override
     public OpportunitySuggestion suggestOpportunity(String contextJson, String title, String why, String recommendation) {
-        if (!hasApiKey()) {
+        if (!llmReady()) {
             return heuristic.suggestOpportunity(contextJson, title, why, recommendation);
         }
         try {
@@ -154,9 +209,7 @@ public class CompositeAiService implements AiService {
         }
     }
 
-    private boolean hasApiKey() {
-        String key = properties.getOpenai().getApiKey();
-        return key != null && !key.isBlank()
-                && !"sk-your-key-here".equals(key);
+    private boolean llmReady() {
+        return properties.getOpenai().isLlmReady();
     }
 }

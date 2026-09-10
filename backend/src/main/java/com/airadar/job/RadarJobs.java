@@ -87,6 +87,10 @@ public class RadarJobs {
 
     @Scheduled(fixedDelayString = "${radar.cluster-interval-ms:3600000}", initialDelayString = "120000")
     public void scheduledCluster() {
+        if (jobMutex.isFetchRunning()) {
+            log.info("cluster_skipped reason=fetch_running");
+            return;
+        }
         if (!clusterRunning.compareAndSet(false, true)) {
             log.info("cluster_skipped reason=already_running");
             return;
@@ -149,6 +153,9 @@ public class RadarJobs {
     }
 
     public Map<String, Object> runCluster() {
+        if (jobMutex.isFetchRunning()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "fetch job already running");
+        }
         if (!clusterRunning.compareAndSet(false, true)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "cluster job already running");
         }
@@ -163,6 +170,9 @@ public class RadarJobs {
     }
 
     public Map<String, Object> runImpact() {
+        if (jobMutex.isFetchRunning()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "fetch job already running");
+        }
         if (!impactRunning.compareAndSet(false, true)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "impact job already running");
         }

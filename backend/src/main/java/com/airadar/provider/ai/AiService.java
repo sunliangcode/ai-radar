@@ -18,7 +18,15 @@ public interface AiService {
     String summarize(NewsItem item);
 
     /**
-     * Batch summarize; default loops {@link #summarize(NewsItem)}.
+     * Summarize with optional localized display title.
+     * Default wraps {@link #summarize(NewsItem)}.
+     */
+    default SummarizeResult summarizeDetailed(NewsItem item) {
+        return SummarizeResult.of(summarize(item));
+    }
+
+    /**
+     * Batch summarize; default loops {@link #summarizeDetailed(NewsItem)}.
      * Implementations may issue a single LLM call for the batch.
      */
     default List<String> summarizeBatch(List<NewsItem> items) {
@@ -30,6 +38,31 @@ public interface AiService {
             out.add(summarize(item));
         }
         return out;
+    }
+
+    default List<SummarizeResult> summarizeDetailedBatch(List<NewsItem> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        List<SummarizeResult> out = new java.util.ArrayList<>(items.size());
+        for (NewsItem item : items) {
+            out.add(summarizeDetailed(item));
+        }
+        return out;
+    }
+
+    /** Extract a like/dislike preference phrase from an item. */
+    default String extractPreferenceKeyword(String title, String summary, String kind) {
+        String base = title == null ? "" : title.trim();
+        if (base.length() > 120) {
+            return base.substring(0, 120);
+        }
+        return base.isBlank() ? null : base;
+    }
+
+    /** Suggest a next action for a saved news item. */
+    default ItemActionSuggestion suggestItemAction(String title, String url, String summary) {
+        return ItemActionSuggestion.none();
     }
 
     /**

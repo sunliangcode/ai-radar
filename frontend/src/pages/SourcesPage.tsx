@@ -3,7 +3,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDescriptor } from '../lib/api'
-import { Button, EmptyState, PageHeader, StateBox } from '../components/ui'
+import { Button, ConfirmDialog, EmptyState, PageHeader, StateBox, useToast } from '../components/ui'
 import { FetchProgressPanel } from '../components/FetchProgressPanel'
 import { FetchResultSummary } from '../components/FetchResultSummary'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
@@ -42,6 +42,7 @@ function buildConfig(
 export default function SourcesPage() {
   const { t, i18n } = useTranslation()
   const qc = useQueryClient()
+  const { push: pushToast } = useToast()
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
   const connectors = useQuery({ queryKey: ['connectors'], queryFn: api.connectors })
   const [open, setOpen] = useState(false)
@@ -50,7 +51,7 @@ export default function SourcesPage() {
   const [type, setType] = useState('RSS')
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const [packId, setPackId] = useState(i18n.language.startsWith('zh') ? 'ai-cn' : 'ai-core')
-  const [toast, setToast] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
   const locale = dateLocale(i18n.language)
 
   const descriptors = useMemo(() => connectors.data ?? [], [connectors.data])
@@ -77,25 +78,39 @@ export default function SourcesPage() {
   })
   const patch = useMutation({
     mutationFn: ({ id, body }: { id: number; body: unknown }) => api.patchSource(id, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sources'] }),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['sources'] })
+      const enabled = (vars.body as { enabled?: boolean })?.enabled
+      pushToast(
+        'success',
+        enabled == null
+          ? t('sources.updated')
+          : enabled
+            ? t('sources.enabledToast')
+            : t('sources.disabledToast'),
+      )
+    },
+    onError: (e) => pushToast('error', (e as Error).message),
   })
   const remove = useMutation({
     mutationFn: api.deleteSource,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sources'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sources'] })
+      pushToast('success', t('sources.deleted'))
+    },
+    onError: (e) => pushToast('error', (e as Error).message),
   })
   const importPack = useMutation({
     mutationFn: () => api.importPack({ packId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sources'] })
-      setToast(t('settings.packImported'))
-      setTimeout(() => setToast(null), 2500)
+      pushToast('success', t('settings.packImported'))
     },
     onError: (e) => {
-      setToast((e as Error).message)
-      setTimeout(() => setToast(null), 4000)
+      pushToast('error', (e as Error).message)
     },
   })
-  const { fetchJob, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
+  const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['sources'],
     ['intelligence-home'],
     ['briefs'],
@@ -152,11 +167,13 @@ export default function SourcesPage() {
       />
 
       {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
-      {phase === 'summary' ? <FetchResultSummary progress={progress} onDismiss={() => void dismiss()} /> : null}
-      {toast ? (
-        <p className="mb-4 text-sm text-moss" role="status">
-          {toast}
-        </p>
+      {phase === 'summary' ? (
+        <FetchResultSummary
+          progress={progress}
+          onDismiss={() => void dismiss()}
+          retrying={retryFailed.isPending}
+          onRetryFailed={(types) => retryFailed.mutate(types)}
+        />
       ) : null}
 
       {open ? (
@@ -244,6 +261,21 @@ export default function SourcesPage() {
         </form>
       ) : null}
 
+      <ConfirmDialog
+        open={deleteTarget != null}
+        title={deleteTarget ? t('sources.deleteConfirm', { name: deleteTarget.name }) : ''}
+        description={t('sources.deleteConfirmHint')}
+        confirmLabel={t('sources.delete')}
+        cancelLabel={t('common.cancel')}
+        danger
+        onConfirm={() => {
+          const target = deleteTarget
+          setDeleteTarget(null)
+          if (target) remove.mutate(target.id)
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
       {sources.isLoading ? <StateBox>{t('sources.loading')}</StateBox> : null}
       {sources.isError ? (
         <StateBox>{t('common.loadFailed', { message: (sources.error as Error).message })}</StateBox>
@@ -282,7 +314,7 @@ export default function SourcesPage() {
           {sources.data?.map((s) => (
             <li key={s.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <Link to={`/sources/${s.id}`} className="font-medium text-ink hover:text-moss">
+                <Link to={`/settings/sources/${s.id}`} className="font-medium text-ink hover:text-moss">
                   {s.name}
                 </Link>
                 <p className="mt-1 font-mono text-xs text-muted">
@@ -292,18 +324,35 @@ export default function SourcesPage() {
                     : ''}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="ghost"
+                  disabled={isPending || !s.enabled}
+                  title={s.enabled ? t('sources.testFetchHint') : t('sources.testFetchDisabled')}
+                  onClick={() =>
+                    fetchJob.mutate(
+                      { sourceType: s.type },
+                      {
+                        onSuccess: async () => {
+                          await dismiss()
+                        },
+                        onError: () => dismiss(),
+                      },
+                    )
+                  }
+                >
+                  {isPending ? t('common.fetching') : t('sources.testFetch')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={patch.isPending}
                   onClick={() => patch.mutate({ id: s.id, body: { enabled: !s.enabled } })}
                 >
                   {s.enabled ? t('sources.disable') : t('sources.enable')}
                 </Button>
                 <Button
                   variant="danger"
-                  onClick={() => {
-                    if (confirm(t('sources.deleteConfirm', { name: s.name }))) remove.mutate(s.id)
-                  }}
+                  onClick={() => setDeleteTarget({ id: s.id, name: s.name })}
                 >
                   {t('sources.delete')}
                 </Button>

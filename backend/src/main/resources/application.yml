@@ -2,8 +2,13 @@ spring:
   application:
     name: ai-radar
   datasource:
-    url: jdbc:sqlite:./data/radar.db
+    # WAL + busy_timeout: concurrent readers + wait instead of immediate SQLITE_BUSY
+    url: jdbc:sqlite:file:./data/radar.db?journal_mode=WAL&busy_timeout=30000&foreign_keys=on
     driver-class-name: org.sqlite.JDBC
+    hikari:
+      # Small pool: SQLite still serializes writers; WAL helps readers coexist
+      maximum-pool-size: 4
+      connection-init-sql: "PRAGMA busy_timeout=30000"
   jpa:
     hibernate:
       # Flyway owns schema; SQLite type affinity fights Hibernate validate (INTEGER vs BIGINT).
@@ -46,9 +51,11 @@ radar:
   summary-language: zh
   briefs-dir: ./data/briefs
   max-snippet-chars: 2000
-  ai-batch-size: 8
+  ai-batch-size: 3
+  ai-parallelism: ${AI_PARALLELISM:1}
   fetch-parallelism: 8
   fetch-interval-ms: 7200000
+  fetch-timeout-ms: ${FETCH_TIMEOUT_MS:60000}
   push-cron: "0 0 8 * * *"
   timezone: Asia/Shanghai
   ui-base-url: http://localhost:8080
@@ -56,8 +63,13 @@ radar:
   local-token: ${LOCAL_TOKEN:}
   openai:
     api-key: ${OPENAI_API_KEY:}
-    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
-    model: ${OPENAI_MODEL:gpt-4o-mini}
+    base-url: ${OPENAI_BASE_URL:http://localhost:11434/v1}
+    model: ${OPENAI_MODEL:qwen3.5:2b-mlx}
+    context-window-tokens: ${OPENAI_CONTEXT_WINDOW_TOKENS:4096}
+    max-completion-tokens: ${OPENAI_MAX_COMPLETION_TOKENS:1024}
+    keep-alive: ${OPENAI_KEEP_ALIVE:0}
+    max-retries: ${OPENAI_MAX_RETRIES:2}
+    retry-backoff-ms: ${OPENAI_RETRY_BACKOFF_MS:500}
   github:
     token: ${GITHUB_TOKEN:}
   producthunt:

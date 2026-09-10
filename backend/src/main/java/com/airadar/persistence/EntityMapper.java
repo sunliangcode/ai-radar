@@ -37,6 +37,7 @@ public class EntityMapper {
         item.setId(entity.getId());
         item.setCanonicalUrl(entity.getCanonicalUrl());
         item.setTitle(entity.getTitle());
+        item.setTitleDisplay(entity.getTitleDisplay());
         item.setPublishedAt(entity.getPublishedAt());
         item.setContentSnippet(entity.getContentSnippet());
         item.setScore(entity.getScore());
@@ -51,6 +52,7 @@ public class EntityMapper {
         item.setRawMeta(readMap(entity.getRawMeta()));
         item.setRead(entity.isReadFlag());
         item.setSaved(entity.isSaved());
+        item.setDismissed(entity.isDismissed());
         item.setCreatedAt(entity.getCreatedAt());
         item.setUpdatedAt(entity.getUpdatedAt());
         return item;
@@ -59,6 +61,7 @@ public class EntityMapper {
     public void applyToEntity(NewsItem item, NewsItemEntity entity) {
         entity.setCanonicalUrl(item.getCanonicalUrl());
         entity.setTitle(item.getTitle());
+        entity.setTitleDisplay(item.getTitleDisplay());
         entity.setPublishedAt(item.getPublishedAt());
         entity.setContentSnippet(item.getContentSnippet());
         entity.setScore(item.getScore());
@@ -73,6 +76,7 @@ public class EntityMapper {
         entity.setRawMeta(writeJson(item.getRawMeta()));
         entity.setReadFlag(item.isRead());
         entity.setSaved(item.isSaved());
+        entity.setDismissed(item.isDismissed());
     }
 
     public String writeJson(Object value) {

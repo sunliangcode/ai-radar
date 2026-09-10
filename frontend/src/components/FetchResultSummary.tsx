@@ -12,15 +12,20 @@ function statusDot(status: FetchSourceProgress['status']): string {
 export function FetchResultSummary({
   progress,
   onDismiss,
+  onRetryFailed,
+  retrying,
 }: {
   progress?: FetchProgress
   onDismiss: () => void
+  onRetryFailed?: (sourceTypes: string[]) => void
+  retrying?: boolean
 }) {
   const { t } = useTranslation()
   if (!progress) return null
 
   const failed = progress.sources?.filter((s) => s.status === 'error') ?? []
   const failedCount = failed.length
+  const failedTypes = [...new Set(failed.map((s) => s.type).filter(Boolean) as string[])]
   const isError = progress.stage === 'error'
   const result = progress.result
   const title = isError
@@ -84,7 +89,16 @@ export function FetchResultSummary({
         <p className="px-5 py-6 text-sm text-muted">{t('fetchProgress.summary.noSources')}</p>
       )}
 
-      <div className="flex justify-end border-t border-mist/80 px-5 py-4">
+      <div className="flex flex-wrap justify-end gap-2 border-t border-mist/80 px-5 py-4">
+        {failedCount > 0 && onRetryFailed ? (
+          <Button
+            variant="ghost"
+            loading={retrying}
+            onClick={() => onRetryFailed(failedTypes)}
+          >
+            {t('fetchProgress.summary.retryFailed')}
+          </Button>
+        ) : null}
         <Button onClick={onDismiss}>{t('fetchProgress.summary.dismiss')}</Button>
       </div>
     </div>

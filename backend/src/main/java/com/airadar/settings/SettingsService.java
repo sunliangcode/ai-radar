@@ -16,6 +16,12 @@ import java.util.Map;
 @Service
 public class SettingsService {
 
+    private static final int MIN_CONTEXT_WINDOW = 1024;
+    private static final int MAX_CONTEXT_WINDOW = 131072;
+    private static final int MIN_COMPLETION = 64;
+    private static final int MIN_AI_PARALLELISM = 1;
+    private static final int MAX_AI_PARALLELISM = 8;
+
     private final RadarProperties properties;
     private final AppSettingsRepository repository;
 
@@ -40,13 +46,18 @@ public class SettingsService {
         dto.put("maxItems", s.maxItems());
         dto.put("lookbackHours", s.lookbackHours());
         dto.put("fetchIntervalMs", s.fetchIntervalMs());
+        dto.put("fetchTimeoutMs", s.fetchTimeoutMs());
         dto.put("pushCron", s.pushCron());
         dto.put("timezone", s.timezone());
         dto.put("uiBaseUrl", s.uiBaseUrl());
         dto.put("pushOnlyWhenItems", s.pushOnlyWhenItems());
         dto.put("openaiBaseUrl", s.openaiBaseUrl());
         dto.put("openaiModel", s.openaiModel());
-        dto.put("openaiConfigured", hasApiKey(properties.getOpenai().getApiKey()));
+        dto.put("contextWindowTokens", s.contextWindowTokens());
+        dto.put("maxCompletionTokens", s.maxCompletionTokens());
+        dto.put("aiParallelism", 1);
+        dto.put("openaiConfigured", properties.getOpenai().isLlmReady());
+        dto.put("openaiApiKeyConfigured", properties.getOpenai().hasApiKey());
         dto.put("githubTokenConfigured", notBlank(properties.getGithub().getToken()));
         dto.put("feishuWebhookUrl", s.feishuWebhookUrl());
         dto.put("feishuConfigured", notBlank(s.feishuWebhookUrl()));
@@ -116,6 +127,9 @@ public class SettingsService {
         if (body.containsKey("fetchIntervalMs")) {
             row.setFetchIntervalMs(asLong(body.get("fetchIntervalMs")));
         }
+        if (body.containsKey("fetchTimeoutMs")) {
+            row.setFetchTimeoutMs(clampFetchTimeout(asInt(body.get("fetchTimeoutMs"))));
+        }
         if (body.containsKey("pushCron")) {
             row.setPushCron(asString(body.get("pushCron")));
         }
@@ -133,6 +147,18 @@ public class SettingsService {
         }
         if (body.containsKey("openaiModel")) {
             row.setOpenaiModel(asString(body.get("openaiModel")));
+        }
+        if (body.containsKey("contextWindowTokens")) {
+            row.setContextWindowTokens(clampContextWindow(asInt(body.get("contextWindowTokens"))));
+        }
+        if (body.containsKey("maxCompletionTokens")) {
+            Integer window = row.getContextWindowTokens() != null
+                    ? row.getContextWindowTokens()
+                    : properties.getOpenai().getContextWindowTokens();
+            row.setMaxCompletionTokens(clampCompletion(asInt(body.get("maxCompletionTokens")), window));
+        }
+        if (body.containsKey("aiParallelism")) {
+            row.setAiParallelism(clampAiParallelism(asInt(body.get("aiParallelism"))));
         }
         if (body.containsKey("feishuWebhookUrl")) {
             row.setFeishuWebhookUrl(asString(body.get("feishuWebhookUrl")));
@@ -203,6 +229,9 @@ public class SettingsService {
         if (s.fetchIntervalMs() != null) {
             properties.setFetchIntervalMs(s.fetchIntervalMs());
         }
+        if (s.fetchTimeoutMs() != null) {
+            properties.setFetchTimeoutMs(s.fetchTimeoutMs());
+        }
         if (s.pushCron() != null) {
             properties.setPushCron(s.pushCron());
         }
@@ -220,6 +249,15 @@ public class SettingsService {
         }
         if (s.openaiModel() != null) {
             properties.getOpenai().setModel(s.openaiModel());
+        }
+        if (s.contextWindowTokens() != null) {
+            properties.getOpenai().setContextWindowTokens(s.contextWindowTokens());
+        }
+        if (s.maxCompletionTokens() != null) {
+            properties.getOpenai().setMaxCompletionTokens(s.maxCompletionTokens());
+        }
+        if (s.aiParallelism() != null) {
+            properties.setAiParallelism(1);
         }
         if (s.feishuWebhookUrl() != null) {
             properties.getDelivery().setFeishuWebhookUrl(s.feishuWebhookUrl());
@@ -261,12 +299,16 @@ public class SettingsService {
                 firstInt(row != null ? row.getMaxItems() : null, properties.getMaxItems()),
                 firstInt(row != null ? row.getLookbackHours() : null, properties.getLookbackHours()),
                 firstLong(row != null ? row.getFetchIntervalMs() : null, properties.getFetchIntervalMs()),
+                firstInt(row != null ? row.getFetchTimeoutMs() : null, properties.getFetchTimeoutMs()),
                 first(row != null ? row.getPushCron() : null, properties.getPushCron()),
                 first(row != null ? row.getTimezone() : null, properties.getTimezone()),
                 first(row != null ? row.getUiBaseUrl() : null, properties.getUiBaseUrl()),
                 firstBool(row != null ? row.getPushOnlyWhenItems() : null, properties.isPushOnlyWhenItems()),
                 first(row != null ? row.getOpenaiBaseUrl() : null, properties.getOpenai().getBaseUrl()),
                 first(row != null ? row.getOpenaiModel() : null, properties.getOpenai().getModel()),
+                firstInt(row != null ? row.getContextWindowTokens() : null, properties.getOpenai().getContextWindowTokens()),
+                firstInt(row != null ? row.getMaxCompletionTokens() : null, properties.getOpenai().getMaxCompletionTokens()),
+                1, // LLM single-threaded only
                 firstNonBlank(envOrDb(d.getFeishuWebhookUrl(), row != null ? row.getFeishuWebhookUrl() : null)),
                 firstNonBlank(envOrDb(d.getWebhookUrl(), row != null ? row.getWebhookUrl() : null)),
                 first(row != null ? row.getWebhookHeadersJson() : null, blankToNull(d.getWebhookHeaders())),
@@ -278,6 +320,34 @@ public class SettingsService {
                 firstBool(row != null ? row.getSmtpStarttls() : null, smtp.isStarttls()),
                 row != null ? row.getSourceWeightsJson() : null
         );
+    }
+
+    private static Integer clampAiParallelism(Integer v) {
+        // LLM calls are single-threaded only.
+        return 1;
+    }
+
+    private static Integer clampFetchTimeout(Integer v) {
+        if (v == null) {
+            return null;
+        }
+        return Math.max(5_000, Math.min(300_000, v));
+    }
+
+    private static Integer clampContextWindow(Integer v) {
+        if (v == null) {
+            return null;
+        }
+        return Math.max(MIN_CONTEXT_WINDOW, Math.min(MAX_CONTEXT_WINDOW, v));
+    }
+
+    private static Integer clampCompletion(Integer v, Integer window) {
+        if (v == null) {
+            return null;
+        }
+        int w = window == null ? 4096 : Math.max(MIN_CONTEXT_WINDOW, window);
+        int max = Math.max(MIN_COMPLETION, w / 2);
+        return Math.max(MIN_COMPLETION, Math.min(max, v));
     }
 
     private static String envOrDb(String env, String db) {
@@ -313,10 +383,6 @@ public class SettingsService {
 
     private static boolean notBlank(String s) {
         return s != null && !s.isBlank();
-    }
-
-    private static boolean hasApiKey(String key) {
-        return notBlank(key) && !"sk-your-key-here".equals(key);
     }
 
     private static String asString(Object v) {
@@ -360,12 +426,16 @@ public class SettingsService {
             Integer maxItems,
             Integer lookbackHours,
             Long fetchIntervalMs,
+            Integer fetchTimeoutMs,
             String pushCron,
             String timezone,
             String uiBaseUrl,
             Boolean pushOnlyWhenItems,
             String openaiBaseUrl,
             String openaiModel,
+            Integer contextWindowTokens,
+            Integer maxCompletionTokens,
+            Integer aiParallelism,
             String feishuWebhookUrl,
             String webhookUrl,
             String webhookHeadersJson,

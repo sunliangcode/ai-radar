@@ -43,6 +43,8 @@ Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.en
 
 Empty databases are seeded from packs `ai-core` + `ai-cn` via `PackImportService` (filesystem `packs/` or classpath). Prefer editing pack JSON rather than hard-coding sources.
 
+**Zhihu** is additionally ensured on every boot (`SourceSeeder.ensureZhihu`): creates 「知乎推荐」 if missing and pins `cliPath` to `/Users/sunliang/workspace/own/zhihu-cli-go/zhihu`. Runtime fetch may still honor `ZHIHU_CLI_PATH`.
+
 The UI loads field schemas from `GET /api/connectors`.
 
 ## Steps to add a connector
@@ -68,7 +70,7 @@ See `backend/src/main/java/com/airadar/connector/FixtureConnector.java`.
 Importable presets under `packs/sources/`:
 
 - `ai-core.json` — English AI blogs + Google News / GDELT / OSS Insight / Trending
-- `ai-cn.json` — WeChat bridges, 36氪, 即刻, V2EX, CN Google News
+- `ai-cn.json` — WeChat bridges, 36氪, 即刻, V2EX, CN Google News, Zhihu
 - `ai-signals.json` — Product Hunt / Twitter / WEB / EMAIL samples (often disabled until tokens are set)
 
 ```bash

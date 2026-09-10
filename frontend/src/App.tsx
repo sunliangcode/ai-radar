@@ -1,6 +1,6 @@
-import { Link, NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import ActionsPage from './pages/ActionsPage'
 import BriefDetailPage from './pages/BriefDetailPage'
@@ -13,8 +13,9 @@ import SourceDetailPage from './pages/SourceDetailPage'
 import SourcesPage from './pages/SourcesPage'
 import TodayPage from './pages/TodayPage'
 import WatchingPage from './pages/WatchingPage'
+import AiMonitorPage from './pages/AiMonitorPage'
 import { api } from './lib/api'
-import { PrefsProvider, usePrefs } from './components/ui'
+import { PrefsProvider, ToastProvider, usePrefs } from './components/ui'
 import { CommandPalette } from './components/CommandPalette'
 
 function LanguageSwitcher() {
@@ -41,24 +42,42 @@ function LanguageSwitcher() {
 function ThemeDensityControls() {
   const { t } = useTranslation()
   const { theme, setTheme, density, setDensity } = usePrefs()
+  const themeOrder: Array<'system' | 'light' | 'dark'> = ['system', 'light', 'dark']
+  const themeIcon = theme === 'system' ? '⚙' : theme === 'dark' ? '☾' : '☀'
+  const cycleTheme = () => {
+    const next = themeOrder[(themeOrder.indexOf(theme) + 1) % themeOrder.length]
+    setTheme(next)
+  }
+  const densityIcons: Record<typeof density, string> = {
+    compact: '≡',
+    comfortable: '☰',
+    cozy: '☰',
+  }
   return (
     <div className="flex items-center gap-1">
       <button
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        type="button"
+        onClick={cycleTheme}
         className="h-7 w-7 rounded text-xs text-muted hover:bg-mist/60 hover:text-ink"
-        title={t('app.theme')}
+        title={`${t('app.theme')}: ${t(`app.themeMode.${theme}`)}`}
+        aria-label={`${t('app.theme')}: ${t(`app.themeMode.${theme}`)}`}
       >
-        {theme === 'dark' ? '☀' : '☾'}
+        <span aria-hidden>{themeIcon}</span>
       </button>
-      <div className="flex rounded border border-border p-0.5">
-        {(['comfortable', 'compact', 'cozy'] as const).map((d) => (
+      <div className="flex rounded border border-border p-0.5" role="group" aria-label={t('app.densityLabel')}>
+        {(['compact', 'comfortable', 'cozy'] as const).map((d) => (
           <button
             key={d}
+            type="button"
             onClick={() => setDensity(d)}
-            className={`h-5 w-5 rounded text-[10px] font-mono ${density === d ? 'bg-ink text-paper' : 'text-muted'}`}
+            className={`h-6 min-w-6 rounded px-1 text-[11px] font-mono ${
+              density === d ? 'bg-ink text-paper' : 'text-muted hover:text-ink'
+            }`}
             title={t(`app.density.${d}`)}
+            aria-label={t(`app.density.${d}`)}
+            aria-pressed={density === d}
           >
-            {d === 'comfortable' ? 'M' : d === 'compact' ? 'S' : 'L'}
+            <span aria-hidden>{densityIcons[d]}</span>
           </button>
         ))}
       </div>
@@ -69,6 +88,12 @@ function ThemeDensityControls() {
 function Shell() {
   const { t } = useTranslation()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const location = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    mainRef.current?.focus({ preventScroll: true })
+  }, [location.pathname])
 
   const unread = useQuery({ queryKey: ['unread-counts'], queryFn: api.unreadCounts, refetchInterval: 60_000 })
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
@@ -98,9 +123,11 @@ function Shell() {
   }, [])
 
   const nav = [
+    { to: '/monitor', label: t('nav.monitor'), end: false, icon: '◎' },
     { to: '/', label: t('nav.today'), end: true, icon: '◉' },
     { to: '/feed', label: t('nav.feed'), end: false, icon: '≡' },
     { to: '/watching', label: t('nav.watching'), end: false, icon: '★' },
+    { to: '/actions', label: t('nav.actions'), end: false, icon: '→' },
     { to: '/settings', label: t('nav.settings'), end: false, icon: '⚙' },
   ]
 
@@ -119,7 +146,7 @@ function Shell() {
               end={item.end}
               className={({ isActive }) =>
                 `flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition ${
-                  isActive ? 'bg-ink text-paper' : 'text-muted hover:bg-mist/60 hover:text-ink'
+                  isActive ? 'bg-accent-soft text-accent font-medium' : 'text-muted hover:bg-mist hover:text-ink'
                 }`
               }
             >
@@ -134,7 +161,7 @@ function Shell() {
           ))}
           <button
             onClick={() => setPaletteOpen(true)}
-            className="mt-0 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted hover:bg-mist/60 hover:text-ink text-left"
+            className="mt-0.5 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted hover:bg-mist hover:text-ink text-left"
           >
             <span className="font-mono text-xs opacity-70">⌘K</span>
             <span>{t('nav.search')}</span>
@@ -153,7 +180,7 @@ function Shell() {
                   <Link
                     key={type}
                     to={`/feed?sourceType=${encodeURIComponent(type)}`}
-                    className={`flex items-center gap-2 rounded px-2.5 py-1 text-xs text-muted hover:bg-mist/60 hover:text-ink ${count > 0 ? 'font-medium text-ink' : ''}`}
+                    className={`flex items-center gap-2 rounded px-2.5 py-1 text-xs hover:bg-mist ${count > 0 ? 'font-medium text-ink' : 'text-faint'}`}
                   >
                     <span className="flex-1 font-mono">{type}</span>
                     {count > 0 ? (
@@ -170,9 +197,14 @@ function Shell() {
           <ThemeDensityControls />
         </div>
       </aside>
-      <main className="px-4 py-5 md:px-8 md:py-7">
+      <main
+        ref={mainRef}
+        tabIndex={-1}
+        className="px-4 py-5 outline-none md:px-8 md:py-7"
+      >
         <div className="mx-auto max-w-4xl">
           <Routes>
+            <Route path="/monitor" element={<AiMonitorPage />} />
             <Route path="/" element={<TodayPage />} />
             <Route path="/feed" element={<FeedPage />} />
             <Route path="/watching" element={<WatchingPage />} />
@@ -189,6 +221,7 @@ function Shell() {
             <Route path="/items" element={<Navigate to="/feed" replace />} />
             <Route path="/contexts" element={<Navigate to="/settings/context" replace />} />
             <Route path="/sources" element={<Navigate to="/settings/sources" replace />} />
+            <Route path="/sources/:id" element={<SourceIdRedirect />} />
             <Route path="/events" element={<Navigate to="/feed" replace />} />
             <Route path="/events/:id" element={<EventRedirect />} />
             <Route path="/briefs" element={<Navigate to="/" replace />} />
@@ -205,10 +238,17 @@ function EventRedirect() {
   return <Navigate to={`/changes/${id ?? ''}`} replace />
 }
 
+function SourceIdRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/settings/sources/${id ?? ''}`} replace />
+}
+
 export default function App() {
   return (
     <PrefsProvider>
-      <Shell />
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
     </PrefsProvider>
   )
 }

@@ -22,7 +22,7 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 RUN apk add --no-cache wget && mkdir -p /app/data/briefs
 COPY --from=backend /app/backend/target/backend-0.1.0-SNAPSHOT.jar /app/app.jar
-ENV SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/radar.db
+ENV SPRING_DATASOURCE_URL=jdbc:sqlite:file:/app/data/radar.db?journal_mode=WAL&busy_timeout=30000&foreign_keys=on
 ENV RADAR_BRIEFS_DIR=/app/data/briefs
 EXPOSE 8080
 VOLUME ["/app/data"]

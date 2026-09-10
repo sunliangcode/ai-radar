@@ -17,6 +17,7 @@ Optional LAN guard: set `LOCAL_TOKEN` and send header `X-Local-Token`.
 | GET | `/api/items/interest-keywords` (keywords from Interested titles) |
 | GET | `/api/briefs`, `/api/briefs/{date}` |
 | GET/PUT | `/api/settings` |
+| GET | `/api/ai/monitor` (LLM context usage & token/s) |
 | POST | `/api/pipeline/run` (legacy alias of fetch pipeline) |
 | GET | `/api/intelligence/home` (changed / why care / impact / do / watch) |
 | GET/PUT | `/api/contexts` |
@@ -46,6 +47,7 @@ Domain model and object mapping: [ai-radar-2.0-domain.md](ai-radar-2.0-domain.md
 | GET | `/api/items/interest-keywords`（从感兴趣标题提取的关键词） |
 | GET | `/api/briefs`, `/api/briefs/{date}` |
 | GET/PUT | `/api/settings` |
+| GET | `/api/ai/monitor`（LLM 上下文用量与 token/s） |
 | POST | `/api/pipeline/run`（fetch 流水线遗留别名） |
 | GET | `/api/intelligence/home`（变了什么 / 为何关心 / 影响 / 做什么 / 观察） |
 | GET/PUT | `/api/contexts` |

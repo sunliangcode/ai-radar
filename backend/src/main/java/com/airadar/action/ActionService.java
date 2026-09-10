@@ -80,6 +80,7 @@ public class ActionService {
         m.put("opportunityId", e.getOpportunityId());
         m.put("impactId", e.getImpactId());
         m.put("eventId", e.getEventId());
+        m.put("newsItemId", e.getNewsItemId());
         m.put("title", e.getTitle());
         try {
             m.put("steps", objectMapper.readValue(

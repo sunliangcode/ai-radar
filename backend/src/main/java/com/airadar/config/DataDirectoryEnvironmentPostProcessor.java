@@ -13,7 +13,9 @@ public class DataDirectoryEnvironmentPostProcessor implements EnvironmentPostPro
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
-        String jdbcUrl = environment.getProperty("spring.datasource.url", "jdbc:sqlite:./data/radar.db");
+        String jdbcUrl = environment.getProperty(
+                "spring.datasource.url",
+                "jdbc:sqlite:file:./data/radar.db?journal_mode=WAL&busy_timeout=30000");
         String briefsDir = environment.getProperty("radar.briefs-dir", "./data/briefs");
         DataDirectoryBootstrap.ensureDirectories(jdbcUrl, briefsDir);
     }

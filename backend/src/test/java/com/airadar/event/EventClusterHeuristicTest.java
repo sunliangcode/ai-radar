@@ -5,13 +5,16 @@ import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
 import com.airadar.interest.InterestSignalsService;
 import com.airadar.persistence.NewsItemRepository;
+import com.airadar.preference.PreferenceKeywordRepository;
 import com.airadar.provider.ai.HeuristicAiService;
 import com.airadar.config.RadarProperties;
+import com.airadar.settings.SettingsService;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,7 +28,11 @@ class EventClusterHeuristicTest {
         RadarProperties props = new RadarProperties();
         NewsItemRepository repo = mock(NewsItemRepository.class);
         when(repo.findBySavedTrue()).thenReturn(List.of());
-        HeuristicAiService ai = new HeuristicAiService(props, new InterestSignalsService(props, repo));
+        PreferenceKeywordRepository prefRepo = mock(PreferenceKeywordRepository.class);
+        when(prefRepo.findByKindOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyString())).thenReturn(List.of());
+        SettingsService settings = mock(SettingsService.class);
+        when(settings.effectiveSourceWeights()).thenReturn(Map.of());
+        HeuristicAiService ai = new HeuristicAiService(props, new InterestSignalsService(props, repo, prefRepo), settings);
 
         NewsItem a = item("OpenAI releases GPT-5 preview for developers", Instant.parse("2026-09-06T10:00:00Z"));
         NewsItem b = item("GPT-5 preview expands to API customers", Instant.parse("2026-09-07T10:00:00Z"));

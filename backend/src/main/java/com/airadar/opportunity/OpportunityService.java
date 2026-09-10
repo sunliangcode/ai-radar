@@ -10,6 +10,7 @@ import com.airadar.provider.ai.OpportunitySuggestion;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,58 +24,77 @@ public class OpportunityService {
     private final AiService aiService;
     private final ContextService contextService;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public OpportunityService(
             OpportunityRepository opportunityRepository,
             ActionRepository actionRepository,
             AiService aiService,
             ContextService contextService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            TransactionTemplate transactionTemplate
     ) {
         this.opportunityRepository = opportunityRepository;
         this.actionRepository = actionRepository;
         this.aiService = aiService;
         this.contextService = contextService;
         this.objectMapper = objectMapper;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
+    /** LLM outside TX; persist opportunity + action in a short write. */
     public void ensureForImpact(ImpactEntity impact) {
+        if (impact == null || impact.getId() == null) {
+            return;
+        }
         if (opportunityRepository.findFirstByImpactId(impact.getId()).isPresent()) {
             return;
         }
-        OpportunitySuggestion suggestion = aiService.suggestOpportunity(
-                contextService.payloadJson(),
-                impact.getTitle(),
-                impact.getWhyText(),
-                impact.getRecommendation()
-        );
-        OpportunityEntity opp = new OpportunityEntity();
-        opp.setImpactId(impact.getId());
-        opp.setEventId(impact.getEventId());
-        opp.setTitle(suggestion.title());
-        opp.setSummary(suggestion.summary());
-        opp.setEstimatedHours(suggestion.estimatedHoursPerMonth());
-        opp.setCoveragePct(suggestion.coveragePct());
-        opp.setKind(suggestion.kind());
-        opportunityRepository.save(opp);
+        Long impactId = impact.getId();
+        Long eventId = impact.getEventId();
+        String title = impact.getTitle();
+        String why = impact.getWhyText();
+        String recommendation = impact.getRecommendation();
+        String contextJson = contextService.payloadJson();
 
-        if (actionRepository.findFirstByImpactId(impact.getId()).isEmpty()) {
-            ActionEntity action = new ActionEntity();
-            action.setOpportunityId(opp.getId());
-            action.setImpactId(impact.getId());
-            action.setEventId(impact.getEventId());
-            action.setTitle(suggestion.actionTitle());
-            try {
-                action.setStepsJson(objectMapper.writeValueAsString(suggestion.steps()));
-            } catch (Exception e) {
-                action.setStepsJson("[]");
+        OpportunitySuggestion suggestion = aiService.suggestOpportunity(
+                contextJson,
+                title,
+                why,
+                recommendation
+        );
+
+        transactionTemplate.executeWithoutResult(status -> {
+            if (opportunityRepository.findFirstByImpactId(impactId).isPresent()) {
+                return;
             }
-            action.setEstimatedMinutes(suggestion.estimatedMinutes());
-            action.setSuccessCriteria(suggestion.successCriteria());
-            action.setStatus("open");
-            actionRepository.save(action);
-        }
+            OpportunityEntity opp = new OpportunityEntity();
+            opp.setImpactId(impactId);
+            opp.setEventId(eventId);
+            opp.setTitle(suggestion.title());
+            opp.setSummary(suggestion.summary());
+            opp.setEstimatedHours(suggestion.estimatedHoursPerMonth());
+            opp.setCoveragePct(suggestion.coveragePct());
+            opp.setKind(suggestion.kind());
+            opportunityRepository.save(opp);
+
+            if (actionRepository.findFirstByImpactId(impactId).isEmpty()) {
+                ActionEntity action = new ActionEntity();
+                action.setOpportunityId(opp.getId());
+                action.setImpactId(impactId);
+                action.setEventId(eventId);
+                action.setTitle(suggestion.actionTitle());
+                try {
+                    action.setStepsJson(objectMapper.writeValueAsString(suggestion.steps()));
+                } catch (Exception e) {
+                    action.setStepsJson("[]");
+                }
+                action.setEstimatedMinutes(suggestion.estimatedMinutes());
+                action.setSuccessCriteria(suggestion.successCriteria());
+                action.setStatus("open");
+                actionRepository.save(action);
+            }
+        });
     }
 
     @Transactional(readOnly = true)
@@ -87,7 +107,7 @@ public class OpportunityService {
         return opportunityRepository.findByKindOrderByUpdatedAtDesc(kind).stream().map(this::toDto).toList();
     }
 
-    private Map<String, Object> toDto(OpportunityEntity e) {
+    public Map<String, Object> toDto(OpportunityEntity e) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", e.getId());
         m.put("impactId", e.getImpactId());

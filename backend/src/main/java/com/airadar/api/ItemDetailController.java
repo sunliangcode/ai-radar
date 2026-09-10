@@ -1,5 +1,6 @@
 package com.airadar.api;
 
+import com.airadar.connector.ZhihuConnector;
 import com.airadar.domain.ItemStatus;
 import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
@@ -38,7 +39,6 @@ import java.util.regex.Pattern;
 public class ItemDetailController {
 
     private static final Logger log = LoggerFactory.getLogger(ItemDetailController.class);
-    private static final String DEFAULT_CLI = "/Users/sunliang/workspace/own/zhihu-cli-go/zhihu";
     private static final Duration TIMEOUT = Duration.ofSeconds(45);
     private static final Pattern ANSWER_ID = Pattern.compile("/answer/(\\d+)");
 
@@ -138,7 +138,7 @@ public class ItemDetailController {
         if (env != null && !env.isBlank()) {
             return env.trim();
         }
-        return DEFAULT_CLI;
+        return ZhihuConnector.DEFAULT_CLI;
     }
 
     private static String runCli(String cli, List<String> args) throws Exception {
@@ -166,6 +166,7 @@ public class ItemDetailController {
             throw new IllegalStateException("zhihu CLI exit " + process.exitValue() + ": "
                     + stdout.substring(0, Math.min(300, stdout.length())));
         }
-        return stdout.toString();
+        // Strip ANSI escape sequences (colors) so regex parsing works.
+        return stdout.toString().replaceAll("\\u001B\\[[;\\d]*[A-Za-z]", "");
     }
 }

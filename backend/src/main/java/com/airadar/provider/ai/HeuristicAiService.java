@@ -48,31 +48,63 @@ public class HeuristicAiService implements AiService {
             return List.of();
         }
         List<String> interestKeywords = parseInterestKeywords(interestSignals.effectiveInterestProfile());
+        List<String> dislikeKeywords = parseInterestKeywords(interestSignals.effectiveDislikeProfile());
         List<ScoreResult> results = new ArrayList<>(items.size());
         for (NewsItem item : items) {
-            results.add(scoreOne(item, interestKeywords));
+            results.add(scoreOne(item, interestKeywords, dislikeKeywords));
         }
         return results;
     }
 
     @Override
     public String summarize(NewsItem item) {
+        return summarizeDetailed(item).summary();
+    }
+
+    @Override
+    public SummarizeResult summarizeDetailed(NewsItem item) {
         String title = item.getTitle() == null ? "" : item.getTitle().trim();
         String snippet = item.getContentSnippet() == null ? "" : item.getContentSnippet().trim();
         String source = item.getPrimarySourceType() == null ? "web" : item.getPrimarySourceType().name();
         boolean zh = !"en".equalsIgnoreCase(properties.getSummaryLanguage());
 
+        String summary;
         if (!snippet.isBlank()) {
-            String body = truncate(snippet, 180);
+            String body = truncate(snippet, 120);
             if (zh) {
-                return "【" + source + "】" + (title.isBlank() ? "" : title + "。") + body;
+                summary = "【" + source + "】" + (title.isBlank() ? "" : title + "——") + body;
+            } else {
+                summary = "[" + source + "] " + (title.isBlank() ? "" : title + " — ") + body;
             }
-            return "[" + source + "] " + (title.isBlank() ? "" : title + ". ") + body;
+        } else if (zh) {
+            summary = "【" + source + "】" + (title.isBlank() ? "相关资讯更新。" : title + "。");
+        } else {
+            summary = "[" + source + "] " + (title.isBlank() ? "Relevant update." : title + ".");
         }
-        if (zh) {
-            return "【" + source + "】" + (title.isBlank() ? "相关资讯更新。" : title + "。");
+        return new SummarizeResult(summary, title.isBlank() ? null : title);
+    }
+
+    @Override
+    public String extractPreferenceKeyword(String title, String summary, String kind) {
+        if (title != null && !title.isBlank()) {
+            return title.trim().length() > 120 ? title.trim().substring(0, 120) : title.trim();
         }
-        return "[" + source + "] " + (title.isBlank() ? "Relevant update." : title + ".");
+        if (summary != null && !summary.isBlank()) {
+            return summary.trim().length() > 120 ? summary.trim().substring(0, 120) : summary.trim();
+        }
+        return null;
+    }
+
+    @Override
+    public ItemActionSuggestion suggestItemAction(String title, String url, String summary) {
+        String t = title == null || title.isBlank() ? "Explore this update" : "Follow up: " + truncate(title, 80);
+        return new ItemActionSuggestion(
+                true,
+                t,
+                List.of("Open the source", "Note one takeaway", "Decide whether to try it"),
+                20,
+                "You have a clear yes/no on whether to act"
+        );
     }
 
     @Override
@@ -166,7 +198,7 @@ public class HeuristicAiService implements AiService {
         return s == null ? "" : s;
     }
 
-    ScoreResult scoreOne(NewsItem item, List<String> interestKeywords) {
+    ScoreResult scoreOne(NewsItem item, List<String> interestKeywords, List<String> dislikeKeywords) {
         String text = ((item.getTitle() == null ? "" : item.getTitle()) + " "
                 + (item.getContentSnippet() == null ? "" : item.getContentSnippet()))
                 .toLowerCase(Locale.ROOT);
@@ -187,6 +219,19 @@ public class HeuristicAiService implements AiService {
         if (interestHits > 0) {
             score += Math.min(30, interestHits * 10);
             reasons.add("兴趣词命中×" + interestHits);
+        }
+
+        int dislikeHits = 0;
+        if (dislikeKeywords != null) {
+            for (String kw : dislikeKeywords) {
+                if (kw.length() >= 2 && text.contains(kw.toLowerCase(Locale.ROOT))) {
+                    dislikeHits++;
+                }
+            }
+        }
+        if (dislikeHits > 0) {
+            score -= Math.min(40, dislikeHits * 15);
+            reasons.add("不喜欢词命中×" + dislikeHits);
         }
 
         int aiHits = countHits(text, AI_KEYWORDS);

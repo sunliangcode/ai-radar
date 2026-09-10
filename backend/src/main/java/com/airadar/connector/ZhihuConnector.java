@@ -26,7 +26,13 @@ import java.util.regex.Pattern;
 public class ZhihuConnector implements SourceConnector {
 
     private static final Logger log = LoggerFactory.getLogger(ZhihuConnector.class);
-    private static final String DEFAULT_CLI = "/Users/sunliang/workspace/own/zhihu-cli-go/zhihu";
+
+    /** Fixed local binary used by seed ensure and as the default fetch path. */
+    public static final String DEFAULT_CLI = "/Users/sunliang/workspace/own/zhihu-cli-go/zhihu";
+    public static final String DEFAULT_SOURCE_NAME = "知乎推荐";
+    public static final int DEFAULT_LIMIT = 5;
+    public static final int DEFAULT_COMMENT_LIMIT = 10;
+
     private static final Duration TIMEOUT = Duration.ofSeconds(120);
     private static final Pattern ANSI = Pattern.compile("\\u001B\\[[;\\d]*[A-Za-z]");
     private static final Pattern COMMENT_LINE = Pattern.compile("^\\s*(\\d+)\\.\\s+(.+?):\\s+(.*)$");
@@ -54,8 +60,8 @@ public class ZhihuConnector implements SourceConnector {
     @Override
     public List<RawItem> fetch(FetchContext ctx) {
         String cliPath = resolveCliPath(ctx);
-        int limit = Math.max(1, ConnectorConfigs.integer(ctx, "limit", 5));
-        int commentLimit = Math.max(0, ConnectorConfigs.integer(ctx, "commentLimit", 10));
+        int limit = Math.max(1, ConnectorConfigs.integer(ctx, "limit", DEFAULT_LIMIT));
+        int commentLimit = Math.max(0, ConnectorConfigs.integer(ctx, "commentLimit", DEFAULT_COMMENT_LIMIT));
 
         String feedsJson;
         try {

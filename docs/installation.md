@@ -27,10 +27,16 @@ Stop:
 ```bash
 cd backend
 cp .env.example .env
-# optional: OPENAI_API_KEY, FEISHU_WEBHOOK_URL, WEBHOOK_URL, SMTP_*
+# defaults: local Ollama at http://localhost:11434/v1 model qwen3.5:2b-mlx
+# optional for cloud: OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
+# optional context budget: OPENAI_CONTEXT_WINDOW_TOKENS=4096 OPENAI_MAX_COMPLETION_TOKENS=1024
+# optional Ollama residency: OPENAI_KEEP_ALIVE=5m (use 0 to unload after each call)
+# host tip: OLLAMA_NUM_PARALLEL=1 keeps a single runner; OPENAI_KEEP_ALIVE=0 lowers peak RAM
+# optional fetch HTTP timeout: FETCH_TIMEOUT_MS=60000 (also editable in Settings → Advanced)
+# optional delivery: FEISHU_WEBHOOK_URL, WEBHOOK_URL, SMTP_*
 ```
 
-Without `OPENAI_API_KEY`, the pipeline uses **heuristic** scoring (still produces a usable brief).
+**Default LLM** is local Ollama (no API key required for `localhost`). Cloud endpoints still need `OPENAI_API_KEY`. Context window defaults to **4096** tokens (also sent as Ollama `num_ctx` for local endpoints) and is adjustable under **Settings → AI model**; oversized prompts are truncated. Local calls use `OPENAI_KEEP_ALIVE` (default **5m**) so the model unloads sooner than a multi-hour pin. Live token/s, in-flight progress, and prompt/response previews appear in **Context monitor** (`GET /api/ai/monitor`). News pull HTTP read timeout defaults to **60s** and is adjustable under **Settings → Advanced**.
 
 Optional LAN guard: set `LOCAL_TOKEN` and send header `X-Local-Token`.
 
@@ -143,10 +149,16 @@ cd ai-radar
 ```bash
 cd backend
 cp .env.example .env
-# 可选: OPENAI_API_KEY, FEISHU_WEBHOOK_URL, WEBHOOK_URL, SMTP_*
+# 默认：本地 Ollama http://localhost:11434/v1 模型 qwen3.5:2b-mlx
+# 云端可选：OPENAI_API_KEY、OPENAI_BASE_URL、OPENAI_MODEL
+# 上下文预算可选：OPENAI_CONTEXT_WINDOW_TOKENS=4096 OPENAI_MAX_COMPLETION_TOKENS=1024
+# Ollama 常驻可选：OPENAI_KEEP_ALIVE=5m（设为 0 则每次调用后卸载）
+# 本机建议：OLLAMA_NUM_PARALLEL=1；更省内存可用 OPENAI_KEEP_ALIVE=0
+# 拉取超时可选：FETCH_TIMEOUT_MS=60000（也可在 设置 → 高级 调节）
+# 推送可选：FEISHU_WEBHOOK_URL、WEBHOOK_URL、SMTP_*
 ```
 
-未配置 `OPENAI_API_KEY` 时使用**启发式**打分（仍可生成可用简报）。
+**默认 LLM** 为本地 Ollama（`localhost` 无需 API Key）。云端接口仍需 `OPENAI_API_KEY`。上下文窗口默认 **4096** tokens（本地会作为 Ollama `num_ctx` 下发），可在 **设置 → AI 模型** 调节；超长 prompt 会截断。本地调用使用 `OPENAI_KEEP_ALIVE`（默认 **5m**），避免模型长时间占满内存。同页的 **上下文监控** 显示进行中进度、输入/输出预览与 token/s（`GET /api/ai/monitor`）。新闻拉取 HTTP 读超时默认 **60s**，可在 **设置 → 高级** 调节。
 
 可选局域网保护：设置 `LOCAL_TOKEN`，请求头带 `X-Local-Token`。
 

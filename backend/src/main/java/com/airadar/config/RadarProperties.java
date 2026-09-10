@@ -13,9 +13,13 @@ public class RadarProperties {
     private String summaryLanguage = "zh";
     private String briefsDir = "./data/briefs";
     private int maxSnippetChars = 2000;
-    private int aiBatchSize = 8;
+    private int aiBatchSize = 3;
+    /** Max concurrent LLM HTTP calls for score/summarize batches (1 = sequential). */
+    private int aiParallelism = 1;
     private int fetchParallelism = 8;
     private long fetchIntervalMs = 7_200_000L;
+    /** HTTP read timeout for RestClient-backed news connectors (ms). */
+    private int fetchTimeoutMs = 60_000;
     private String pushCron = "0 0 8 * * *";
     private String timezone = "Asia/Shanghai";
     private String uiBaseUrl = "http://localhost:8080";
@@ -102,6 +106,15 @@ public class RadarProperties {
         this.aiBatchSize = aiBatchSize;
     }
 
+    public int getAiParallelism() {
+        // Local LLMs (e.g. Ollama) are single-threaded; never run parallel AI calls.
+        return 1;
+    }
+
+    public void setAiParallelism(int aiParallelism) {
+        this.aiParallelism = 1;
+    }
+
     public int getFetchParallelism() {
         return fetchParallelism;
     }
@@ -116,6 +129,19 @@ public class RadarProperties {
 
     public void setFetchIntervalMs(long fetchIntervalMs) {
         this.fetchIntervalMs = fetchIntervalMs;
+    }
+
+    public int getFetchTimeoutMs() {
+        return fetchTimeoutMs;
+    }
+
+    public void setFetchTimeoutMs(int fetchTimeoutMs) {
+        this.fetchTimeoutMs = fetchTimeoutMs;
+    }
+
+    /** Connect timeout derived from fetch timeout (capped at 15s). */
+    public int getHttpConnectTimeoutMs() {
+        return Math.min(15_000, Math.max(1_000, fetchTimeoutMs));
     }
 
     public String getPushCron() {
@@ -196,8 +222,18 @@ public class RadarProperties {
 
     public static class OpenAi {
         private String apiKey = "";
-        private String baseUrl = "https://api.openai.com/v1";
-        private String model = "gpt-4o-mini";
+        private String baseUrl = "http://localhost:11434/v1";
+        private String model = "qwen3.5:2b-mlx";
+        private int contextWindowTokens = 4096;
+        private int maxCompletionTokens = 1024;
+        /** Ollama keep_alive for local endpoints (e.g. "5m", "0" = unload after each call, "-1" = forever). */
+        private String keepAlive = "0";
+        /** Extra HTTP attempts after the first failure (transient errors only). */
+        private int maxRetries = 2;
+        /** Base backoff in ms; attempt n sleeps base * (2^(n-1)) before retry. */
+        private long retryBackoffMs = 500L;
+        /** Skip event-intelligence LLM if event was refreshed within this window (burst coalescing). */
+        private long eventIntelCooldownMs = 300_000L;
 
         public String getApiKey() {
             return apiKey;
@@ -221,6 +257,84 @@ public class RadarProperties {
 
         public void setModel(String model) {
             this.model = model;
+        }
+
+        public int getContextWindowTokens() {
+            return contextWindowTokens;
+        }
+
+        public void setContextWindowTokens(int contextWindowTokens) {
+            this.contextWindowTokens = contextWindowTokens;
+        }
+
+        public int getMaxCompletionTokens() {
+            return maxCompletionTokens;
+        }
+
+        public void setMaxCompletionTokens(int maxCompletionTokens) {
+            this.maxCompletionTokens = maxCompletionTokens;
+        }
+
+        public String getKeepAlive() {
+            return keepAlive;
+        }
+
+        public void setKeepAlive(String keepAlive) {
+            this.keepAlive = keepAlive;
+        }
+
+        public int getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(int maxRetries) {
+            this.maxRetries = Math.max(0, Math.min(5, maxRetries));
+        }
+
+        public long getRetryBackoffMs() {
+            return retryBackoffMs;
+        }
+
+        public void setRetryBackoffMs(long retryBackoffMs) {
+            this.retryBackoffMs = Math.max(0L, retryBackoffMs);
+        }
+
+        public long getEventIntelCooldownMs() {
+            return eventIntelCooldownMs;
+        }
+
+        public void setEventIntelCooldownMs(long eventIntelCooldownMs) {
+            this.eventIntelCooldownMs = eventIntelCooldownMs;
+        }
+
+        /** Prompt budget = context window minus reserved completion tokens. */
+        public int promptBudgetTokens() {
+            int window = Math.max(1024, contextWindowTokens);
+            int completion = Math.max(64, Math.min(maxCompletionTokens, window / 2));
+            return Math.max(512, window - completion);
+        }
+
+        public boolean hasApiKey() {
+            return apiKey != null && !apiKey.isBlank() && !"sk-your-key-here".equals(apiKey);
+        }
+
+        public boolean isLocalEndpoint() {
+            if (baseUrl == null || baseUrl.isBlank()) {
+                return false;
+            }
+            String host = baseUrl.toLowerCase();
+            return host.contains("localhost")
+                    || host.contains("127.0.0.1")
+                    || host.contains("[::1]")
+                    || host.contains("0.0.0.0");
+        }
+
+        /** Live LLM is usable when URL+model set and (local Ollama or API key present). */
+        public boolean isLlmReady() {
+            if (baseUrl == null || baseUrl.isBlank() || model == null || model.isBlank()) {
+                return false;
+            }
+            return isLocalEndpoint() || hasApiKey();
         }
     }
 

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
@@ -20,11 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AppConfig {
 
     @Bean
-    RestClient.Builder restClientBuilder() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(15_000);
-        factory.setReadTimeout(60_000);
-        return RestClient.builder().requestFactory(factory);
+    RestClient.Builder restClientBuilder(RadarProperties properties) {
+        return RestClient.builder().requestFactory(new DynamicTimeoutRequestFactory(properties));
     }
 
     @Bean

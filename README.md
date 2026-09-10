@@ -15,7 +15,7 @@ AI Radar turns AI news into decisions for your work — it watches the AI ecosys
 
 [Demo](#demo) · [Quick Start](#quick-start) · [Documentation](#documentation)
 
-**Stack:** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI-compatible LLM (optional)
+**Stack:** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI-compatible LLM (default: local Ollama)
 
 ## Demo
 
@@ -27,10 +27,11 @@ AI Radar turns AI news into decisions for your work — it watches the AI ecosys
 
 ### Demo story
 
-1. Open Settings / Context and describe your role, projects, and tech stack.
-2. Run a fetch — Radar surfaces **Changes** that match your world, not every headline.
-3. Open a change to see **Impact**: why it matters to you, not a generic summary.
-4. Take a recommended **Action** — a concrete next step you can execute or experiment with.
+1. Open Settings / Context and describe your role, projects, and tech stack; set your **primary language** (Chinese or English).
+2. Run a fetch — items appear in the Feed **as each one is scored and summarized** (no need to wait for the whole job).
+3. Read the one-line AI summary; mark **Not interested** or **Save** so Radar learns like/dislike keywords.
+4. Open a change for **Impact**, or check **Actions** for next steps (saving an item can also trigger an action suggestion).
+5. Watch the **AI Monitor** for queue progress and live Ollama token streaming.
 
 ## Why AI Radar
 
@@ -39,7 +40,7 @@ Most AI news is noise. AI Radar filters that noise against your context and surf
 ## How it works
 
 ```text
-Your Context → Signals → Important Changes → Impact → Actions
+Your Context → Signals → Score & Summarize (per item) → Impact → Actions
 ```
 
 ## Quick start
@@ -63,9 +64,13 @@ Docker, dev mode, environment variables, and delivery channels: [docs/installati
 ## Core features
 
 - **Personal Context** — Profile, projects, and stack so relevance is about *you*, not global trends.
+- **Primary language** — Summaries and display titles in Chinese or English; English sources are localized when AI is available.
+- **Live Feed** — One-sentence AI summary per item; new items show up as soon as they are analyzed.
+- **Like / dislike keywords** — Save or mark Not interested to teach preference phrases (editable in Settings).
 - **Change Detection** — Important external shifts, not an endless raw feed.
 - **Impact Analysis** — Why a change matters for your work, in plain language.
-- **Recommended Actions** — Concrete next steps (optional experiments & outcomes).
+- **Recommended Actions** — Checklist-style next steps; saving an item can ask the LLM whether an action is worth creating.
+- **AI Monitor** — Queue counts (total / done / remaining, calls per item) plus streaming I/O for local Ollama.
 
 ## Documentation
 

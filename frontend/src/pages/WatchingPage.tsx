@@ -1,36 +1,92 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type ChangeCard, type Item, type WatchingGroup } from '../lib/api'
-import { Button, EmptyState, PageHeader, ScoreBar, StateBox } from '../components/ui'
+import { Button, EmptyState, ListSkeleton, PageHeader, ScoreBar, useToast } from '../components/ui'
+import { useMarkItemRead } from '../hooks/useMarkItemRead'
 import { dateLocale } from '../i18n'
+
+const TIMELINE_PREVIEW = 3
 
 export default function WatchingPage() {
   const { t, i18n } = useTranslation()
+  const qc = useQueryClient()
+  const { push: pushToast } = useToast()
   const locale = dateLocale(i18n.language)
+  const markItemRead = useMarkItemRead()
+  const [showAllTimeline, setShowAllTimeline] = useState(false)
 
   const changes = useQuery({ queryKey: ['changes-watching'], queryFn: () => api.changes(40) })
   const saved = useQuery({ queryKey: ['watching-saved'], queryFn: () => api.items('?saved=true&sort=score&limit=50') })
   const timeline = useQuery({ queryKey: ['watching-timeline'], queryFn: api.watchingTimeline })
+
+  const patchItem = useMutation({
+    mutationFn: ({ id, saved, read }: { id: number; saved?: boolean; read?: boolean }) =>
+      api.patchItem(id, { saved, read }),
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({ queryKey: ['watching-saved'] })
+      await qc.invalidateQueries({ queryKey: ['watching'] })
+      await qc.invalidateQueries({ queryKey: ['feed'] })
+      if (vars.saved === false) {
+        pushToast('success', t('watching.unsaved'), {
+          label: t('common.undo'),
+          onClick: () => {
+            void api
+              .patchItem(vars.id, { saved: true })
+              .then(() => qc.invalidateQueries({ queryKey: ['watching-saved'] }))
+              .catch(() => undefined)
+          },
+        })
+      }
+    },
+    onError: (err) => {
+      pushToast('error', t('common.loadFailed', { message: (err as Error).message }))
+    },
+  })
 
   const tracked = (changes.data ?? []).filter(
     (c) => c.tier === 'HIGH' || c.tier === 'MEDIUM' || c.status === 'WATCHING',
   )
   const savedItems = saved.data?.items ?? []
   const groups = timeline.data?.groups ?? []
+  const visibleGroups = showAllTimeline ? groups : groups.slice(0, TIMELINE_PREVIEW)
 
   return (
     <div>
-      <PageHeader title={t('watching.title')} subtitle={t('watching.subtitle')} />
+      <PageHeader
+        title={t('watching.title')}
+        subtitle={t('watching.subtitle')}
+        actions={
+          <Link to="/actions" className="text-sm text-moss underline underline-offset-2">
+            {t('watching.openActions')}
+          </Link>
+        }
+      />
 
       {groups.length > 0 ? (
         <section className="mb-8">
-          <h2 className="mb-3 text-base font-semibold text-ink">{t('watching.timeline')}</h2>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-base font-semibold text-ink">{t('watching.timeline')}</h2>
+            {groups.length > TIMELINE_PREVIEW ? (
+              <button
+                type="button"
+                onClick={() => setShowAllTimeline((v) => !v)}
+                className="text-xs text-accent hover:underline"
+              >
+                {showAllTimeline ? t('watching.collapseTimeline') : t('watching.expandTimeline')}
+              </button>
+            ) : null}
+          </div>
           <div className="space-y-3">
-            {groups.map((g: WatchingGroup) => (
+            {visibleGroups.map((g: WatchingGroup) => (
               <div key={g.eventId} className="rounded-lg border border-border bg-surface p-4">
                 <div className="flex items-baseline justify-between">
-                  <Link to={`/changes/${g.eventId}`} className="font-medium text-ink hover:underline">
+                  <Link
+                    to={`/changes/${g.eventId}`}
+                    state={{ from: '/watching' }}
+                    className="font-medium text-ink hover:underline"
+                  >
                     {g.title}
                   </Link>
                   <span className="font-mono text-[11px] text-muted">{g.entryCount}</span>
@@ -53,7 +109,7 @@ export default function WatchingPage() {
 
       <section className="mb-8">
         <h2 className="mb-3 text-base font-semibold text-ink">{t('watching.trackedChanges')}</h2>
-        {changes.isLoading ? <StateBox>{t('common.loading')}</StateBox> : null}
+        {changes.isLoading ? <ListSkeleton rows={3} /> : null}
         {!changes.isLoading && tracked.length === 0 ? (
           <EmptyState title={t('watching.noTracked')} description={t('watching.noTrackedHint')} />
         ) : (
@@ -65,7 +121,11 @@ export default function WatchingPage() {
                     <ScoreBar score={c.priority ? Math.min(100, Math.round(c.priority / 1000)) : c.score} size="sm" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <Link to={`/changes/${c.id}`} className="font-medium text-ink hover:underline">
+                    <Link
+                      to={`/changes/${c.id}`}
+                      state={{ from: '/watching' }}
+                      className="font-medium text-ink hover:underline"
+                    >
                       {c.title}
                     </Link>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
@@ -95,7 +155,7 @@ export default function WatchingPage() {
             {t('watching.savedCount', { count: savedItems.length })}
           </span>
         </div>
-        {saved.isLoading ? <StateBox>{t('common.loading')}</StateBox> : null}
+        {saved.isLoading ? <ListSkeleton rows={3} /> : null}
         {!saved.isLoading && savedItems.length === 0 ? (
           <EmptyState
             title={t('watching.noSaved')}
@@ -119,6 +179,9 @@ export default function WatchingPage() {
                       href={item.canonicalUrl}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={() => {
+                        if (!item.read) markItemRead.mutate({ id: item.id, read: true })
+                      }}
                       className="font-medium text-ink hover:underline"
                     >
                       {item.title}
@@ -130,6 +193,26 @@ export default function WatchingPage() {
                           {new Date(item.publishedAt).toLocaleDateString(locale)}
                         </span>
                       ) : null}
+                      {item.read ? <span className="font-mono">{t('watching.readBadge')}</span> : null}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {!item.read ? (
+                        <button
+                          type="button"
+                          onClick={() => patchItem.mutate({ id: item.id, read: true })}
+                          className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-mist hover:text-ink"
+                        >
+                          {t('common.markRead')}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={patchItem.isPending}
+                        onClick={() => patchItem.mutate({ id: item.id, saved: false })}
+                        className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-mist hover:text-ink disabled:opacity-50"
+                      >
+                        {t('watching.unsave')}
+                      </button>
                     </div>
                   </div>
                 </div>

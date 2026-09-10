@@ -72,9 +72,10 @@ class FeishuDeliveryTest {
 
     private static SettingsService.EffectiveSettings settings(String feishu) {
         return new SettingsService.EffectiveSettings(
-                "ai", "zh", 60, 30, 48, 7200000L, "0 0 8 * * *", "Asia/Shanghai",
-                "http://localhost:8080", true, "https://api.openai.com/v1", "gpt-4o-mini",
-                feishu, "", null, "", 587, "", "", "", true
+                "ai", "zh", 60, 30, 48, 7200000L, 60000, "0 0 8 * * *", "Asia/Shanghai",
+                "http://localhost:8080", true,
+                "http://localhost:11434/v1", "qwen3.5:2b-mlx", 8192, 1024, 1,
+                feishu, "", null, "", 587, "", "", "", true, null
         );
     }
 }

@@ -67,11 +67,25 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
           </div>
           <div className="flex flex-wrap gap-4 font-mono text-xs tabular-nums text-muted">
             <span>{t('fetchProgress.elapsed', { time: formatDuration(progress.elapsedMs) })}</span>
-            {inFetch || total > 0 ? (
+            {progress.analysis && (progress.analysis.itemsTotal ?? 0) > 0 ? (
+              <span>
+                {t('fetchProgress.analysisProgress', {
+                  done: progress.analysis.itemsDone ?? 0,
+                  total: progress.analysis.itemsTotal ?? 0,
+                  remaining: progress.analysis.itemsRemaining ?? 0,
+                })}
+              </span>
+            ) : inFetch || total > 0 ? (
               <span>{t('fetchProgress.remaining', { remaining, total })}</span>
             ) : null}
           </div>
         </div>
+
+        {progress.analysis?.currentItemTitle ? (
+          <p className="mt-2 truncate text-xs text-muted">
+            {t('fetchProgress.currentItem', { title: progress.analysis.currentItemTitle })}
+          </p>
+        ) : null}
 
         <ol className="mt-4 flex flex-wrap gap-2">
           {steps.map((s, i) => {

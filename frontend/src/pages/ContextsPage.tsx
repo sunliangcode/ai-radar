@@ -1,10 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type UserContext } from '../lib/api'
-import { SettingsSection } from '../components/SettingsSection'
-import { SourcesSection } from '../components/SourcesSection'
-import { Button, PageHeader, StateBox } from '../components/ui'
+import { Button, FormSaveBar, PageHeader, StateBox, useToast } from '../components/ui'
 
 function listToText(values?: string[]) {
   return (values ?? []).join(', ')
@@ -20,37 +18,44 @@ function textToList(value: string) {
 export default function ContextsPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const { push: pushToast } = useToast()
   const ctx = useQuery({ queryKey: ['contexts'], queryFn: api.getContext })
   const [payload, setPayload] = useState<UserContext['payload'] | null>(null)
   const [rawText, setRawText] = useState('')
   const [githubUrl, setGithubUrl] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
+  const [baseline, setBaseline] = useState<string | null>(null)
+  const hydratedRef = useRef(false)
+  const currentKey = useMemo(
+    () => JSON.stringify({ payload, rawText }),
+    [payload, rawText],
+  )
+  const isDirty = baseline != null && currentKey !== baseline
 
   useEffect(() => {
-    if (ctx.data?.payload) {
-      setPayload(ctx.data.payload)
-      setRawText(ctx.data.rawText ?? '')
-    }
+    if (!ctx.data?.payload || hydratedRef.current) return
+    setPayload(ctx.data.payload)
+    setRawText(ctx.data.rawText ?? '')
+    setBaseline(JSON.stringify({ payload: ctx.data.payload, rawText: ctx.data.rawText ?? '' }))
+    hydratedRef.current = true
   }, [ctx.data])
 
   const save = useMutation({
     mutationFn: () => api.saveContext({ payload, rawText, source: 'manual' }),
     onSuccess: (data) => {
       qc.setQueryData(['contexts'], data)
-      setToast(t('contexts.saved'))
-      setTimeout(() => setToast(null), 2000)
+      setBaseline(JSON.stringify({ payload, rawText }))
+      pushToast('success', t('contexts.saved'))
     },
-    onError: (e) => setToast((e as Error).message),
+    onError: (e) => pushToast('error', (e as Error).message),
   })
 
   const extract = useMutation({
     mutationFn: () => api.extractContext(rawText),
     onSuccess: (draft) => {
       setPayload(draft.payload)
-      setToast(t('contexts.extracted'))
-      setTimeout(() => setToast(null), 2000)
+      pushToast('success', t('contexts.extracted'))
     },
-    onError: (e) => setToast((e as Error).message),
+    onError: (e) => pushToast('error', (e as Error).message),
   })
 
   const importGithub = useMutation({
@@ -58,15 +63,21 @@ export default function ContextsPage() {
     onSuccess: (draft) => {
       setPayload(draft.payload)
       if (draft.rawText) setRawText(draft.rawText)
-      setToast(t('contexts.imported'))
-      setTimeout(() => setToast(null), 2000)
+      pushToast('success', t('contexts.imported'))
     },
-    onError: (e) => setToast((e as Error).message),
+    onError: (e) => pushToast('error', (e as Error).message),
   })
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
     save.mutate()
+  }
+
+  function discard() {
+    if (baseline == null) return
+    const parsed = JSON.parse(baseline) as { payload: UserContext['payload']; rawText: string }
+    setPayload(parsed.payload)
+    setRawText(parsed.rawText)
   }
 
   if (ctx.isLoading) return <StateBox>{t('contexts.loading')}</StateBox>
@@ -78,11 +89,6 @@ export default function ContextsPage() {
   return (
     <div className="space-y-10">
       <PageHeader title={t('contexts.title')} subtitle={t('contexts.subtitle')} />
-      {toast ? (
-        <p className="text-sm text-moss" role="status">
-          {toast}
-        </p>
-      ) : null}
 
       <form className="space-y-6" onSubmit={onSubmit}>
         <section>
@@ -198,15 +204,18 @@ export default function ContextsPage() {
               </label>
             </div>
 
-            <Button type="submit" loading={save.isPending}>
+            <FormSaveBar
+              dirty={isDirty}
+              saving={save.isPending}
+              onSave={() => save.mutate()}
+              onDiscard={discard}
+            />
+            <Button type="submit" loading={save.isPending} disabled={!isDirty}>
               {save.isPending ? t('common.saving') : t('contexts.confirmSave')}
             </Button>
           </div>
         </section>
       </form>
-
-      <SourcesSection />
-      <SettingsSection />
     </div>
   )
 }

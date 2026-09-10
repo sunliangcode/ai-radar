@@ -68,6 +68,12 @@ export default function SettingsHubPage() {
           {t('settingsHub.howItWorksBody')}
         </div>
       </section>
+
+      <p className="mt-6 text-sm text-muted">
+        <Link to="/actions" className="text-moss underline underline-offset-2">
+          {t('settingsHub.openActions')}
+        </Link>
+      </p>
     </div>
   )
 }

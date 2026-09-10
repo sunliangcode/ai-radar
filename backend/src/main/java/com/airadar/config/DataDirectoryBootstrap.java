@@ -25,7 +25,7 @@ public final class DataDirectoryBootstrap {
     }
 
     public static void ensureDefaultDirectories() {
-        ensureDirectories("jdbc:sqlite:./data/radar.db", "./data/briefs");
+        ensureDirectories("jdbc:sqlite:file:./data/radar.db?journal_mode=WAL&busy_timeout=30000", "./data/briefs");
     }
 
     private static void ensureParentOfSqliteUrl(String jdbcUrl) {
@@ -40,6 +40,9 @@ public final class DataDirectoryBootstrap {
         int query = pathPart.indexOf('?');
         if (query >= 0) {
             pathPart = pathPart.substring(0, query);
+        }
+        if (pathPart.regionMatches(true, 0, "file:", 0, 5)) {
+            pathPart = pathPart.substring(5);
         }
         if (pathPart.isBlank() || pathPart.startsWith(":") || ":memory:".equalsIgnoreCase(pathPart)) {
             return;

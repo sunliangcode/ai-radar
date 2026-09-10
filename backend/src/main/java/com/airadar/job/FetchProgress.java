@@ -31,6 +31,15 @@ public class FetchProgress {
     private final ConcurrentHashMap<Long, SourceState> sources = new ConcurrentHashMap<>();
     private final AtomicReference<List<Long>> sourceOrder = new AtomicReference<>(List.of());
 
+    // Analysis queue (score/summarize/persist per item)
+    private volatile int itemsTotal;
+    private volatile int itemsDone;
+    private volatile int itemsPersisted;
+    private volatile String currentItemTitle;
+    private volatile Long lastItemId;
+    private volatile int callsExpectedPerItem = 2;
+    private volatile int aiParallelism = 1;
+
     /** Mark job as started before sources are known (so UI can show immediately). */
     public void markStarting() {
         synchronized (lock) {
@@ -42,6 +51,7 @@ public class FetchProgress {
             result = null;
             sources.clear();
             sourceOrder.set(List.of());
+            resetAnalysisQueue();
         }
     }
 
@@ -72,6 +82,53 @@ public class FetchProgress {
             }
             sourceOrder.set(List.copyOf(order));
         }
+    }
+
+    public void beginAnalysisQueue(int total, int parallelism, int callsPerItem) {
+        synchronized (lock) {
+            itemsTotal = Math.max(0, total);
+            itemsDone = 0;
+            itemsPersisted = 0;
+            currentItemTitle = null;
+            lastItemId = null;
+            aiParallelism = Math.max(1, parallelism);
+            callsExpectedPerItem = Math.max(1, callsPerItem);
+        }
+    }
+
+    public void markItemAnalyzing(String title) {
+        currentItemTitle = title;
+    }
+
+    public void markItemPersisted(Long itemId, String title) {
+        synchronized (lock) {
+            itemsDone++;
+            itemsPersisted++;
+            lastItemId = itemId;
+            currentItemTitle = title;
+            String verb = stage == Stage.score ? "scoring" : "translating";
+            message = verb + " " + itemsDone + "/" + itemsTotal;
+        }
+    }
+
+    /** Advance analysis queue after a scored (or otherwise completed) item without persist. */
+    public void markItemDone(String title) {
+        synchronized (lock) {
+            itemsDone++;
+            currentItemTitle = title;
+            String verb = stage == Stage.score ? "scoring" : "translating";
+            message = verb + " " + itemsDone + "/" + itemsTotal;
+        }
+    }
+
+    private void resetAnalysisQueue() {
+        itemsTotal = 0;
+        itemsDone = 0;
+        itemsPersisted = 0;
+        currentItemTitle = null;
+        lastItemId = null;
+        callsExpectedPerItem = 2;
+        aiParallelism = 1;
     }
 
     public void setStage(Stage stage) {
@@ -144,6 +201,16 @@ public class FetchProgress {
         totals.put("running", runningCount);
         totals.put("remaining", pending + runningCount);
 
+        Map<String, Object> analysis = new LinkedHashMap<>();
+        analysis.put("itemsTotal", itemsTotal);
+        analysis.put("itemsDone", itemsDone);
+        analysis.put("itemsRemaining", Math.max(0, itemsTotal - itemsDone));
+        analysis.put("itemsPersisted", itemsPersisted);
+        analysis.put("currentItemTitle", currentItemTitle);
+        analysis.put("lastItemId", lastItemId);
+        analysis.put("callsExpectedPerItem", callsExpectedPerItem);
+        analysis.put("aiParallelism", aiParallelism);
+
         Map<String, Object> snap = new LinkedHashMap<>();
         snap.put("running", running);
         snap.put("stage", stage.name());
@@ -153,6 +220,7 @@ public class FetchProgress {
         snap.put("message", message);
         snap.put("sources", sourceSnapshots);
         snap.put("totals", totals);
+        snap.put("analysis", analysis);
         snap.put("result", result);
         return snap;
     }

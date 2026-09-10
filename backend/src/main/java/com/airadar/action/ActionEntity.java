@@ -28,6 +28,9 @@ public class ActionEntity {
     @Column(name = "event_id")
     private Long eventId;
 
+    @Column(name = "news_item_id")
+    private Long newsItemId;
+
     @Column(nullable = false)
     private String title;
 
@@ -68,6 +71,8 @@ public class ActionEntity {
     public void setImpactId(Long impactId) { this.impactId = impactId; }
     public Long getEventId() { return eventId; }
     public void setEventId(Long eventId) { this.eventId = eventId; }
+    public Long getNewsItemId() { return newsItemId; }
+    public void setNewsItemId(Long newsItemId) { this.newsItemId = newsItemId; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getStepsJson() { return stepsJson; }

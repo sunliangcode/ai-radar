@@ -11,6 +11,7 @@ import com.airadar.provider.ai.ImpactAnalysisResult;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +26,7 @@ public class ImpactService {
     private final AiService aiService;
     private final MemoryService memoryService;
     private final OpportunityService opportunityService;
+    private final TransactionTemplate transactionTemplate;
 
     public ImpactService(
             ImpactRepository impactRepository,
@@ -32,7 +34,8 @@ public class ImpactService {
             ContextService contextService,
             AiService aiService,
             MemoryService memoryService,
-            @Lazy OpportunityService opportunityService
+            @Lazy OpportunityService opportunityService,
+            TransactionTemplate transactionTemplate
     ) {
         this.impactRepository = impactRepository;
         this.eventRepository = eventRepository;
@@ -40,9 +43,10 @@ public class ImpactService {
         this.aiService = aiService;
         this.memoryService = memoryService;
         this.opportunityService = opportunityService;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
+    /** LLM stays outside TX; each event persists in a short write boundary. */
     public Map<String, Object> recomputeAll() {
         contextService.getOrSeed();
         String contextJson = contextService.payloadJson();
@@ -51,9 +55,22 @@ public class ImpactService {
         int computed = 0;
         int high = 0;
         for (EventEntity event : events) {
-            ImpactEntity impact = analyzeOne(event, contextJson, memory);
+            Long eventId = event.getId();
+            String title = event.getTitle();
+            String summary = event.getSummary();
+            String impactText = event.getImpact();
+
+            ImpactAnalysisResult analysis = aiService.analyzeImpact(
+                    contextJson,
+                    title,
+                    summary,
+                    impactText,
+                    memory
+            );
+
+            ImpactEntity impact = transactionTemplate.execute(status -> persistAnalysis(eventId, title, analysis));
             computed++;
-            if ("HIGH".equalsIgnoreCase(impact.getTier())) {
+            if (impact != null && "HIGH".equalsIgnoreCase(impact.getTier())) {
                 high++;
                 opportunityService.ensureForImpact(impact);
             }
@@ -64,20 +81,13 @@ public class ImpactService {
         return result;
     }
 
-    private ImpactEntity analyzeOne(EventEntity event, String contextJson, String memory) {
-        ImpactAnalysisResult analysis = aiService.analyzeImpact(
-                contextJson,
-                event.getTitle(),
-                event.getSummary(),
-                event.getImpact(),
-                memory
-        );
+    private ImpactEntity persistAnalysis(Long eventId, String title, ImpactAnalysisResult analysis) {
         double effort = Math.max(1, analysis.effort());
         double priority = analysis.relevance() * analysis.impact() * analysis.urgency() * analysis.confidence() / effort;
 
-        ImpactEntity row = impactRepository.findByEventId(event.getId()).orElseGet(ImpactEntity::new);
-        row.setEventId(event.getId());
-        row.setTitle(event.getTitle());
+        ImpactEntity row = impactRepository.findByEventId(eventId).orElseGet(ImpactEntity::new);
+        row.setEventId(eventId);
+        row.setTitle(title);
         row.setRelevance(analysis.relevance());
         row.setImpactScore(analysis.impact());
         row.setUrgency(analysis.urgency());

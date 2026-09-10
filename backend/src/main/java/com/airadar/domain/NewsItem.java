@@ -12,6 +12,8 @@ public class NewsItem {
     private Long id;
     private String canonicalUrl;
     private String title;
+    /** Localized display title (e.g. Chinese when primary language is zh). */
+    private String titleDisplay;
     private Instant publishedAt;
     private String contentSnippet;
     private Double score;
@@ -26,6 +28,7 @@ public class NewsItem {
     private Map<String, Object> rawMeta;
     private boolean read;
     private boolean saved;
+    private boolean dismissed;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -51,6 +54,14 @@ public class NewsItem {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public String getTitleDisplay() {
+        return titleDisplay;
+    }
+
+    public void setTitleDisplay(String titleDisplay) {
+        this.titleDisplay = titleDisplay;
     }
 
     public Instant getPublishedAt() {
@@ -163,6 +174,14 @@ public class NewsItem {
 
     public void setSaved(boolean saved) {
         this.saved = saved;
+    }
+
+    public boolean isDismissed() {
+        return dismissed;
+    }
+
+    public void setDismissed(boolean dismissed) {
+        this.dismissed = dismissed;
     }
 
     public Instant getCreatedAt() {

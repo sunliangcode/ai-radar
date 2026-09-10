@@ -5,6 +5,8 @@ import com.airadar.domain.NewsItem;
 import com.airadar.domain.SourceType;
 import com.airadar.interest.InterestSignalsService;
 import com.airadar.persistence.NewsItemRepository;
+import com.airadar.preference.PreferenceKeywordRepository;
+import com.airadar.settings.SettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -28,8 +30,12 @@ class HeuristicAiServiceTest {
         props.setSummaryLanguage("zh");
         NewsItemRepository repo = mock(NewsItemRepository.class);
         when(repo.findBySavedTrue()).thenReturn(List.of());
-        InterestSignalsService signals = new InterestSignalsService(props, repo);
-        service = new HeuristicAiService(props, signals);
+        PreferenceKeywordRepository prefRepo = mock(PreferenceKeywordRepository.class);
+        when(prefRepo.findByKindOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyString())).thenReturn(List.of());
+        InterestSignalsService signals = new InterestSignalsService(props, repo, prefRepo);
+        SettingsService settings = mock(SettingsService.class);
+        when(settings.effectiveSourceWeights()).thenReturn(Map.of());
+        service = new HeuristicAiService(props, signals, settings);
     }
 
     @Test

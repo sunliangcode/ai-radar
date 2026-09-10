@@ -1,5 +1,6 @@
 package com.airadar.event;
 
+import com.airadar.config.RadarProperties;
 import com.airadar.domain.ItemStatus;
 import com.airadar.domain.NewsItem;
 import com.airadar.persistence.EntityMapper;
@@ -12,7 +13,7 @@ import com.airadar.provider.ai.EventIntelligence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -36,6 +37,8 @@ public class EventClusterService {
     private final NewsItemRepository newsItemRepository;
     private final EntityMapper entityMapper;
     private final AiService aiService;
+    private final TransactionTemplate transactionTemplate;
+    private final RadarProperties properties;
 
     public EventClusterService(
             EventRepository eventRepository,
@@ -44,7 +47,9 @@ public class EventClusterService {
             EventClusterLogRepository clusterLogRepository,
             NewsItemRepository newsItemRepository,
             EntityMapper entityMapper,
-            AiService aiService
+            AiService aiService,
+            TransactionTemplate transactionTemplate,
+            RadarProperties properties
     ) {
         this.eventRepository = eventRepository;
         this.eventItemRepository = eventItemRepository;
@@ -53,10 +58,11 @@ public class EventClusterService {
         this.newsItemRepository = newsItemRepository;
         this.entityMapper = entityMapper;
         this.aiService = aiService;
+        this.transactionTemplate = transactionTemplate;
+        this.properties = properties;
     }
 
     /** Link recently persisted DONE items that are not yet attached to an event. */
-    @Transactional
     public Map<String, Object> linkUnattachedItems(int lookbackHours) {
         Instant since = Instant.now().minus(Math.max(1, lookbackHours), ChronoUnit.HOURS);
         List<NewsItemEntity> entities = newsItemRepository.findByCreatedAtGreaterThanEqualOrderByScoreDesc(since);
@@ -92,7 +98,6 @@ public class EventClusterService {
         return metrics;
     }
 
-    @Transactional
     public void linkNewItems(List<NewsItem> items) {
         if (items == null || items.isEmpty()) {
             return;
@@ -113,6 +118,8 @@ public class EventClusterService {
     }
 
     /**
+     * Load candidates → LLM outside TX → short write TX → refresh (LLM outside TX).
+     *
      * @return true if a new event was created
      */
     boolean linkOne(NewsItem item) {
@@ -121,28 +128,32 @@ public class EventClusterService {
         List<EventCandidate> candidates = prefilter(item, recent);
 
         EventAssignResult decision = aiService.assignEvent(item, candidates);
-        EventEntity event;
-        boolean created;
-        if (!decision.createNew()
-                && decision.eventId() != null
-                && decision.confidence() >= MIN_ASSIGN_CONFIDENCE
-                && eventRepository.existsById(decision.eventId())) {
-            event = eventRepository.findById(decision.eventId()).orElseThrow();
-            created = false;
-            attach(event, item, EventItemRole.UPDATE, decision);
-        } else {
-            event = new EventEntity();
-            event.setTitle(decision.title() == null || decision.title().isBlank()
-                    ? (item.getTitle() == null ? "Untitled" : item.getTitle())
-                    : decision.title());
-            event.setStatus(EventStatus.EMERGING);
-            event.setFirstSeenAt(item.getPublishedAt() != null ? item.getPublishedAt() : Instant.now());
-            event = eventRepository.save(event);
-            created = true;
-            attach(event, item, EventItemRole.SEED, decision);
-        }
-        refreshEvent(event.getId());
-        return created;
+
+        boolean createNew = decision.createNew()
+                || decision.eventId() == null
+                || decision.confidence() < MIN_ASSIGN_CONFIDENCE
+                || !eventRepository.existsById(decision.eventId());
+
+        Long eventId = transactionTemplate.execute(status -> {
+            EventEntity event;
+            if (!createNew) {
+                event = eventRepository.findById(decision.eventId()).orElseThrow();
+                attach(event, item, EventItemRole.UPDATE, decision);
+            } else {
+                event = new EventEntity();
+                event.setTitle(decision.title() == null || decision.title().isBlank()
+                        ? (item.getTitle() == null ? "Untitled" : item.getTitle())
+                        : decision.title());
+                event.setStatus(EventStatus.EMERGING);
+                event.setFirstSeenAt(item.getPublishedAt() != null ? item.getPublishedAt() : Instant.now());
+                event = eventRepository.save(event);
+                attach(event, item, EventItemRole.SEED, decision);
+            }
+            return event.getId();
+        });
+
+        refreshEvent(eventId);
+        return createNew;
     }
 
     private List<EventCandidate> prefilter(NewsItem item, List<EventEntity> recent) {
@@ -198,20 +209,63 @@ public class EventClusterService {
         clusterLogRepository.save(logEntity);
     }
 
-    @Transactional
     public void refreshEvent(Long eventId) {
+        if (eventId == null) {
+            return;
+        }
+        LoadedEvent loaded = transactionTemplate.execute(status -> loadForRefresh(eventId));
+        if (loaded == null) {
+            return;
+        }
+
+        EventIntelligence intel = null;
+        if (loaded.needsIntelRefresh(properties.getOpenai().getEventIntelCooldownMs())) {
+            try {
+                intel = aiService.refreshEventIntelligence(loaded.title(), loaded.members());
+            } catch (Exception e) {
+                log.warn("event_intel_failed id={} error={}", eventId, e.getMessage());
+            }
+        } else {
+            log.debug("event_intel_skipped id={} reason=cooldown", eventId);
+        }
+        EventIntelligence finalIntel = intel;
+
+        transactionTemplate.executeWithoutResult(status -> {
+            EventEntity event = eventRepository.findById(eventId).orElse(null);
+            if (event == null) {
+                return;
+            }
+            event.setScore(loaded.score());
+            event.setStatus(loaded.status());
+            if (finalIntel != null) {
+                if (finalIntel.summary() != null && !finalIntel.summary().isBlank()) {
+                    event.setSummary(finalIntel.summary());
+                }
+                if (finalIntel.impact() != null && !finalIntel.impact().isBlank()) {
+                    event.setImpact(finalIntel.impact());
+                }
+                if (finalIntel.watchNext() != null && !finalIntel.watchNext().isBlank()) {
+                    event.setWatchNext(finalIntel.watchNext());
+                }
+            } else if (event.getSummary() == null && !loaded.members().isEmpty()) {
+                event.setSummary(loaded.members().getFirst().getSummary());
+            }
+            event.setLastUpdatedAt(Instant.now());
+            eventRepository.save(event);
+        });
+    }
+
+    private LoadedEvent loadForRefresh(Long eventId) {
         EventEntity event = eventRepository.findById(eventId).orElse(null);
         if (event == null) {
-            return;
+            return null;
         }
         List<EventItemEntity> links = eventItemRepository.findByEventId(eventId);
         List<NewsItem> members = new ArrayList<>();
         double maxScore = 0;
         for (EventItemEntity link : links) {
-            newsItemRepository.findById(link.getNewsItemId()).ifPresent(e -> {
-                NewsItem item = entityMapper.toDomain(e);
-                members.add(item);
-            });
+            newsItemRepository.findById(link.getNewsItemId()).ifPresent(e ->
+                    members.add(entityMapper.toDomain(e)));
         }
         for (NewsItem m : members) {
             if (m.getScore() != null) {
@@ -220,37 +274,21 @@ public class EventClusterService {
         }
         long hours = ChronoUnit.HOURS.between(event.getFirstSeenAt(), Instant.now());
         double novelty = hours <= 24 ? 1.1 : (hours <= 72 ? 1.0 : 0.9);
-        event.setScore(Math.min(100, maxScore * novelty));
+        double score = Math.min(100, maxScore * novelty);
 
+        EventStatus status;
         if (links.size() >= 3 && hours <= 96) {
-            event.setStatus(EventStatus.ACTIVE);
+            status = EventStatus.ACTIVE;
         } else if (hours > 168) {
-            event.setStatus(EventStatus.COOLING);
+            status = EventStatus.COOLING;
         } else if (links.size() == 1) {
-            event.setStatus(EventStatus.EMERGING);
+            status = EventStatus.EMERGING;
         } else {
-            event.setStatus(EventStatus.ACTIVE);
+            status = EventStatus.ACTIVE;
         }
 
-        try {
-            EventIntelligence intel = aiService.refreshEventIntelligence(event.getTitle(), members);
-            if (intel.summary() != null && !intel.summary().isBlank()) {
-                event.setSummary(intel.summary());
-            }
-            if (intel.impact() != null && !intel.impact().isBlank()) {
-                event.setImpact(intel.impact());
-            }
-            if (intel.watchNext() != null && !intel.watchNext().isBlank()) {
-                event.setWatchNext(intel.watchNext());
-            }
-        } catch (Exception e) {
-            log.warn("event_intel_failed id={} error={}", eventId, e.getMessage());
-            if (event.getSummary() == null && !members.isEmpty()) {
-                event.setSummary(members.getFirst().getSummary());
-            }
-        }
-        event.setLastUpdatedAt(Instant.now());
-        eventRepository.save(event);
+        return new LoadedEvent(event.getTitle(), members, score, status,
+                event.getSummary(), event.getLastUpdatedAt());
     }
 
     public Map<String, Object> computeMetrics() {
@@ -273,5 +311,25 @@ public class EventClusterService {
     }
 
     private record ScoredCandidate(double score, EventEntity event) {
+    }
+
+    private record LoadedEvent(
+            String title,
+            List<NewsItem> members,
+            double score,
+            EventStatus status,
+            String existingSummary,
+            Instant lastUpdatedAt
+    ) {
+        boolean needsIntelRefresh(long cooldownMs) {
+            if (existingSummary == null || existingSummary.isBlank()) {
+                return true;
+            }
+            if (lastUpdatedAt == null) {
+                return true;
+            }
+            long cooldown = Math.max(0L, cooldownMs);
+            return lastUpdatedAt.isBefore(Instant.now().minusMillis(cooldown));
+        }
     }
 }

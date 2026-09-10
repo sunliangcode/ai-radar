@@ -10,16 +10,18 @@
   /* Light: Yuque-like clean tool palette */
   --color-ink: #1f2329;
   --color-paper: #ffffff;
-  --color-mist: #ebebeb;
+  --color-mist: #f2f3f5;
   --color-moss: #2a6f2f;
   --color-moss-deep: #1f5523;
   --color-ember: #b88300;
   --color-muted: #646a73;
+  --color-faint: #8f959e;
   --color-accent: #3370ff;
+  --color-accent-soft: #e8f0fe;
 
-  --color-bg: #ffffff;
+  --color-bg: #f7f8fa;
   --color-surface: #ffffff;
-  --color-border: #eaecef;
+  --color-border: #e5e6eb;
   --color-sidebar: #f7f8fa;
 }
 
@@ -29,15 +31,17 @@
 .dark {
   color-scheme: dark;
   --color-ink: #e3e5e8;
-  --color-paper: #16171a;
+  --color-paper: #1a1b1e;
   --color-mist: #2a2b2e;
   --color-moss: #4caf50;
   --color-moss-deep: #3d8b40;
   --color-ember: #d29922;
   --color-muted: #9aa0a8;
+  --color-faint: #6b7078;
   --color-accent: #6ea8ff;
+  --color-accent-soft: #1e2d4a;
   --color-bg: #0f1011;
-  --color-surface: #16171a;
+  --color-surface: #1a1b1e;
   --color-border: #2a2b2e;
   --color-sidebar: #131416;
 }
@@ -63,10 +67,45 @@ body {
 
 .row-py { padding-top: var(--row-py); padding-bottom: var(--row-py); }
 
-/* Feed row selected / hover affordances */
-.feed-row { border-left: 2px solid transparent; transition: background-color 120ms ease, border-color 120ms ease; }
-.feed-row:hover { background: color-mix(in srgb, var(--color-mist) 30%, transparent); }
-.feed-row.selected { border-left-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
+/* Feed row: card style */
+.feed-row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.feed-row:hover { border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border)); }
+.feed-row.selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface));
+}
+.feed-row.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 6px 0 0 6px;
+  background: var(--color-accent);
+}
+.feed-row { position: relative; }
+.feed-row-detail {
+  background: var(--color-mist);
+  border-radius: 0 0 6px 6px;
+  margin: 0 -1px -1px -1px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Skeleton shimmer */
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.skeleton {
+  background: var(--color-mist);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
 
 /* Score bar */
 .score-bar { height: 4px; border-radius: 9999px; background: var(--color-mist); overflow: hidden; }
@@ -102,6 +141,81 @@ kbd {
 .prose-brief li {
   color: var(--color-muted);
   line-height: 1.65;
+}
+
+/* AI monitor chat bubbles */
+.prose-monitor {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--color-ink);
+}
+.prose-monitor > *:first-child {
+  margin-top: 0;
+}
+.prose-monitor > *:last-child {
+  margin-bottom: 0;
+}
+.prose-monitor p {
+  margin: 0 0 0.55em;
+}
+.prose-monitor p:last-child {
+  margin-bottom: 0;
+}
+.prose-monitor h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.4em;
+  color: var(--color-ink);
+}
+.prose-monitor ul,
+.prose-monitor ol {
+  margin: 0.35em 0;
+  padding-left: 1.25em;
+}
+.prose-monitor li {
+  margin: 0.15em 0;
+}
+.prose-monitor strong {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.prose-monitor code {
+  font-size: 0.85em;
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  background: var(--color-mist);
+}
+.prose-monitor pre {
+  margin: 0.5em 0;
+  padding: 0.6em;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--color-mist);
+  font-size: 0.8em;
+}
+.prose-monitor pre code {
+  padding: 0;
+  background: transparent;
+}
+.monitor-cursor {
+  display: inline-block;
+  width: 0.45em;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--color-accent);
+  border-radius: 1px;
+  animation: monitor-cursor-blink 1s steps(1) infinite;
+}
+@keyframes monitor-cursor-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 /* Thin scrollbars for feed columns */

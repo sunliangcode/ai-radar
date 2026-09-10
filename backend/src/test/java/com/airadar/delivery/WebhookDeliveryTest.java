@@ -41,10 +41,11 @@ class WebhookDeliveryTest {
     void deliverPostsJsonPayload() throws Exception {
         server.enqueue(new MockResponse().setResponseCode(200));
         when(settingsService.effective()).thenReturn(new SettingsService.EffectiveSettings(
-                "ai", "zh", 60, 30, 48, 7200000L, "0 0 8 * * *", "Asia/Shanghai",
-                "http://localhost:8080", true, "https://api.openai.com/v1", "gpt-4o-mini",
+                "ai", "zh", 60, 30, 48, 7200000L, 60000, "0 0 8 * * *", "Asia/Shanghai",
+                "http://localhost:8080", true,
+                "http://localhost:11434/v1", "qwen3.5:2b-mlx", 8192, 1024, 1,
                 "", server.url("/hook").toString(), "{\"X-Token\":\"abc\"}",
-                "", 587, "", "", "", true
+                "", 587, "", "", "", true, null
         ));
 
         WebhookDelivery delivery = new WebhookDelivery(settingsService, RestClient.builder(), new ObjectMapper());

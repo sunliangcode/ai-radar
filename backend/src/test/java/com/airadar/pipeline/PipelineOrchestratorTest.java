@@ -13,8 +13,10 @@ import com.airadar.persistence.NewsItemEntity;
 import com.airadar.persistence.NewsItemRepository;
 import com.airadar.persistence.SourceEntity;
 import com.airadar.persistence.SourceRepository;
+import com.airadar.provider.ai.AiCallMonitor;
 import com.airadar.provider.ai.AiService;
 import com.airadar.provider.ai.ScoreResult;
+import com.airadar.provider.ai.SummarizeResult;
 import com.airadar.provider.webfetch.WebContentFetcher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -118,6 +121,13 @@ class PipelineOrchestratorTest {
             }
             return list;
         });
+        when(newsItemRepository.save(org.mockito.ArgumentMatchers.any(NewsItemEntity.class))).thenAnswer(inv -> {
+            NewsItemEntity e = inv.getArgument(0);
+            if (e.getId() == null) {
+                e.setId(1L);
+            }
+            return e;
+        });
 
         when(aiService.score(anyList())).thenAnswer(inv -> {
             List<NewsItem> items = inv.getArgument(0);
@@ -125,9 +135,15 @@ class PipelineOrchestratorTest {
                     .map(i -> new ScoreResult(80, "test", List.of("ai"), "ai"))
                     .toList();
         });
-        when(aiService.summarizeBatch(anyList())).thenAnswer(inv -> {
+        when(aiService.summarizeDetailed(org.mockito.ArgumentMatchers.any(NewsItem.class))).thenAnswer(inv -> {
+            NewsItem item = inv.getArgument(0);
+            return new SummarizeResult("Summary of " + item.getTitle(), item.getTitle());
+        });
+        when(aiService.summarizeDetailedBatch(anyList())).thenAnswer(inv -> {
             List<NewsItem> items = inv.getArgument(0);
-            return items.stream().map(i -> "Summary of " + i.getTitle()).toList();
+            return items.stream()
+                    .map(i -> new SummarizeResult("Summary of " + i.getTitle(), i.getTitle()))
+                    .toList();
         });
 
         orchestrator = new PipelineOrchestrator(
@@ -142,7 +158,8 @@ class PipelineOrchestratorTest {
                 eventClusterService,
                 new FetchProgress(),
                 webContentFetcher,
-                transactionTemplate
+                transactionTemplate,
+                mock(AiCallMonitor.class)
         );
     }
 
@@ -154,10 +171,34 @@ class PipelineOrchestratorTest {
         assertEquals(1, result.kept());
         assertTrue(result.briefPath().contains("briefs"));
         verify(aiService).score(anyList());
-        verify(aiService).summarizeBatch(anyList());
-        verify(newsItemRepository).saveAll(anyList());
+        verify(aiService, atLeastOnce()).summarizeDetailed(org.mockito.ArgumentMatchers.any(NewsItem.class));
+        verify(newsItemRepository, atLeastOnce()).save(org.mockito.ArgumentMatchers.any(NewsItemEntity.class));
+        verify(sourceRepository).touchLastFetchedAt(anyCollection(), org.mockito.ArgumentMatchers.any());
         verify(eventClusterService, atLeastOnce()).linkNewItems(anyList());
         assertEquals(ItemStatus.DONE, result.topItems().getFirst().getStatus());
         assertTrue(result.topItems().getFirst().getSummary().startsWith("Summary of"));
+    }
+
+    @Test
+    void skipsSummarizeWhenDbAlreadyHasSummary() {
+        NewsItemEntity existing = new NewsItemEntity();
+        existing.setId(42L);
+        existing.setCanonicalUrl("https://example.com/llm-agent");
+        existing.setTitle("Open source LLM agent toolkit");
+        existing.setTitleDisplay("开源 LLM Agent 工具包");
+        existing.setSummary("Already translated summary.");
+        existing.setScore(80.0);
+        existing.setScoreReason("prior");
+        existing.setStatus(ItemStatus.DONE);
+        when(newsItemRepository.findByCanonicalUrlIn(anyCollection())).thenReturn(List.of(existing));
+
+        PipelineResult result = orchestrator.run(new PipelineRequest(null, null, null));
+
+        assertEquals(1, result.kept());
+        assertEquals("Already translated summary.", result.topItems().getFirst().getSummary());
+        assertEquals("开源 LLM Agent 工具包", result.topItems().getFirst().getTitleDisplay());
+        verify(aiService, never()).summarizeDetailed(org.mockito.ArgumentMatchers.any(NewsItem.class));
+        verify(aiService, never()).score(anyList());
+        verify(newsItemRepository, atLeastOnce()).save(org.mockito.ArgumentMatchers.any(NewsItemEntity.class));
     }
 }

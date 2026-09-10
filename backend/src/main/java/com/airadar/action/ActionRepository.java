@@ -9,6 +9,8 @@ public interface ActionRepository extends JpaRepository<ActionEntity, Long> {
 
     Optional<ActionEntity> findFirstByImpactId(Long impactId);
 
+    Optional<ActionEntity> findFirstByNewsItemId(Long newsItemId);
+
     List<ActionEntity> findByStatusInOrderByUpdatedAtDesc(List<String> statuses);
 
     List<ActionEntity> findAllByOrderByUpdatedAtDesc();

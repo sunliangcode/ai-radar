@@ -29,6 +29,9 @@ public class NewsItemEntity {
     @Column(nullable = false)
     private String title;
 
+    @Column(name = "title_display")
+    private String titleDisplay;
+
     @Column(name = "published_at")
     private Instant publishedAt;
 
@@ -68,6 +71,9 @@ public class NewsItemEntity {
 
     @Column(nullable = false)
     private boolean saved = false;
+
+    @Column(nullable = false)
+    private boolean dismissed = false;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -109,6 +115,14 @@ public class NewsItemEntity {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public String getTitleDisplay() {
+        return titleDisplay;
+    }
+
+    public void setTitleDisplay(String titleDisplay) {
+        this.titleDisplay = titleDisplay;
     }
 
     public Instant getPublishedAt() {
@@ -221,6 +235,14 @@ public class NewsItemEntity {
 
     public void setSaved(boolean saved) {
         this.saved = saved;
+    }
+
+    public boolean isDismissed() {
+        return dismissed;
+    }
+
+    public void setDismissed(boolean dismissed) {
+        this.dismissed = dismissed;
     }
 
     public Instant getCreatedAt() {

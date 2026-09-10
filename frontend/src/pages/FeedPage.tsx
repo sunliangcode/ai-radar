@@ -3,11 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type Item } from '../lib/api'
-import { Button, EmptyState, PageHeader, StateBox } from '../components/ui'
+import { Button, ConfirmDialog, EmptyState, ListSkeleton, PageHeader, StateBox, useToast } from '../components/ui'
 import { FeedRow } from '../components/FeedRow'
 import { FetchProgressPanel } from '../components/FetchProgressPanel'
 import { FetchResultSummary } from '../components/FetchResultSummary'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
+import { patchFeedItemInCache, useMarkItemRead } from '../hooks/useMarkItemRead'
 import { dateLocale } from '../i18n'
 
 type Range = '24h' | '7d' | '30d' | 'all'
@@ -24,6 +25,7 @@ const PAGE = 40
 export default function FeedPage() {
   const { t, i18n } = useTranslation()
   const qc = useQueryClient()
+  const { push: pushToast } = useToast()
   const locale = dateLocale(i18n.language)
 
   const [range, setRange] = useState<Range>('7d')
@@ -34,6 +36,8 @@ export default function FeedPage() {
   const [inputQ, setInputQ] = useState('')
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [expandSignals, setExpandSignals] = useState<Record<number, number>>({})
+  const [confirmMarkAllOpen, setConfirmMarkAllOpen] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
@@ -50,6 +54,23 @@ export default function FeedPage() {
   const since = sinceIso(range)
   const offset = (page - 1) * PAGE
 
+  useEffect(() => {
+    const trimmed = inputQ.trim()
+    if (!trimmed) {
+      setQ('')
+      return
+    }
+    const id = window.setTimeout(() => setQ(trimmed), 250)
+    return () => window.clearTimeout(id)
+  }, [inputQ])
+
+  const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
+    ['feed'],
+    ['sources'],
+    ['intelligence-home'],
+    ['watching'],
+  ])
+
   const feedQuery = useQuery({
     queryKey: ['feed', range, sourceType, unreadOnly, page],
     queryFn: () => {
@@ -59,6 +80,7 @@ export default function FeedPage() {
       if (sourceType) parts.push(`sourceType=${encodeURIComponent(sourceType)}`)
       return api.items(`?${parts.join('&')}`)
     },
+    refetchInterval: () => (progress?.running ? 1500 : false),
   })
 
   const searchQuery = useQuery({
@@ -70,30 +92,83 @@ export default function FeedPage() {
   const items: Item[] = searchMode ? searchQuery.data?.items ?? [] : feedQuery.data?.items ?? []
   const total = searchMode ? searchQuery.data?.items.length ?? 0 : feedQuery.data?.total ?? 0
 
-  useEffect(() => setPage(1), [range, sourceType, unreadOnly])
+  useEffect(() => {
+    setPage(1)
+    setSelectedId(null)
+  }, [range, sourceType, unreadOnly, q])
   useEffect(() => {
     if (items.length && selectedId == null) setSelectedId(items[0].id)
   }, [items, selectedId])
 
-  const { fetchJob, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
-    ['feed'],
-    ['sources'],
-    ['intelligence-home'],
-    ['watching'],
-  ])
-
   const patch = useMutation({
-    mutationFn: ({ id, read, saved }: { id: number; read?: boolean; saved?: boolean }) =>
-      api.patchItem(id, { read, saved }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['feed'] })
-      void qc.invalidateQueries({ queryKey: ['watching'] })
+    mutationFn: ({
+      id,
+      read,
+      saved,
+      dismissed,
+    }: {
+      id: number
+      read?: boolean
+      saved?: boolean
+      dismissed?: boolean
+    }) => api.patchItem(id, { read, saved, dismissed }),
+    onSuccess: (_data, vars) => {
+      if (vars.dismissed) {
+        patchFeedItemInCache(qc, vars.id, { dismissed: true, read: true }, { remove: true })
+        void qc.invalidateQueries({ queryKey: ['preference-keywords'] })
+        pushToast('success', t('feed.notInterestedDone'))
+      } else {
+        const patchFields: Partial<Item> = {}
+        if (vars.read != null) patchFields.read = vars.read
+        if (vars.saved != null) patchFields.saved = vars.saved
+        // Keep list order stable; only drop when viewing unread-only and marking read.
+        const remove = unreadOnly && vars.read === true
+        patchFeedItemInCache(qc, vars.id, patchFields, { remove })
+        if (vars.saved) {
+          void qc.invalidateQueries({ queryKey: ['preference-keywords'] })
+          void qc.invalidateQueries({ queryKey: ['actions'] })
+          void qc.invalidateQueries({ queryKey: ['watching'] })
+          pushToast('success', t('feed.savedHint'))
+        }
+      }
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
     },
   })
   const markAll = useMutation({
     mutationFn: api.markAllRead,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['feed'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['feed'] })
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+      pushToast('success', t('feed.markAllReadDone'))
+    },
+    onError: (err) => {
+      pushToast('error', t('common.loadFailed', { message: (err as Error).message }))
+    },
   })
+
+  const markItemRead = useMarkItemRead()
+  const markItemReadMutate = markItemRead.mutate
+
+  const markReadOnOpen = useCallback(
+    (item: Item) => {
+      if (!item.read) markItemReadMutate({ id: item.id, read: true })
+    },
+    [markItemReadMutate],
+  )
+
+  const openExternalAndMarkRead = useCallback(
+    (item: Item) => {
+      if (!item.canonicalUrl) return
+      window.open(item.canonicalUrl, '_blank', 'noopener')
+      markReadOnOpen(item)
+    },
+    [markReadOnOpen],
+  )
+
+  const changePage = (next: number) => {
+    setPage(next)
+    setSelectedId(null)
+  }
 
   const focusSearch = useCallback(() => {
     document.getElementById('feed-search-input')?.focus()
@@ -114,9 +189,15 @@ export default function FeedPage() {
         e.preventDefault()
         const prev = items[Math.max(0, idx - 1)]
         if (prev) setSelectedId(prev.id)
-      } else if (e.key === 'o' || e.key === 'Enter') {
+      } else if (e.key === 'o') {
         const cur = items[idx]
-        if (cur) window.open(cur.canonicalUrl, '_blank', 'noopener')
+        if (cur) {
+          e.preventDefault()
+          setExpandSignals((m) => ({ ...m, [cur.id]: (m[cur.id] ?? 0) + 1 }))
+        }
+      } else if (e.key === 'Enter') {
+        const cur = items[idx]
+        if (cur) openExternalAndMarkRead(cur)
       } else if (e.key === 's') {
         const cur = items[idx]
         if (cur) patch.mutate({ id: cur.id, saved: !cur.saved })
@@ -130,7 +211,7 @@ export default function FeedPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [items, selectedId, patch, focusSearch])
+  }, [items, selectedId, patch, focusSearch, openExternalAndMarkRead])
 
   useEffect(() => {
     listRef.current
@@ -143,6 +224,7 @@ export default function FeedPage() {
       onSuccess: async () => {
         await dismiss()
         setPage(1)
+        setSelectedId(null)
       },
       onError: () => dismiss(),
     })
@@ -163,15 +245,34 @@ export default function FeedPage() {
             <Button onClick={runFetch} loading={isPending}>
               {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
             </Button>
-            <Button variant="ghost" onClick={() => markAll.mutate()} disabled={markAll.isPending}>
+            <Button variant="ghost" onClick={() => setConfirmMarkAllOpen(true)} disabled={markAll.isPending}>
               {t('feed.markAllRead')}
             </Button>
           </>
         }
       />
 
+      <ConfirmDialog
+        open={confirmMarkAllOpen}
+        title={t('feed.markAllReadConfirm')}
+        confirmLabel={t('common.confirm')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={() => {
+          setConfirmMarkAllOpen(false)
+          markAll.mutate()
+        }}
+        onCancel={() => setConfirmMarkAllOpen(false)}
+      />
+
       {phase === 'running' ? <FetchProgressPanel progress={progress} /> : null}
-      {phase === 'summary' ? <FetchResultSummary progress={progress} onDismiss={() => void dismiss()} /> : null}
+      {phase === 'summary' ? (
+        <FetchResultSummary
+          progress={progress}
+          onDismiss={() => void dismiss()}
+          retrying={retryFailed.isPending}
+          onRetryFailed={(types) => retryFailed.mutate(types)}
+        />
+      ) : null}
 
       {/* Toolbar */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -181,23 +282,42 @@ export default function FeedPage() {
             value={inputQ}
             onChange={(e) => setInputQ(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') setQ(inputQ)
               if (e.key === 'Escape') {
                 setInputQ('')
                 setQ('')
               }
             }}
             placeholder={t('feed.searchPlaceholder')}
-            className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent"
+            className="h-9 w-full rounded-md border border-border bg-surface px-3 pr-8 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/15"
           />
-          <kbd className="absolute right-2 top-2">/</kbd>
+          {inputQ ? (
+            <button
+              type="button"
+              aria-label={t('feed.clearSearch')}
+              onClick={() => {
+                setInputQ('')
+                setQ('')
+                document.getElementById('feed-search-input')?.focus()
+              }}
+              className="absolute right-2 top-1.5 flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-mist hover:text-ink"
+            >
+              ×
+            </button>
+          ) : (
+            <kbd className="absolute right-2 top-2">/</kbd>
+          )}
         </div>
-        <div className="flex rounded-md border border-border bg-surface p-0.5">
+        <div
+          className={`flex rounded-md border border-border bg-surface p-0.5 ${searchMode ? 'pointer-events-none opacity-45' : ''}`}
+          title={searchMode ? t('feed.searchFiltersDisabled') : undefined}
+        >
           {(['24h', '7d', '30d', 'all'] as Range[]).map((r) => (
             <button
               key={r}
+              type="button"
+              disabled={searchMode}
               onClick={() => setRange(r)}
-              className={`rounded px-2 py-1 text-xs font-medium ${range === r ? 'bg-ink text-paper' : 'text-muted hover:text-ink'}`}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition ${range === r ? 'bg-accent text-white' : 'text-muted hover:text-ink'}`}
             >
               {t(`feed.range.${r}`)}
             </button>
@@ -205,12 +325,14 @@ export default function FeedPage() {
         </div>
         <select
           value={sourceType}
+          disabled={searchMode}
+          title={searchMode ? t('feed.searchFiltersDisabled') : undefined}
           onChange={(e) => {
             const v = e.target.value
             if (v) setSearchParams({ sourceType: v }, { replace: true })
             else setSearchParams({}, { replace: true })
           }}
-          className="h-9 rounded-md border border-border bg-surface px-2 text-sm"
+          className={`h-9 rounded-md border border-border bg-surface px-2 text-sm ${searchMode ? 'opacity-45' : ''}`}
         >
           <option value="">{t('feed.allSources')}</option>
           {channelTypes.map((c) => (
@@ -220,8 +342,13 @@ export default function FeedPage() {
           ))}
         </select>
         <button
+          type="button"
+          disabled={searchMode}
+          title={searchMode ? t('feed.searchFiltersDisabled') : undefined}
           onClick={() => setUnreadOnly((v) => !v)}
-          className={`h-9 rounded-md border px-3 text-sm ${unreadOnly ? 'border-accent bg-accent/10 text-accent' : 'border-border bg-surface text-muted'}`}
+          className={`h-9 rounded-md border px-3 text-xs font-medium transition ${
+            searchMode ? 'opacity-45' : ''
+          } ${unreadOnly ? 'border-accent bg-accent-soft text-accent' : 'border-border bg-surface text-muted hover:text-ink'}`}
         >
           {t('feed.unreadOnly')}
         </button>
@@ -230,26 +357,73 @@ export default function FeedPage() {
           {unreadCount > 0 && !unreadOnly ? ` · ${t('feed.unreadInline', { count: unreadCount })}` : ''}
         </span>
       </div>
+      {searchMode ? (
+        <p className="mb-3 text-xs text-muted">{t('feed.searchFiltersDisabled')}</p>
+      ) : null}
+
+      {channelTypes.length > 0 ? (
+        <div className="mb-3 flex gap-1.5 overflow-x-auto md:hidden" aria-label={t('nav.sources')}>
+          <button
+            type="button"
+            disabled={searchMode}
+            onClick={() => setSearchParams({}, { replace: true })}
+            className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-mono transition ${
+              !sourceType ? 'border-accent bg-accent-soft text-accent' : 'border-border bg-surface text-muted'
+            } ${searchMode ? 'opacity-45' : ''}`}
+          >
+            {t('feed.allSources')}
+          </button>
+          {channelTypes.map((c) => (
+            <button
+              key={c}
+              type="button"
+              disabled={searchMode}
+              onClick={() => setSearchParams({ sourceType: c }, { replace: true })}
+              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-mono transition ${
+                sourceType === c ? 'border-accent bg-accent-soft text-accent' : 'border-border bg-surface text-muted'
+              } ${searchMode ? 'opacity-45' : ''}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {/* List */}
-      {feedQuery.isLoading && !searchMode ? (
-        <StateBox>{t('common.loading')}</StateBox>
+      {feedQuery.isLoading && !searchMode ? <ListSkeleton rows={6} /> : null}
+      {searchMode && searchQuery.isLoading ? <ListSkeleton rows={4} /> : null}
+      {!searchMode && feedQuery.isError ? (
+        <StateBox>
+          <p className="mb-3">{t('common.loadFailed', { message: (feedQuery.error as Error).message })}</p>
+          <Button variant="ghost" onClick={() => void feedQuery.refetch()}>
+            {t('common.retry')}
+          </Button>
+        </StateBox>
       ) : null}
-      {searchMode && searchQuery.isLoading ? <StateBox>{t('common.loading')}</StateBox> : null}
-      {items.length === 0 && !feedQuery.isLoading ? (
+      {searchMode && searchQuery.isError ? (
+        <StateBox>
+          <p className="mb-3">{t('common.loadFailed', { message: (searchQuery.error as Error).message })}</p>
+          <Button variant="ghost" onClick={() => void searchQuery.refetch()}>
+            {t('common.retry')}
+          </Button>
+        </StateBox>
+      ) : null}
+      {items.length === 0 &&
+      !feedQuery.isLoading &&
+      !searchQuery.isLoading &&
+      !feedQuery.isError &&
+      !(searchMode && searchQuery.isError) ? (
         <EmptyState
           title={searchMode ? t('feed.noSearchResult') : t('feed.empty')}
           description={searchMode ? t('feed.noSearchResultHint') : t('feed.emptyHint')}
-          primary={
-            <Button onClick={runFetch}>{t('common.fetchNow')}</Button>
-          }
+          primary={<Button onClick={runFetch}>{t('common.fetchNow')}</Button>}
         />
       ) : null}
 
       {items.length > 0 ? (
-        <div ref={listRef} className="rounded-lg border border-border bg-surface">
+        <div ref={listRef}>
           {items.map((item) => (
-            <div key={item.id} className="border-b border-border/60 last:border-0">
+            <div key={item.id} className="group">
               <FeedRow
                 item={item}
                 selected={item.id === selectedId}
@@ -257,6 +431,9 @@ export default function FeedPage() {
                 locale={locale}
                 onToggleSaved={() => patch.mutate({ id: item.id, saved: !item.saved })}
                 onMarkRead={() => patch.mutate({ id: item.id, read: true })}
+                onNotInterested={() => patch.mutate({ id: item.id, dismissed: true })}
+                onOpenExternal={() => markReadOnOpen(item)}
+                expandSignal={expandSignals[item.id]}
               />
             </div>
           ))}
@@ -270,10 +447,10 @@ export default function FeedPage() {
             {t('feed.pageInfo', { page, totalPages: Math.ceil(total / PAGE) })}
           </span>
           <div className="flex gap-2">
-            <Button variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            <Button variant="ghost" disabled={page <= 1} onClick={() => changePage(page - 1)}>
               {t('feed.prev')}
             </Button>
-            <Button variant="ghost" disabled={page >= Math.ceil(total / PAGE)} onClick={() => setPage((p) => p + 1)}>
+            <Button variant="ghost" disabled={page >= Math.ceil(total / PAGE)} onClick={() => changePage(page + 1)}>
               {t('feed.next')}
             </Button>
           </div>

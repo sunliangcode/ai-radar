@@ -1,5 +1,6 @@
 package com.airadar.api;
 
+import com.airadar.action.ActionSuggestService;
 import com.airadar.domain.NewsItem;
 import com.airadar.event.EventItemRepository;
 import com.airadar.interest.InterestSignalsService;
@@ -7,7 +8,10 @@ import com.airadar.persistence.EntityMapper;
 import com.airadar.persistence.NewsItemEntity;
 import com.airadar.persistence.NewsItemRepository;
 import com.airadar.persistence.RepoStarSnapshotRepository;
+import com.airadar.preference.PreferenceKeywordService;
 import com.airadar.star.StarService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,11 +30,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/api/items")
 public class ItemsController {
+
+    private static final Logger log = LoggerFactory.getLogger(ItemsController.class);
 
     private final NewsItemRepository newsItemRepository;
     private final EntityMapper entityMapper;
@@ -38,6 +45,9 @@ public class ItemsController {
     private final InterestSignalsService interestSignals;
     private final StarService starService;
     private final RepoStarSnapshotRepository snapshotRepository;
+    private final PreferenceKeywordService preferenceKeywordService;
+    private final ActionSuggestService actionSuggestService;
+    private final ExecutorService fetchExecutor;
 
     public ItemsController(
             NewsItemRepository newsItemRepository,
@@ -45,7 +55,10 @@ public class ItemsController {
             EventItemRepository eventItemRepository,
             InterestSignalsService interestSignals,
             StarService starService,
-            RepoStarSnapshotRepository snapshotRepository
+            RepoStarSnapshotRepository snapshotRepository,
+            PreferenceKeywordService preferenceKeywordService,
+            ActionSuggestService actionSuggestService,
+            ExecutorService fetchExecutor
     ) {
         this.newsItemRepository = newsItemRepository;
         this.entityMapper = entityMapper;
@@ -53,6 +66,9 @@ public class ItemsController {
         this.interestSignals = interestSignals;
         this.starService = starService;
         this.snapshotRepository = snapshotRepository;
+        this.preferenceKeywordService = preferenceKeywordService;
+        this.actionSuggestService = actionSuggestService;
+        this.fetchExecutor = fetchExecutor;
     }
 
     @GetMapping("/interest-keywords")
@@ -106,6 +122,10 @@ public class ItemsController {
         if (Boolean.TRUE.equals(unread)) {
             stream = stream.filter(i -> !i.isRead());
         }
+        // Hide dismissed items unless explicitly listing saved-only (user may still want them there)
+        if (!savedOnly) {
+            stream = stream.filter(i -> !i.isDismissed());
+        }
         if (sourceId != null) {
             String needle = String.valueOf(sourceId);
             stream = stream.filter(i ->
@@ -154,13 +174,57 @@ public class ItemsController {
     public Map<String, Object> patch(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         NewsItemEntity entity = newsItemRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("item not found: " + id));
+        boolean becameSaved = false;
+        boolean becameDismissed = false;
         if (body.containsKey("read")) {
             entity.setReadFlag(Boolean.parseBoolean(String.valueOf(body.get("read"))));
         }
         if (body.containsKey("saved")) {
-            entity.setSaved(Boolean.parseBoolean(String.valueOf(body.get("saved"))));
+            boolean saved = Boolean.parseBoolean(String.valueOf(body.get("saved")));
+            becameSaved = saved && !entity.isSaved();
+            if (saved != entity.isSaved()) {
+                interestSignals.invalidate();
+            }
+            entity.setSaved(saved);
         }
-        return toDto(entityMapper.toDomain(newsItemRepository.save(entity)));
+        if (body.containsKey("dismissed") || body.containsKey("notInterested")) {
+            Object raw = body.containsKey("dismissed") ? body.get("dismissed") : body.get("notInterested");
+            boolean dismissed = Boolean.parseBoolean(String.valueOf(raw));
+            becameDismissed = dismissed && !entity.isDismissed();
+            entity.setDismissed(dismissed);
+            if (dismissed) {
+                entity.setReadFlag(true);
+            }
+        }
+        NewsItemEntity savedEntity = newsItemRepository.save(entity);
+        if (becameSaved) {
+            Long itemId = savedEntity.getId();
+            // One executor task: preference then action (AiCallGate also enforces global single-flight).
+            fetchExecutor.execute(() -> {
+                try {
+                    preferenceKeywordService.extractAndStore(
+                            itemId,
+                            PreferenceKeywordService.KIND_LIKE,
+                            PreferenceKeywordService.SOURCE_AI_SAVE
+                    );
+                } catch (Exception e) {
+                    log.warn("preference_keyword_extract_failed itemId={} error={}", itemId, e.getMessage());
+                }
+                try {
+                    actionSuggestService.suggestForItem(itemId);
+                } catch (Exception e) {
+                    log.warn("action_suggest_failed itemId={} error={}", itemId, e.getMessage());
+                }
+            });
+        }
+        if (becameDismissed) {
+            preferenceKeywordService.extractAsync(
+                    savedEntity.getId(),
+                    PreferenceKeywordService.KIND_DISLIKE,
+                    PreferenceKeywordService.SOURCE_AI_DISMISS
+            );
+        }
+        return toDto(entityMapper.toDomain(savedEntity));
     }
 
     @PostMapping("/mark-all-read")
@@ -199,6 +263,7 @@ public class ItemsController {
         List<Map<String, Object>> results = newsItemRepository
                 .findByTitleContainingIgnoreCaseOrContentSnippetContainingIgnoreCase(needle, needle)
                 .stream()
+                .filter(e -> !e.isDismissed())
                 .sorted(Comparator.comparing(NewsItemEntity::getScore,
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(lim)
@@ -249,6 +314,7 @@ public class ItemsController {
         Map<String, Object> dto = new LinkedHashMap<>();
         dto.put("id", item.getId());
         dto.put("title", item.getTitle());
+        dto.put("titleDisplay", item.getTitleDisplay());
         dto.put("canonicalUrl", item.getCanonicalUrl());
         dto.put("score", item.getScore());
         dto.put("scoreReason", item.getScoreReason());
@@ -263,6 +329,7 @@ public class ItemsController {
         dto.put("primarySourceType", item.getPrimarySourceType());
         dto.put("read", item.isRead());
         dto.put("saved", item.isSaved());
+        dto.put("dismissed", item.isDismissed());
         dto.put("createdAt", ApiTimes.iso(item.getCreatedAt()));
         if (item.getRawMeta() != null && item.getRawMeta().get("stars") instanceof Number n) {
             Integer stars = n.intValue();

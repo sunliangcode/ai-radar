@@ -1,13 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { FeedbackBar } from '../components/FeedbackBar'
 import { PageHeader, ScorePill, StateBox, StatusBadge } from '../components/ui'
 import { dateLocale } from '../i18n'
 
+type LocationState = { from?: string }
+
 export default function ChangeDetailPage() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
   const changeId = Number(id)
   const q = useQuery({
@@ -16,6 +20,18 @@ export default function ChangeDetailPage() {
     enabled: Number.isFinite(changeId),
   })
   const locale = dateLocale(i18n.language)
+
+  const fromState = (location.state as LocationState | null)?.from
+  const fallbackFrom = fromState ?? '/watching'
+  const canGoBack = Boolean(fromState) && window.history.length > 1
+
+  const goBack = () => {
+    if (canGoBack) {
+      navigate(-1)
+      return
+    }
+    navigate(fallbackFrom, { replace: !fromState })
+  }
 
   if (q.isLoading) return <StateBox>{t('changes.loading')}</StateBox>
   if (q.isError) return <StateBox>{t('common.loadFailed', { message: (q.error as Error).message })}</StateBox>
@@ -31,9 +47,13 @@ export default function ChangeDetailPage() {
           score: c.score ?? '—',
         })}
         actions={
-          <Link to="/changes" className="text-sm text-moss underline underline-offset-2">
+          <button
+            type="button"
+            onClick={goBack}
+            className="text-sm text-moss underline underline-offset-2"
+          >
             {t('common.backToList')}
-          </Link>
+          </button>
         }
       />
       <div className="mb-4 flex flex-wrap gap-2">

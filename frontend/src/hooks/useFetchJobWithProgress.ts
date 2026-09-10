@@ -33,6 +33,12 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     invalidateKeysRef.current = onSuccessInvalidate ?? DEFAULT_INVALIDATE
   }, [onSuccessInvalidate])
 
+  const finishFromJob = useCallback(async () => {
+    const finalSnap = await api.fetchProgress().catch(() => qc.getQueryData<FetchProgress>(PROGRESS_KEY))
+    setSummaryProgress(finalSnap ?? EMPTY_PROGRESS)
+    setPhase('summary')
+  }, [qc])
+
   const fetchJob = useMutation({
     mutationFn: (opts?: { sourceType?: string }) => api.fetchJob(opts),
     onMutate: () => {
@@ -42,9 +48,38 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
       qc.setQueryData(PROGRESS_KEY, EMPTY_PROGRESS)
     },
     onSuccess: async () => {
+      await finishFromJob()
+    },
+    onError: async (err) => {
+      setJobError(err as Error)
       const finalSnap = await api.fetchProgress().catch(() => qc.getQueryData<FetchProgress>(PROGRESS_KEY))
-      setSummaryProgress(finalSnap ?? EMPTY_PROGRESS)
+      setSummaryProgress(
+        finalSnap ?? {
+          ...EMPTY_PROGRESS,
+          running: false,
+          stage: 'error',
+          error: (err as Error).message,
+        },
+      )
       setPhase('summary')
+    },
+  })
+
+  const retryFailed = useMutation({
+    mutationFn: async (sourceTypes: string[]) => {
+      const unique = [...new Set(sourceTypes.filter(Boolean))]
+      for (const sourceType of unique) {
+        await api.fetchJob({ sourceType })
+      }
+    },
+    onMutate: () => {
+      setPhase('running')
+      setSummaryProgress(null)
+      setJobError(null)
+      qc.setQueryData(PROGRESS_KEY, EMPTY_PROGRESS)
+    },
+    onSuccess: async () => {
+      await finishFromJob()
     },
     onError: async (err) => {
       setJobError(err as Error)
@@ -94,6 +129,7 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
 
   return {
     fetchJob,
+    retryFailed,
     phase,
     progress,
     dismiss,
