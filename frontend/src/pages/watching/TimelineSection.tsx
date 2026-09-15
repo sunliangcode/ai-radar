@@ -38,21 +38,21 @@ export function TimelineSection({
       </div>
       <div className="space-y-3">
         {visibleGroups.map((g) => (
-          <div key={g.eventId} className="rounded-lg border border-border bg-surface p-4">
-            <div className="flex items-baseline justify-between">
+          <div key={g.eventId} className="rounded-xl border border-border bg-surface px-4 py-3">
+            <div className="flex items-baseline justify-between gap-3">
               <Link
                 to={`/changes/${g.eventId}`}
                 state={{ from: '/watching' }}
-                className="font-medium text-ink hover:underline"
+                className="font-semibold text-ink hover:text-accent"
               >
                 {g.title}
               </Link>
-              <span className="font-mono text-[11px] text-muted">{g.entryCount}</span>
+              <span className="shrink-0 font-mono text-[11px] text-muted">{g.entryCount}</span>
             </div>
-            <ol className="mt-2 space-y-1.5 border-l-2 border-border pl-3">
+            <ol className="mt-3 space-y-2 border-l-2 border-border pl-3">
               {g.entries.map((e) => (
                 <li key={e.id} className="relative">
-                  <span className="absolute -left-[0.42rem] top-1.5 h-1.5 w-1.5 rounded-full bg-muted" />
+                  <span className="absolute -left-[0.42rem] top-1.5 h-1.5 w-1.5 rounded-full bg-accent" />
                   <p className="font-mono text-[10px] text-muted">
                     {e.at ? new Date(e.at).toLocaleString(locale) : ''}
                   </p>

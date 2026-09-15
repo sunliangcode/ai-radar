@@ -11,7 +11,6 @@ export function useFeedActions(unreadOnly: boolean) {
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const [confirmMarkAllOpen, setConfirmMarkAllOpen] = useState(false)
-  const [expandSignals, setExpandSignals] = useState<Record<number, number>>({})
 
   const patch = useMutation({
     mutationFn: ({
@@ -103,10 +102,6 @@ export function useFeedActions(unreadOnly: boolean) {
     (item: Item) => patch.mutate({ id: item.id, read: true }),
     [patch],
   )
-  const expandItem = useCallback(
-    (id: number) => setExpandSignals((m) => ({ ...m, [id]: (m[id] ?? 0) + 1 })),
-    [],
-  )
   const dismissItem = useCallback(
     (item: Item) => patch.mutate({ id: item.id, dismissed: true }),
     [patch],
@@ -117,12 +112,10 @@ export function useFeedActions(unreadOnly: boolean) {
     markAll,
     confirmMarkAllOpen,
     setConfirmMarkAllOpen,
-    expandSignals,
     markReadOnOpen,
     openExternalAndMarkRead,
     toggleSaved,
     markItemSelectedRead,
-    expandItem,
     dismissItem,
   }
 }

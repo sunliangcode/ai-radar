@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Feishu scan-to-bind (Device Authorization Grant): Settings shows a QR code, stores app credentials + open_id, one-click unbind; push prefers IM API with legacy webhook fallback
+- `POST/GET/DELETE /api/delivery/feishu/bind*` bind session APIs
+- Magazine-style Feed / Today / Watching: dual-column MagCards + immersive detail drawer (browse rhythm + single-item focus)
+- Today hero focus card for the top HIGH impact signal
 - `JobScheduleCoordinator` — programmatic fetch / push / cluster schedule that re-arms from live settings; `@Scheduled` no longer freezes `${radar.*}` at boot
 - `GET /api/jobs/schedule` — next/last run times, current cron/interval, and push-cron errors
 - Settings save now hot-reloads the job schedule (no backend restart after changing fetch interval or push cron)
@@ -38,6 +42,11 @@ All notable changes to this project will be documented in this file.
 - `/api/health` reports configured LLM readiness (`ready`, `model`, `baseUrl`, `local`, `hasApiKey`)
 
 ### Changed
+
+- Settings product surface: customers only edit interests / language / inbox email / Feishu bind / push time; LLM, SMTP transport, webhooks, weights, and pipeline knobs move to `.env` / `application.yml`
+- Email notify: single inbox field (`smtpTo`); SMTP host/user/password are deployer-only; public DTO exposes `emailTransportReady`
+- Settings hub card “AI model” → “Preferences & notifications” (`/settings/preferences`; `/settings/llm` redirects)
+- Feed / Today / Watching lists use magazine MagCards + immersive drawer instead of flat accordion / divide-y stacks; shell content width `max-w-5xl`
 
 - Sidebar source filters use localized source-type display names instead of raw enum keys (`HACKER_NEWS` → Hacker News)
 - Zhihu source seed is portable: enable only when the local CLI exists; stop force-pinning a machine-specific `cliPath` over working custom paths

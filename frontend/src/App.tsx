@@ -96,7 +96,7 @@ function Shell() {
         tabIndex={-1}
         className="px-4 py-5 outline-none md:px-8 md:py-7"
       >
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-5xl">
           <ErrorBoundary>
             <Suspense fallback={<PageFallback />}>
               <Routes>
@@ -108,7 +108,8 @@ function Shell() {
                 <Route path="/settings/context" element={<ContextsPage />} />
                 <Route path="/settings/sources" element={<SourcesPage />} />
                 <Route path="/settings/sources/:id" element={<SourceDetailPage />} />
-                <Route path="/settings/llm" element={<SettingsPage />} />
+                <Route path="/settings/preferences" element={<SettingsPage />} />
+                <Route path="/settings/llm" element={<Navigate to="/settings/preferences" replace />} />
                 <Route path="/changes/:id" element={<ChangeDetailPage />} />
                 <Route path="/actions" element={<ActionsPage />} />
                 <Route path="/briefs/:date" element={<BriefDetailPage />} />

@@ -13,6 +13,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Feishu delivery: prefer IM API after scan-bind; fall back to custom-bot webhook from env.
+ */
 @Component
 public class FeishuDelivery implements DeliveryChannel {
 
@@ -22,15 +25,18 @@ public class FeishuDelivery implements DeliveryChannel {
     private final SettingsService settingsService;
     private final RestClient.Builder restClientBuilder;
     private final ObjectMapper objectMapper;
+    private final FeishuOpenApiClient openApiClient;
 
     public FeishuDelivery(
             SettingsService settingsService,
             RestClient.Builder restClientBuilder,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            FeishuOpenApiClient openApiClient
     ) {
         this.settingsService = settingsService;
         this.restClientBuilder = restClientBuilder;
         this.objectMapper = objectMapper;
+        this.openApiClient = openApiClient;
     }
 
     @Override
@@ -40,8 +46,8 @@ public class FeishuDelivery implements DeliveryChannel {
 
     @Override
     public boolean isEnabled() {
-        String url = settingsService.effective().feishuWebhookUrl();
-        return url != null && !url.isBlank();
+        var s = settingsService.effective();
+        return s.feishuImBound() || notBlank(s.feishuWebhookUrl());
     }
 
     @Override
@@ -50,47 +56,59 @@ public class FeishuDelivery implements DeliveryChannel {
         if (!isEnabled()) {
             return DeliveryResult.skipped(channel(), "not_configured");
         }
-        String webhook = settingsService.effective().feishuWebhookUrl();
+        var s = settingsService.effective();
         try {
-            String text = buildMarkdown(payload);
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("msg_type", "interactive");
-            Map<String, Object> card = new LinkedHashMap<>();
-            Map<String, Object> header = new LinkedHashMap<>();
-            Map<String, Object> title = new LinkedHashMap<>();
-            title.put("tag", "plain_text");
-            title.put("content", "AI Radar 日报 · " + payload.date());
-            header.put("title", title);
-            header.put("template", "blue");
-            card.put("header", header);
-
-            List<Map<String, Object>> elements = new ArrayList<>();
-            Map<String, Object> md = new LinkedHashMap<>();
-            md.put("tag", "div");
-            Map<String, Object> mdText = new LinkedHashMap<>();
-            mdText.put("tag", "lark_md");
-            mdText.put("content", text);
-            md.put("text", mdText);
-            elements.add(md);
-            card.put("elements", elements);
-            body.put("card", card);
-
-            restClientBuilder.build()
-                    .post()
-                    .uri(webhook)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(objectMapper.writeValueAsString(body))
-                    .retrieve()
-                    .toBodilessEntity();
-
+            Map<String, Object> card = buildCard(payload);
+            if (s.feishuImBound()) {
+                String token = openApiClient.tenantAccessToken(s.feishuAppId(), s.feishuAppSecret());
+                openApiClient.sendInteractive(token, s.feishuOpenId(), card);
+            } else {
+                deliverWebhook(s.feishuWebhookUrl(), card);
+            }
             long ms = System.currentTimeMillis() - started;
-            log.info("delivery channel=feishu success=true items={} durationMs={}", payload.items().size(), ms);
+            log.info("delivery channel=feishu success=true items={} durationMs={} mode={}",
+                    payload.items().size(), ms, s.feishuImBound() ? "im" : "webhook");
             return DeliveryResult.ok(channel(), payload.items().size(), ms);
         } catch (Exception e) {
             long ms = System.currentTimeMillis() - started;
             log.error("delivery channel=feishu success=false error={}", e.getMessage());
             return DeliveryResult.fail(channel(), payload.items().size(), ms, e.getMessage());
         }
+    }
+
+    private void deliverWebhook(String webhook, Map<String, Object> card) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("msg_type", "interactive");
+        body.put("card", card);
+        restClientBuilder.build()
+                .post()
+                .uri(webhook)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(objectMapper.writeValueAsString(body))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    Map<String, Object> buildCard(BriefPayload payload) {
+        Map<String, Object> card = new LinkedHashMap<>();
+        Map<String, Object> header = new LinkedHashMap<>();
+        Map<String, Object> title = new LinkedHashMap<>();
+        title.put("tag", "plain_text");
+        title.put("content", "AI Radar 日报 · " + payload.date());
+        header.put("title", title);
+        header.put("template", "blue");
+        card.put("header", header);
+
+        List<Map<String, Object>> elements = new ArrayList<>();
+        Map<String, Object> md = new LinkedHashMap<>();
+        md.put("tag", "div");
+        Map<String, Object> mdText = new LinkedHashMap<>();
+        mdText.put("tag", "lark_md");
+        mdText.put("content", buildMarkdown(payload));
+        md.put("text", mdText);
+        elements.add(md);
+        card.put("elements", elements);
+        return card;
     }
 
     String buildMarkdown(BriefPayload payload) {
@@ -138,5 +156,9 @@ public class FeishuDelivery implements DeliveryChannel {
             sb.append("---\n[打开 AI Radar](").append(payload.uiUrl()).append(")");
         }
         return sb.toString();
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.isBlank();
     }
 }

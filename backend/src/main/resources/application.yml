@@ -105,17 +105,25 @@ radar:
     max-chars: 12000
     parallelism: ${WEB_FETCH_PARALLELISM:4}
   rsshub-base: ${RSSHUB_BASE:https://rsshub.umzzz.com}
+  # Delivery: customer UI = smtpTo + Feishu scan-bind; transport/webhooks = env only.
   delivery:
+    # Legacy custom-bot webhook (optional). Prefer Settings → Feishu scan-to-bind.
     feishu-webhook-url: ${FEISHU_WEBHOOK_URL:}
+    # OpenAPI base for IM push after bind (override only for mocks / Lark intl).
+    feishu-api-base: ${FEISHU_API_BASE:https://open.feishu.cn}
+    # Generic JSON webhook for custom integrations (not shown in customer UI).
     webhook-url: ${WEBHOOK_URL:}
     webhook-headers: ${WEBHOOK_HEADERS:}
+    # Always-on local file sink under ./data/outbox/ (useful without Feishu/SMTP).
     outbox-enabled: true
     smtp:
+      # Deployer-only transport. Customer only sets recipient (smtpTo) in Settings UI.
       host: ${SMTP_HOST:}
       port: ${SMTP_PORT:587}
       username: ${SMTP_USERNAME:}
       password: ${SMTP_PASSWORD:}
       from: ${SMTP_FROM:}
+      # Seed only; once the customer saves an inbox address, DB wins.
       to: ${SMTP_TO:}
       starttls: ${SMTP_STARTTLS:true}
 

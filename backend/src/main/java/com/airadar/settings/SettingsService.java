@@ -3,25 +3,35 @@ package com.airadar.settings;
 import com.airadar.config.RadarProperties;
 import com.airadar.persistence.AppSettingsEntity;
 import com.airadar.persistence.AppSettingsRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Merges yml/env defaults with the single-row SQLite settings.
- * Secrets (API keys, SMTP password) stay env-only and are never echoed.
+ * Secrets (API keys, SMTP password, Feishu app secret) stay server-side and are never echoed.
+ * Customer-facing PUT only accepts a small whitelist; ops knobs live in .env / application.yml.
  */
 @Service
 public class SettingsService {
 
-    private static final int MIN_CONTEXT_WINDOW = 1024;
-    private static final int MAX_CONTEXT_WINDOW = 131072;
-    private static final int MIN_COMPLETION = 64;
-    private static final int MIN_AI_PARALLELISM = 1;
-    private static final int MAX_AI_PARALLELISM = 8;
+    private static final Logger log = LoggerFactory.getLogger(SettingsService.class);
+
+    /** Fields the product UI may write. Everything else is ignored (ops → env). */
+    private static final Set<String> CUSTOMER_PUT_KEYS = Set.of(
+            "interestProfile",
+            "summaryLanguage",
+            "pushCron",
+            "timezone",
+            "pushOnlyWhenItems",
+            "smtpTo"
+    );
 
     private final RadarProperties properties;
     private final AppSettingsRepository repository;
@@ -46,42 +56,45 @@ public class SettingsService {
     @Transactional(readOnly = true)
     public Map<String, Object> toPublicDto() {
         EffectiveSettings s = effective();
+        boolean emailTransportReady = notBlank(s.smtpHost());
+        boolean feishuBound = notBlank(s.feishuAppId()) && notBlank(s.feishuOpenId());
+        boolean feishuWebhook = notBlank(s.feishuWebhookUrl());
+
         Map<String, Object> dto = new LinkedHashMap<>();
+        // Customer-facing
         dto.put("interestProfile", s.interestProfile());
         dto.put("summaryLanguage", s.summaryLanguage());
+        dto.put("pushCron", s.pushCron());
+        dto.put("timezone", s.timezone());
+        dto.put("pushOnlyWhenItems", s.pushOnlyWhenItems());
+        dto.put("smtpTo", s.smtpTo());
+        dto.put("emailTransportReady", emailTransportReady);
+        dto.put("emailConfigured", emailTransportReady && notBlank(s.smtpTo()));
+        dto.put("feishuBound", feishuBound);
+        dto.put("feishuBindAvailable", true);
+        dto.put("feishuConfigured", feishuBound || feishuWebhook);
+
+        // Read-only status used by hub / health surfaces
+        dto.put("openaiConfigured", properties.getOpenai().isLlmReady());
+        dto.put("openaiApiKeyConfigured", properties.getOpenai().hasApiKey());
+        dto.put("openaiBaseUrl", s.openaiBaseUrl());
+        dto.put("openaiModel", s.openaiModel());
+        dto.put("localTokenConfigured", notBlank(properties.getLocalToken()));
+
+        // Still useful for schedule display / non-settings callers; not editable in customer UI
+        dto.put("uiBaseUrl", s.uiBaseUrl());
+        dto.put("fetchIntervalMs", s.fetchIntervalMs());
         dto.put("scoreThreshold", s.scoreThreshold());
         dto.put("maxItems", s.maxItems());
         dto.put("lookbackHours", s.lookbackHours());
-        dto.put("fetchIntervalMs", s.fetchIntervalMs());
         dto.put("fetchTimeoutMs", s.fetchTimeoutMs());
-        dto.put("pushCron", s.pushCron());
-        dto.put("timezone", s.timezone());
-        dto.put("uiBaseUrl", s.uiBaseUrl());
-        dto.put("pushOnlyWhenItems", s.pushOnlyWhenItems());
-        dto.put("openaiBaseUrl", s.openaiBaseUrl());
-        dto.put("openaiModel", s.openaiModel());
         dto.put("contextWindowTokens", s.contextWindowTokens());
         dto.put("maxCompletionTokens", s.maxCompletionTokens());
         dto.put("aiParallelism", 1);
-        dto.put("openaiConfigured", properties.getOpenai().isLlmReady());
-        dto.put("openaiApiKeyConfigured", properties.getOpenai().hasApiKey());
-        dto.put("githubTokenConfigured", notBlank(properties.getGithub().getToken()));
-        dto.put("feishuWebhookUrl", s.feishuWebhookUrl());
-        dto.put("feishuConfigured", notBlank(s.feishuWebhookUrl()));
-        dto.put("webhookUrl", s.webhookUrl());
-        dto.put("webhookConfigured", notBlank(s.webhookUrl()));
-        dto.put("webhookHeaders", s.webhookHeadersJson());
-        dto.put("smtpHost", s.smtpHost());
-        dto.put("smtpPort", s.smtpPort());
-        dto.put("smtpUsername", s.smtpUsername());
-        dto.put("smtpFrom", s.smtpFrom());
-        dto.put("smtpTo", s.smtpTo());
-        dto.put("smtpStarttls", s.smtpStarttls());
-        dto.put("smtpPasswordConfigured", notBlank(properties.getDelivery().getSmtp().getPassword()));
-        dto.put("emailConfigured", notBlank(s.smtpHost()) && notBlank(s.smtpTo()));
-        dto.put("localTokenConfigured", notBlank(properties.getLocalToken()));
-        dto.put("sourceWeights", parseWeights(s.sourceWeightsJson()));
         dto.put("retentionDays", s.retentionDays() != null ? s.retentionDays() : 0);
+        dto.put("sourceWeights", parseWeights(s.sourceWeightsJson()));
+        dto.put("webhookConfigured", notBlank(s.webhookUrl()));
+        dto.put("smtpPasswordConfigured", notBlank(properties.getDelivery().getSmtp().getPassword()));
         return dto;
     }
 
@@ -117,26 +130,18 @@ public class SettingsService {
             e.setId(1L);
             return e;
         });
+
+        for (String key : body.keySet()) {
+            if (!CUSTOMER_PUT_KEYS.contains(key)) {
+                log.debug("Ignoring non-customer settings key from PUT: {}", key);
+            }
+        }
+
         if (body.containsKey("interestProfile")) {
             row.setInterestProfile(asString(body.get("interestProfile")));
         }
         if (body.containsKey("summaryLanguage")) {
             row.setSummaryLanguage(asString(body.get("summaryLanguage")));
-        }
-        if (body.containsKey("scoreThreshold")) {
-            row.setScoreThreshold(asInt(body.get("scoreThreshold")));
-        }
-        if (body.containsKey("maxItems")) {
-            row.setMaxItems(asInt(body.get("maxItems")));
-        }
-        if (body.containsKey("lookbackHours")) {
-            row.setLookbackHours(asInt(body.get("lookbackHours")));
-        }
-        if (body.containsKey("fetchIntervalMs")) {
-            row.setFetchIntervalMs(asLong(body.get("fetchIntervalMs")));
-        }
-        if (body.containsKey("fetchTimeoutMs")) {
-            row.setFetchTimeoutMs(clampFetchTimeout(asInt(body.get("fetchTimeoutMs"))));
         }
         if (body.containsKey("pushCron")) {
             row.setPushCron(asString(body.get("pushCron")));
@@ -144,83 +149,44 @@ public class SettingsService {
         if (body.containsKey("timezone")) {
             row.setTimezone(asString(body.get("timezone")));
         }
-        if (body.containsKey("uiBaseUrl")) {
-            row.setUiBaseUrl(asString(body.get("uiBaseUrl")));
-        }
         if (body.containsKey("pushOnlyWhenItems")) {
             row.setPushOnlyWhenItems(asBool(body.get("pushOnlyWhenItems")));
-        }
-        if (body.containsKey("openaiBaseUrl")) {
-            row.setOpenaiBaseUrl(asString(body.get("openaiBaseUrl")));
-        }
-        if (body.containsKey("openaiModel")) {
-            row.setOpenaiModel(asString(body.get("openaiModel")));
-        }
-        if (body.containsKey("contextWindowTokens")) {
-            row.setContextWindowTokens(clampContextWindow(asInt(body.get("contextWindowTokens"))));
-        }
-        if (body.containsKey("maxCompletionTokens")) {
-            Integer window = row.getContextWindowTokens() != null
-                    ? row.getContextWindowTokens()
-                    : properties.getOpenai().getContextWindowTokens();
-            row.setMaxCompletionTokens(clampCompletion(asInt(body.get("maxCompletionTokens")), window));
-        }
-        if (body.containsKey("aiParallelism")) {
-            row.setAiParallelism(clampAiParallelism(asInt(body.get("aiParallelism"))));
-        }
-        if (body.containsKey("feishuWebhookUrl")) {
-            row.setFeishuWebhookUrl(asString(body.get("feishuWebhookUrl")));
-        }
-        if (body.containsKey("webhookUrl")) {
-            row.setWebhookUrl(asString(body.get("webhookUrl")));
-        }
-        if (body.containsKey("webhookHeaders")) {
-            Object h = body.get("webhookHeaders");
-            row.setWebhookHeadersJson(h == null ? null : String.valueOf(h));
-        }
-        if (body.containsKey("smtpHost")) {
-            row.setSmtpHost(asString(body.get("smtpHost")));
-        }
-        if (body.containsKey("smtpPort")) {
-            row.setSmtpPort(asInt(body.get("smtpPort")));
-        }
-        if (body.containsKey("smtpUsername")) {
-            row.setSmtpUsername(asString(body.get("smtpUsername")));
-        }
-        if (body.containsKey("smtpFrom")) {
-            row.setSmtpFrom(asString(body.get("smtpFrom")));
         }
         if (body.containsKey("smtpTo")) {
             row.setSmtpTo(asString(body.get("smtpTo")));
         }
-        if (body.containsKey("smtpStarttls")) {
-            row.setSmtpStarttls(asBool(body.get("smtpStarttls")));
-        }
-        if (body.containsKey("sourceWeights")) {
-            Object w = body.get("sourceWeights");
-            if (w instanceof Map<?, ?> map) {
-                Map<String, Object> clean = new LinkedHashMap<>();
-                for (Map.Entry<?, ?> e : map.entrySet()) {
-                    clean.put(String.valueOf(e.getKey()), asInt(e.getValue()));
-                }
-                try {
-                    row.setSourceWeightsJson(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(clean));
-                } catch (Exception ex) {
-                    throw new IllegalArgumentException("invalid sourceWeights: " + ex.getMessage());
-                }
-            } else {
-                row.setSourceWeightsJson(null);
-            }
-        }
-        if (body.containsKey("retentionDays")) {
-            Integer days = asInt(body.get("retentionDays"));
-            row.setRetentionDays(days != null && days < 0 ? 0 : days);
-        }
+
         repository.save(row);
         applyLiveOverrides(effective());
-        // @Scheduled resolves ${radar.*} once at startup; the job coordinator re-arms on this event.
         events.publishEvent(new SettingsUpdatedEvent(this));
         return toPublicDto();
+    }
+
+    @Transactional
+    public void saveFeishuBind(String appId, String appSecret, String openId) {
+        AppSettingsEntity row = repository.findById(1L).orElseGet(() -> {
+            AppSettingsEntity e = new AppSettingsEntity();
+            e.setId(1L);
+            return e;
+        });
+        row.setFeishuAppId(appId);
+        row.setFeishuAppSecret(appSecret);
+        row.setFeishuOpenId(openId);
+        repository.save(row);
+        events.publishEvent(new SettingsUpdatedEvent(this));
+    }
+
+    @Transactional
+    public void clearFeishuBind() {
+        AppSettingsEntity row = repository.findById(1L).orElse(null);
+        if (row == null) {
+            return;
+        }
+        row.setFeishuAppId(null);
+        row.setFeishuAppSecret(null);
+        row.setFeishuOpenId(null);
+        repository.save(row);
+        events.publishEvent(new SettingsUpdatedEvent(this));
     }
 
     /** Apply DB overrides onto RadarProperties for in-process consumers. */
@@ -270,9 +236,8 @@ public class SettingsService {
         if (s.maxCompletionTokens() != null) {
             properties.getOpenai().setMaxCompletionTokens(s.maxCompletionTokens());
         }
-        if (s.aiParallelism() != null) {
-            properties.setAiParallelism(1);
-        }
+        properties.setAiParallelism(1);
+        // Webhook URLs: env-backed effective value
         if (s.feishuWebhookUrl() != null) {
             properties.getDelivery().setFeishuWebhookUrl(s.feishuWebhookUrl());
         }
@@ -282,30 +247,21 @@ public class SettingsService {
         if (s.webhookHeadersJson() != null) {
             properties.getDelivery().setWebhookHeaders(s.webhookHeadersJson());
         }
+        // SMTP transport stays env-only; only recipient follows customer settings
         RadarProperties.Smtp smtp = properties.getDelivery().getSmtp();
-        if (s.smtpHost() != null) {
-            smtp.setHost(s.smtpHost());
-        }
-        if (s.smtpPort() != null) {
-            smtp.setPort(s.smtpPort());
-        }
-        if (s.smtpUsername() != null) {
-            smtp.setUsername(s.smtpUsername());
-        }
-        if (s.smtpFrom() != null) {
-            smtp.setFrom(s.smtpFrom());
-        }
         if (s.smtpTo() != null) {
             smtp.setTo(s.smtpTo());
-        }
-        if (s.smtpStarttls() != null) {
-            smtp.setStarttls(s.smtpStarttls());
         }
     }
 
     private EffectiveSettings merge(AppSettingsEntity row) {
         RadarProperties.Delivery d = properties.getDelivery();
         RadarProperties.Smtp smtp = d.getSmtp();
+        // Transport: always env. Recipient: DB wins so the customer field sticks.
+        String smtpTo = firstNonBlank(dbOrEnv(
+                row != null ? row.getSmtpTo() : null,
+                smtp.getTo()
+        ));
         return new EffectiveSettings(
                 first(row != null ? row.getInterestProfile() : null, properties.getInterestProfile()),
                 first(row != null ? row.getSummaryLanguage() : null, properties.getSummaryLanguage()),
@@ -322,47 +278,22 @@ public class SettingsService {
                 first(row != null ? row.getOpenaiModel() : null, properties.getOpenai().getModel()),
                 firstInt(row != null ? row.getContextWindowTokens() : null, properties.getOpenai().getContextWindowTokens()),
                 firstInt(row != null ? row.getMaxCompletionTokens() : null, properties.getOpenai().getMaxCompletionTokens()),
-                1, // LLM single-threaded only
+                1,
                 firstNonBlank(envOrDb(d.getFeishuWebhookUrl(), row != null ? row.getFeishuWebhookUrl() : null)),
                 firstNonBlank(envOrDb(d.getWebhookUrl(), row != null ? row.getWebhookUrl() : null)),
                 first(row != null ? row.getWebhookHeadersJson() : null, blankToNull(d.getWebhookHeaders())),
-                firstNonBlank(envOrDb(smtp.getHost(), row != null ? row.getSmtpHost() : null)),
-                firstInt(row != null ? row.getSmtpPort() : null, smtp.getPort()),
-                first(row != null ? row.getSmtpUsername() : null, blankToNull(smtp.getUsername())),
-                first(row != null ? row.getSmtpFrom() : null, blankToNull(smtp.getFrom())),
-                firstNonBlank(envOrDb(smtp.getTo(), row != null ? row.getSmtpTo() : null)),
-                firstBool(row != null ? row.getSmtpStarttls() : null, smtp.isStarttls()),
+                blankToEmpty(smtp.getHost()),
+                smtp.getPort(),
+                blankToNull(smtp.getUsername()),
+                blankToNull(smtp.getFrom()),
+                smtpTo,
+                smtp.isStarttls(),
+                row != null ? blankToNull(row.getFeishuAppId()) : null,
+                row != null ? blankToNull(row.getFeishuAppSecret()) : null,
+                row != null ? blankToNull(row.getFeishuOpenId()) : null,
                 row != null ? row.getSourceWeightsJson() : null,
                 row != null ? row.getRetentionDays() : null
         );
-    }
-
-    private static Integer clampAiParallelism(Integer v) {
-        // LLM calls are single-threaded only.
-        return 1;
-    }
-
-    private static Integer clampFetchTimeout(Integer v) {
-        if (v == null) {
-            return null;
-        }
-        return Math.max(5_000, Math.min(300_000, v));
-    }
-
-    private static Integer clampContextWindow(Integer v) {
-        if (v == null) {
-            return null;
-        }
-        return Math.max(MIN_CONTEXT_WINDOW, Math.min(MAX_CONTEXT_WINDOW, v));
-    }
-
-    private static Integer clampCompletion(Integer v, Integer window) {
-        if (v == null) {
-            return null;
-        }
-        int w = window == null ? 4096 : Math.max(MIN_CONTEXT_WINDOW, window);
-        int max = Math.max(MIN_COMPLETION, w / 2);
-        return Math.max(MIN_COMPLETION, Math.min(max, v));
     }
 
     private static String envOrDb(String env, String db) {
@@ -372,12 +303,24 @@ public class SettingsService {
         return db;
     }
 
+    /** DB wins (customer smtpTo). */
+    private static String dbOrEnv(String db, String env) {
+        if (notBlank(db)) {
+            return db;
+        }
+        return env;
+    }
+
     private static String first(String a, String b) {
         return a != null && !a.isBlank() ? a : b;
     }
 
     private static String firstNonBlank(String a) {
         return notBlank(a) ? a : "";
+    }
+
+    private static String blankToEmpty(String s) {
+        return s == null ? "" : s;
     }
 
     private static Integer firstInt(Integer a, int b) {
@@ -402,26 +345,6 @@ public class SettingsService {
 
     private static String asString(Object v) {
         return v == null ? null : String.valueOf(v);
-    }
-
-    private static Integer asInt(Object v) {
-        if (v == null) {
-            return null;
-        }
-        if (v instanceof Number n) {
-            return n.intValue();
-        }
-        return Integer.parseInt(String.valueOf(v));
-    }
-
-    private static Long asLong(Object v) {
-        if (v == null) {
-            return null;
-        }
-        if (v instanceof Number n) {
-            return n.longValue();
-        }
-        return Long.parseLong(String.valueOf(v));
     }
 
     private static Boolean asBool(Object v) {
@@ -460,8 +383,14 @@ public class SettingsService {
             String smtpFrom,
             String smtpTo,
             Boolean smtpStarttls,
+            String feishuAppId,
+            String feishuAppSecret,
+            String feishuOpenId,
             String sourceWeightsJson,
             Integer retentionDays
     ) {
+        public boolean feishuImBound() {
+            return notBlank(feishuAppId) && notBlank(feishuAppSecret) && notBlank(feishuOpenId);
+        }
     }
 }

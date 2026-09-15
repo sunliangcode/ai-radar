@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { StateBox, PageHeader } from '../components/ui'
 import { useAiMonitorStream } from './monitor/useAiMonitorStream'
@@ -40,9 +39,9 @@ export default function AiMonitorPage() {
       <PageHeader title={t('nav.monitor')} subtitle={t('settings.monitorHint')} />
       <p className="mb-4 text-xs text-muted">
         {t('settings.monitorOpenSettings')}{' '}
-        <Link className="text-moss underline underline-offset-2" to="/settings/llm">
-          {t('settings.llmSection')}
-        </Link>
+        <code className="rounded bg-border/60 px-1 font-mono">OPENAI_*</code>
+        {' '}
+        {t('settings.monitorEnvHint')}
         {sseLive ? (
           <span className="ml-2 text-moss">{t('settings.monitorStreaming')}</span>
         ) : null}

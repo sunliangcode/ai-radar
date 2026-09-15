@@ -7,17 +7,38 @@
 
 # AI Radar
 
-**你的个人 AI 决策系统。**
+### 你的个人 AI 决策系统。
+
+```
+你的 Context → 信号 → 逐条评分与摘要 → 影响 → 行动
+```
 
 知道变了什么。知道为何重要。知道下一步做什么。
 
-AI Radar 不只是告诉你 AI 世界发生了什么，而是告诉你哪些变化与你有关、影响什么，以及下一步做什么。它持续理解你的工作与技术栈，把重要变化变成可执行行动。
-
-[演示](#演示) · [快速开始](#快速开始) · [文档](#文档)
+[演示](#演示)
+· [快速开始](#快速开始)
+· [文档](#文档)
 
 **技术栈：** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI 兼容 LLM（默认本地 Ollama） · Argos Translate（英→中标题）
 
-## 演示
+---
+
+### 为什么选择 AI Radar？
+
+大多数 AI 资讯是噪音。AI Radar 用你的上下文过滤噪音，只留下值得关注的变化，并告诉你该怎么做。
+
+- ✓ **个人 Context** — 画像、项目与技术栈，相关性围绕「你」
+- ✓ **主语言** — 摘要由 LLM 按中文 / 英文生成；英文标题经本地 **Argos Translate** 侧车译为中文
+- ✓ **实时 Feed** — 每条一句话 AI 总结；分析完一条就能在列表里看到一条
+- ✓ **喜欢 / 不喜欢关键词** — 收藏或不感兴趣会写入偏好短语
+- ✓ **变化发现** — 重要外部变化，而不是无尽原始信息流
+- ✓ **影响分析** — 用白话说明这件事对你的工作意味着什么
+- ✓ **推荐行动** — 待办式 checklist；收藏后可由 LLM 判断是否值得生成下一步
+- ✓ **AI 监控** — 队列进度 + 本地 Ollama 流式 I/O
+
+---
+
+### 演示
 
 ![AI Radar 情报首页](assets/demo/intelligence-home.png)
 
@@ -25,7 +46,7 @@ AI Radar 不只是告诉你 AI 世界发生了什么，而是告诉你哪些变�
 - **为何关心** — 这件事为什么和你的项目 / 技术栈有关？
 - **做什么** — 你下一步应该做什么？
 
-### 完整路径
+**完整路径**
 
 1. 在设置 / Context 里填写角色、项目与技术栈，并选择**主语言**（中文或英文）。
 2. 触发一次抓取 — Feed 会在**每条新闻评分并摘要完成后立刻出现**，无需等整批结束。
@@ -33,17 +54,11 @@ AI Radar 不只是告诉你 AI 世界发生了什么，而是告诉你哪些变�
 4. 打开变化查看 **Impact**，或在 **Actions** 里跟进下一步（收藏也可能触发行动建议）。
 5. 在 **AI 监控** 查看分析队列进度，以及本地 Ollama 的流式输入输出。
 
-## 为什么选择 AI Radar
-
-大多数 AI 资讯是噪音。AI Radar 用你的上下文过滤噪音，只留下值得关注的变化，并告诉你该怎么做。
-
-## 工作方式
-
-```text
-你的 Context → 信号 → 逐条评分与摘要 → 影响 → 行动
-```
+---
 
 ## 快速开始
+
+**方式 A — 一键安装（推荐）**
 
 ```bash
 git clone https://github.com/sunliangcode/ai-radar.git
@@ -53,36 +68,33 @@ cd ai-radar
 
 打开 [http://localhost:8080](http://localhost:8080)。
 
-随时查看健康状态：
-
 ```bash
-./scripts/status.sh
+./scripts/status.sh    # 健康状态快照
+./scripts/backup.sh    # WAL 安全备份 → data/backups/
+./stop.sh              # 停止 install.sh 拉起的后台进程
 ```
 
-备份本地数据库（WAL 安全，默认写入 `data/backups/`）：
+**方式 B — Docker**
 
 ```bash
-./scripts/backup.sh
+cp backend/.env.example backend/.env
+docker compose up -d --build
 ```
 
-停止由 `install.sh` 拉起的后台进程：
+Argos Translate 在 `:8765`，AI Radar 在 `:8080`。详情见：[docs/installation.md](docs/installation.md)。
+
+**方式 C — 开发模式**
 
 ```bash
-./stop.sh
+# 后端（http://localhost:8080）
+cd backend && cp .env.example .env   # 首次
+./mvnw spring-boot:run
+
+# 前端（http://localhost:5173，/api 代理到 :8080）
+cd frontend && npm install && npm run dev
 ```
 
-Docker、开发模式、环境变量与推送渠道见：[docs/installation.md](docs/installation.md)。
-
-## 核心能力
-
-- **个人 Context** — 画像、项目与技术栈，相关性围绕「你」，而不是全球热榜。
-- **主语言** — 摘要由 LLM 按中文 / 英文生成；英文标题经本地 **Argos Translate** 侧车译为中文展示，不再占用 LLM。
-- **实时 Feed** — 每条一句话 AI 总结；分析完一条就能在列表里看到一条。
-- **喜欢 / 不喜欢关键词** — 收藏或不感兴趣会写入偏好短语，可在设置中增删。
-- **变化发现** — 重要外部变化，而不是无尽原始信息流。
-- **影响分析** — 用白话说明这件事对你的工作意味着什么。
-- **推荐行动** — 待办式 checklist；收藏后可由 LLM 判断是否值得生成下一步。
-- **AI 监控** — 队列进度（总数 / 已处理 / 剩余、每条请求数）+ 本地 Ollama 流式 I/O。
+环境变量、推送渠道等详见：[docs/installation.md](docs/installation.md)。
 
 ## 文档
 
@@ -98,7 +110,7 @@ Docker、开发模式、环境变量与推送渠道见：[docs/installation.md](
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — 见 [LICENSE](LICENSE)。
 
 第三方翻译依赖（Argos Translate / 模型）：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 

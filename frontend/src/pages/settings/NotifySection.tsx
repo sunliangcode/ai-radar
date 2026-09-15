@@ -1,23 +1,45 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { api, type Settings } from '../../lib/api'
 import { errorText } from '../../lib/errors'
 import { formatPushResult, type PushResultBody } from '../../lib/formatPushResult'
-import { Button, Card, useToast } from '../../components/ui'
-import { SettingsField } from './SettingsField'
+import { Button, Card, Field, Input, Select, useToast } from '../../components/ui'
+
+const PUSH_PRESETS = [
+  { hour: 7, cron: '0 0 7 * * *' },
+  { hour: 8, cron: '0 0 8 * * *' },
+  { hour: 9, cron: '0 0 9 * * *' },
+  { hour: 12, cron: '0 0 12 * * *' },
+  { hour: 18, cron: '0 0 18 * * *' },
+] as const
+
+function cronToHour(cron: string | undefined): number | 'custom' {
+  if (!cron) return 8
+  const match = PUSH_PRESETS.find((p) => p.cron === cron)
+  return match ? match.hour : 'custom'
+}
+
+function qrImageUrl(data: string) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(data)}`
+}
 
 export function NotifySection({
   form,
   patch,
-  smtpPasswordConfigured,
+  emailTransportReady,
+  feishuBound,
 }: {
   form: Partial<Settings>
   patch: (patch: Partial<Settings>) => void
-  smtpPasswordConfigured?: boolean
+  emailTransportReady?: boolean
+  feishuBound?: boolean
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { push } = useToast()
+  const [bindSessionId, setBindSessionId] = useState<string | null>(null)
+
   const pushNow = useMutation({
     mutationFn: api.pushJob,
     onSuccess: (body) => {
@@ -29,6 +51,61 @@ export function NotifySection({
     onError: (e) => push('error', t('common.loadFailed', { message: errorText(e, t) })),
   })
 
+  const startBind = useMutation({
+    mutationFn: api.feishuBindStart,
+    onSuccess: (body) => {
+      setBindSessionId(body.sessionId)
+      if (body.status === 'bound') {
+        void qc.invalidateQueries({ queryKey: ['settings'] })
+        push('success', t('settings.feishuBoundOk'))
+        setBindSessionId(null)
+      }
+    },
+    onError: (e) => push('error', t('common.loadFailed', { message: errorText(e, t) })),
+  })
+
+  const unbind = useMutation({
+    mutationFn: api.feishuUnbind,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['settings'] })
+      setBindSessionId(null)
+      push('success', t('settings.feishuUnbound'))
+    },
+    onError: (e) => push('error', t('common.loadFailed', { message: errorText(e, t) })),
+  })
+
+  const bindStatus = useQuery({
+    queryKey: ['feishu-bind', bindSessionId],
+    queryFn: () => api.feishuBindStatus(bindSessionId!),
+    enabled: Boolean(bindSessionId),
+    refetchInterval: (q) => {
+      const s = q.state.data?.status
+      if (s === 'bound' || s === 'failed' || s === 'expired') return false
+      return 2000
+    },
+  })
+
+  useEffect(() => {
+    const s = bindStatus.data?.status
+    if (!s || !bindSessionId) return
+    if (s === 'bound') {
+      void qc.invalidateQueries({ queryKey: ['settings'] })
+      push('success', bindStatus.data?.welcomeHint ? t('settings.feishuBoundOkHint') : t('settings.feishuBoundOk'))
+      setBindSessionId(null)
+    } else if (s === 'failed') {
+      push('error', t('settings.feishuBindFailed', { error: bindStatus.data?.error ?? 'failed' }))
+      setBindSessionId(null)
+    } else if (s === 'expired') {
+      push('error', t('settings.feishuBindExpired'))
+      setBindSessionId(null)
+    }
+    // Toast once when the bind session reaches a terminal status (clearing sessionId stops re-entry).
+  }, [bindStatus.data?.status, bindSessionId])
+
+  const hour = cronToHour(form.pushCron)
+  const qrUrl = bindStatus.data?.qrUrl ?? startBind.data?.qrUrl
+  const binding = Boolean(bindSessionId) || startBind.isPending
+
   return (
     <Card>
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -37,25 +114,118 @@ export function NotifySection({
           {pushNow.isPending ? t('common.pushing') : t('common.pushNow')}
         </Button>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <SettingsField field="feishuWebhookUrl" label={t('settings.feishuWebhook')} value={form.feishuWebhookUrl} patch={patch} />
-        <SettingsField field="smtpTo" label={t('settings.smtpTo')} value={form.smtpTo} patch={patch} />
-        <SettingsField field="smtpHost" label={t('settings.smtpHost')} value={form.smtpHost} patch={patch} />
-        <SettingsField field="smtpFrom" label={t('settings.smtpFrom')} value={form.smtpFrom} patch={patch} />
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
-          <input
-            type="checkbox"
-            checked={Boolean(form.pushOnlyWhenItems)}
-            onChange={(e) => patch({ pushOnlyWhenItems: e.target.checked })}
-          />
-          <span>{t('settings.pushOnlyWhenItems')}</span>
-        </label>
+
+      <div className="grid gap-6">
+        <div>
+          <h4 className="mb-1 text-sm font-medium text-ink">{t('settings.emailChannel')}</h4>
+          {emailTransportReady ? (
+            <Field label={t('settings.smtpTo')} hint={t('settings.smtpToHint')}>
+              <Input
+                type="email"
+                value={form.smtpTo ?? ''}
+                onChange={(e) => patch({ smtpTo: e.target.value })}
+                placeholder="you@example.com"
+              />
+            </Field>
+          ) : (
+            <p className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-muted">
+              {t('settings.emailTransportMissing')}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <h4 className="mb-1 text-sm font-medium text-ink">{t('settings.feishuChannel')}</h4>
+          {feishuBound ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-moss">{t('settings.feishuBound')}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                loading={unbind.isPending}
+                onClick={() => unbind.mutate()}
+              >
+                {t('settings.feishuUnbind')}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted">{t('settings.feishuBindHint')}</p>
+              {!binding ? (
+                <Button type="button" loading={startBind.isPending} onClick={() => startBind.mutate()}>
+                  {t('settings.feishuBind')}
+                </Button>
+              ) : null}
+              {qrUrl ? (
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+                  <img
+                    src={qrImageUrl(qrUrl)}
+                    alt={t('settings.feishuQrAlt')}
+                    width={220}
+                    height={220}
+                    className="rounded-md border border-border bg-white p-2"
+                  />
+                  <div className="max-w-xs text-sm text-muted">
+                    <p>{t('settings.feishuScanHint')}</p>
+                    <a
+                      className="mt-2 inline-block break-all text-moss underline underline-offset-2"
+                      href={qrUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {t('settings.feishuOpenLink')}
+                    </a>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="mt-2"
+                      onClick={() => setBindSessionId(null)}
+                    >
+                      {t('common.cancel')}
+                    </Button>
+                  </div>
+                </div>
+              ) : binding ? (
+                <p className="text-sm text-muted">{t('settings.feishuPreparingQr')}</p>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('settings.pushTime')} hint={t('settings.pushTimeHint')}>
+            <Select
+              value={hour === 'custom' ? 'custom' : String(hour)}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === 'custom') return
+                const preset = PUSH_PRESETS.find((p) => String(p.hour) === v)
+                if (preset) patch({ pushCron: preset.cron })
+              }}
+            >
+              {PUSH_PRESETS.map((p) => (
+                <option key={p.hour} value={String(p.hour)}>
+                  {t('settings.pushTimeHour', { hour: p.hour })}
+                </option>
+              ))}
+              {hour === 'custom' ? (
+                <option value="custom">{t('settings.pushTimeCustom')}</option>
+              ) : null}
+            </Select>
+          </Field>
+          <Field label={t('settings.timezone')} hint={t('settings.timezoneHint')}>
+            <Input value={form.timezone ?? 'Asia/Shanghai'} readOnly className="opacity-80" />
+          </Field>
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={Boolean(form.pushOnlyWhenItems)}
+              onChange={(e) => patch({ pushOnlyWhenItems: e.target.checked })}
+            />
+            <span>{t('settings.pushOnlyWhenItems')}</span>
+          </label>
+        </div>
       </div>
-      <p className="mt-3 text-xs text-muted">
-        {t('settings.smtpPasswordHint', {
-          status: smtpPasswordConfigured ? t('common.yes') : t('common.no'),
-        })}
-      </p>
     </Card>
   )
 }

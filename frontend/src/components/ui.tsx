@@ -8,6 +8,7 @@
  *  - score/      ScoreBar, legacy ScorePill
  *  - feedback/   FeedbackBar
  *  - fetch/      FetchProgressPanel, FetchResultSummary
+ *  - magazine/   MagCard, MagGrid, ImmersiveDrawer, HeroFocusCard
  *
  * Prefer importing from the specific module in new code.
  */
@@ -37,3 +38,9 @@ export { FeedbackBar } from './feedback/FeedbackBar'
 
 export { FetchProgressPanel } from './fetch/FetchProgressPanel'
 export { FetchResultSummary } from './fetch/FetchResultSummary'
+
+export { MagCard, MagAction } from './magazine/MagCard'
+export { MagGrid } from './magazine/MagGrid'
+export { ImmersiveDrawer } from './magazine/ImmersiveDrawer'
+export { HeroFocusCard } from './magazine/HeroFocusCard'
+export { ItemDetailBody } from './magazine/ItemDetailBody'

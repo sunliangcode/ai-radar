@@ -1,13 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type ImpactCard } from '../lib/api'
-import { Button, ListSkeleton, PageHeader, StateBox, useToast } from '../components/ui'
+import {
+  Button,
+  HeroFocusCard,
+  ImmersiveDrawer,
+  ListSkeleton,
+  MagAction,
+  MagCard,
+  MagGrid,
+  PageHeader,
+  StateBox,
+  useToast,
+} from '../components/ui'
 import { PackPicker } from '../components/PackPicker'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { useSources } from '../hooks/useSources'
 import { errorText } from '../lib/errors'
+
+function impactScore(card: ImpactCard): number {
+  return card.priority
+    ? Math.min(100, Math.round(card.priority / 1000))
+    : Math.round(card.relevance ?? 0)
+}
 
 export default function TodayPage() {
   const { t } = useTranslation()
@@ -15,6 +33,7 @@ export default function TodayPage() {
   const { push: pushToast } = useToast()
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const sources = useSources()
+  const [drawerId, setDrawerId] = useState<number | null>(null)
 
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['intelligence-home'],
@@ -24,8 +43,6 @@ export default function TodayPage() {
     ['sources'],
   ])
 
-  // Impact is what actually fills Today/Actions, but nothing used to trigger it: the onboarding
-  // said "update once, then read Today" and Today stayed empty forever.
   const impactJob = useMutation({
     mutationFn: api.impactJob,
     onSuccess: async () => {
@@ -46,11 +63,20 @@ export default function TodayPage() {
   const todayChanges = (data?.todayChanges ?? data?.whyCare ?? []).slice(0, 10)
   const ready = todayChanges.length > 0
 
+  const { hero, rest } = useMemo(() => {
+    if (todayChanges.length === 0) return { hero: null as ImpactCard | null, rest: [] as ImpactCard[] }
+    const highIdx = todayChanges.findIndex((c) => (c.tier ?? '').toUpperCase() === 'HIGH')
+    const idx = highIdx >= 0 ? highIdx : 0
+    const heroCard = todayChanges[idx]
+    const restCards = todayChanges.filter((_, i) => i !== idx)
+    return { hero: heroCard, rest: restCards }
+  }, [todayChanges])
+
   const highCount = todayChanges.filter((c) => c.tier === 'HIGH').length
+  const drawerCard = todayChanges.find((c) => c.id === drawerId) ?? null
 
   const runFetch = () => {
     fetchJob.mutate(undefined, {
-      // Chain impact so one click really does produce decisions on Today.
       onSuccess: () => impactJob.mutate(),
     })
   }
@@ -80,7 +106,6 @@ export default function TodayPage() {
         <StateBox>{t('common.loadFailed', { message: errorText(home.error, t) })}</StateBox>
       ) : null}
 
-      {/* Getting started */}
       {!home.isLoading && !home.isError && !ready ? (
         <div className="mb-8 rounded-xl border border-dashed border-border bg-surface p-6">
           <h3 className="text-lg font-medium text-ink">
@@ -118,10 +143,9 @@ export default function TodayPage() {
         </div>
       ) : null}
 
-      {ready ? (
+      {ready && hero ? (
         <>
-          {/* Stats strip */}
-          <div className="mb-6 flex flex-wrap gap-x-6 gap-y-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm">
+          <div className="mb-4 flex flex-wrap gap-x-6 gap-y-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm">
             <span className="text-muted">
               {t('today.statShown')}{' '}
               <strong className="font-mono text-ink">{todayChanges.length}</strong>
@@ -135,11 +159,52 @@ export default function TodayPage() {
             </Link>
           </div>
 
-          <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
-            {todayChanges.map((card: ImpactCard) => (
-              <TodayRow key={card.id} card={card} />
-            ))}
-          </ul>
+          <HeroFocusCard
+            title={hero.title}
+            why={hero.why}
+            evidence={hero.evidence}
+            score={impactScore(hero)}
+            tier={hero.tier}
+            onOpen={() => setDrawerId(hero.id)}
+            actions={
+              <Link
+                to={`/changes/${hero.eventId}`}
+                state={{ from: '/' }}
+                className="inline-flex items-center rounded-md px-2 py-1 text-xs text-muted transition hover:bg-border hover:text-ink"
+              >
+                {t('today.openChange')} →
+              </Link>
+            }
+          />
+
+          {rest.length > 0 ? (
+            <MagGrid dimmed={drawerId != null}>
+              {rest.map((card) => (
+                <MagCard
+                  key={card.id}
+                  dataId={card.id}
+                  title={card.title}
+                  lead={card.why}
+                  score={impactScore(card)}
+                  tier={card.tier}
+                  selected={card.id === drawerId}
+                  dimmed={drawerId != null && card.id !== drawerId}
+                  onOpen={() => setDrawerId(card.id)}
+                  meta={
+                    <>
+                      {card.tier ? <span className="font-mono">{card.tier}</span> : null}
+                      {card.evidence ? (
+                        <span className="line-clamp-1 max-w-[18rem]">{card.evidence}</span>
+                      ) : null}
+                    </>
+                  }
+                  actions={
+                    <MagAction onClick={() => setDrawerId(card.id)}>{t('today.heroOpen')}</MagAction>
+                  }
+                />
+              ))}
+            </MagGrid>
+          ) : null}
 
           <p className="mt-4 text-xs text-muted">
             {t('today.hint')}{' '}
@@ -151,38 +216,68 @@ export default function TodayPage() {
               {t('nav.actions')}
             </Link>
           </p>
+
+          <ImmersiveDrawer
+            open={!!drawerCard}
+            onClose={() => setDrawerId(null)}
+            title={drawerCard?.title}
+            subtitle={
+              drawerCard ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {drawerCard.tier ? (
+                    <span className="font-mono">{drawerCard.tier}</span>
+                  ) : null}
+                  <span className="font-mono tabular-nums">{impactScore(drawerCard)}</span>
+                </div>
+              ) : null
+            }
+            footer={
+              drawerCard ? (
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    to={`/changes/${drawerCard.eventId}`}
+                    state={{ from: '/' }}
+                    className="inline-flex items-center rounded-md px-2 py-1 text-xs text-moss transition hover:bg-moss/10"
+                  >
+                    {t('today.openChange')} →
+                  </Link>
+                </div>
+              ) : null
+            }
+          >
+            {drawerCard ? (
+              <div className="space-y-4">
+                {drawerCard.why ? (
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-accent">
+                      {t('today.whyLabel')}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-ink">{drawerCard.why}</p>
+                  </div>
+                ) : null}
+                {drawerCard.evidence ? (
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                      {t('today.evidenceLabel')}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-muted">{drawerCard.evidence}</p>
+                  </div>
+                ) : null}
+                {drawerCard.recommendation ? (
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                      {t('today.recommendationLabel')}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-ink">
+                      {drawerCard.recommendation}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </ImmersiveDrawer>
         </>
       ) : null}
     </div>
-  )
-}
-
-function TodayRow({ card }: { card: ImpactCard }) {
-  return (
-    <li className="row-py px-4">
-      <div className="flex items-start gap-3">
-        <div className="pt-0.5 w-12 shrink-0">
-          <div className="font-mono text-sm font-semibold tabular-nums text-ink">
-            {card.priority ? Math.min(100, Math.round(card.priority / 1000)) : Math.round(card.relevance ?? 0)}
-          </div>
-          {card.tier ? (
-            <span className="font-mono text-[10px] text-muted">{card.tier}</span>
-          ) : null}
-        </div>
-        <div className="min-w-0 flex-1">
-          <Link
-            to={`/changes/${card.eventId}`}
-            state={{ from: '/' }}
-            className="font-medium text-ink hover:underline"
-          >
-            {card.title}
-          </Link>
-          {card.why ? <p className="mt-1 text-sm text-muted">{card.why}</p> : null}
-          {card.evidence ? (
-            <p className="mt-0.5 text-[11px] text-muted/80">{card.evidence}</p>
-          ) : null}
-        </div>
-      </div>
-    </li>
   )
 }

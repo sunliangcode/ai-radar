@@ -23,6 +23,11 @@ export default function SettingsHubPage() {
 
   const cards = [
     {
+      to: '/settings/preferences',
+      title: t('settingsHub.preferences'),
+      desc: t('settingsHub.preferencesDesc'),
+    },
+    {
       to: '/settings/context',
       title: t('settingsHub.context'),
       desc: t('settingsHub.contextDesc'),
@@ -31,21 +36,6 @@ export default function SettingsHubPage() {
       to: '/settings/sources',
       title: t('settingsHub.sources'),
       desc: t('settingsHub.sourcesDesc'),
-    },
-    {
-      to: '/settings/llm',
-      title: t('settingsHub.llm'),
-      desc: aiReady
-        ? t('settingsHub.llmReady')
-        : aiDegraded
-          ? t('settingsHub.llmDegraded')
-          : t('settingsHub.llmNotReady'),
-      badge: aiReady ? t('settingsHub.on') : aiDegraded ? t('settingsHub.degraded') : t('settingsHub.off'),
-      badgeCls: aiReady
-        ? 'text-moss border-moss/40'
-        : aiDegraded
-          ? 'text-ember border-ember/40'
-          : 'text-muted border-border',
     },
   ]
 
@@ -88,9 +78,6 @@ export default function SettingsHubPage() {
           >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-ink">{c.title}</h3>
-              {c.badge ? (
-                <span className={`rounded-full border px-2 py-0.5 text-[11px] font-mono ${c.badgeCls}`}>{c.badge}</span>
-              ) : null}
             </div>
             <p className="mt-2 text-sm text-muted">{c.desc}</p>
             <p className="mt-4 text-sm text-accent group-hover:underline">→</p>

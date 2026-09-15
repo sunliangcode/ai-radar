@@ -7,17 +7,38 @@ English | [中文](README.zh.md)
 
 # AI Radar
 
-**Your personal AI intelligence system.**
+### Your personal AI intelligence system.
+
+```
+Your Context → Signals → Score & Summarize → Impact → Actions
+```
 
 Know what changed. Know why it matters. Know what to do.
 
-AI Radar turns AI news into decisions for your work — it watches the AI ecosystem, understands your projects and stack, and turns important changes into personalized actions.
-
-[Demo](#demo) · [Quick Start](#quick-start) · [Documentation](#documentation)
+[Demo](#demo)
+· [Quick Start](#quick-start)
+· [Documentation](#documentation)
 
 **Stack:** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI-compatible LLM (default: local Ollama) · Argos Translate (en→zh titles)
 
-## Demo
+---
+
+### Why AI Radar?
+
+Most AI news is noise. AI Radar filters that noise against your context and surfaces only changes worth your attention — then tells you what to do about them.
+
+- ✓ **Personal Context** — Profile, projects, and stack so relevance is about *you*
+- ✓ **Primary language** — Summaries in zh/en via LLM; English titles localized with **Argos Translate** (offline sidecar)
+- ✓ **Live Feed** — One-sentence AI summary per item; items appear as soon as they are analyzed
+- ✓ **Like / dislike keywords** — Save or mark Not interested to teach preference phrases
+- ✓ **Change Detection** — Important external shifts, not an endless raw feed
+- ✓ **Impact Analysis** — Why a change matters for your work, in plain language
+- ✓ **Recommended Actions** — Checklist-style next steps; saving can trigger an action suggestion
+- ✓ **AI Monitor** — Queue progress plus streaming I/O for local Ollama
+
+---
+
+### Demo
 
 ![AI Radar Intelligence Home](assets/demo/intelligence-home.png)
 
@@ -25,7 +46,7 @@ AI Radar turns AI news into decisions for your work — it watches the AI ecosys
 - **Why care** — Why does this matter for *your* projects and stack?
 - **What to do** — What should you do next?
 
-### Demo story
+**Demo story**
 
 1. Open Settings / Context and describe your role, projects, and tech stack; set your **primary language** (Chinese or English).
 2. Run a fetch — items appear in the Feed **as each one is scored and summarized** (no need to wait for the whole job).
@@ -33,17 +54,11 @@ AI Radar turns AI news into decisions for your work — it watches the AI ecosys
 4. Open a change for **Impact**, or check **Actions** for next steps (saving an item can also trigger an action suggestion).
 5. Watch the **AI Monitor** for queue progress and live Ollama token streaming.
 
-## Why AI Radar
+---
 
-Most AI news is noise. AI Radar filters that noise against your context and surfaces only changes worth your attention — then tells you what to do about them.
+## Quick Start
 
-## How it works
-
-```text
-Your Context → Signals → Score & Summarize (per item) → Impact → Actions
-```
-
-## Quick start
+**Option A — One-box (recommended)**
 
 ```bash
 git clone https://github.com/sunliangcode/ai-radar.git
@@ -53,36 +68,33 @@ cd ai-radar
 
 Open [http://localhost:8080](http://localhost:8080).
 
-Check health anytime:
-
 ```bash
-./scripts/status.sh
+./scripts/status.sh    # health snapshot
+./scripts/backup.sh    # WAL-safe DB backup → data/backups/
+./stop.sh              # stop background processes from install.sh
 ```
 
-Backup the local database (WAL-safe, writes to `data/backups/`):
+**Option B — Docker**
 
 ```bash
-./scripts/backup.sh
+cp backend/.env.example backend/.env
+docker compose up -d --build
 ```
 
-Stop the background process started by `install.sh`:
+Argos Translate on `:8765`, AI Radar on `:8080`. Details: [docs/installation.md](docs/installation.md).
+
+**Option C — Dev mode**
 
 ```bash
-./stop.sh
+# Backend (http://localhost:8080)
+cd backend && cp .env.example .env   # first time
+./mvnw spring-boot:run
+
+# Frontend (http://localhost:5173, proxies /api → :8080)
+cd frontend && npm install && npm run dev
 ```
 
-Docker, dev mode, environment variables, and delivery channels: [docs/installation.md](docs/installation.md).
-
-## Core features
-
-- **Personal Context** — Profile, projects, and stack so relevance is about *you*, not global trends.
-- **Primary language** — Summaries in Chinese or English via LLM; English titles are localized to Chinese with **Argos Translate** (offline sidecar), not the LLM.
-- **Live Feed** — One-sentence AI summary per item; new items show up as soon as they are analyzed.
-- **Like / dislike keywords** — Save or mark Not interested to teach preference phrases (editable in Settings).
-- **Change Detection** — Important external shifts, not an endless raw feed.
-- **Impact Analysis** — Why a change matters for your work, in plain language.
-- **Recommended Actions** — Checklist-style next steps; saving an item can ask the LLM whether an action is worth creating.
-- **AI Monitor** — Queue counts (total / done / remaining, calls per item) plus streaming I/O for local Ollama.
+Environment variables, delivery channels, and more: [docs/installation.md](docs/installation.md).
 
 ## Documentation
 

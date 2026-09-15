@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { errorText } from '../lib/errors'
@@ -7,12 +7,19 @@ import {
   buttonVariants,
   ConfirmDialog,
   EmptyState,
+  ImmersiveDrawer,
+  ItemDetailBody,
   ListSkeleton,
+  MagAction,
+  MagCard,
+  MagGrid,
   PageHeader,
+  ScoreSourceBadge,
+  SourceBadge,
   StateBox,
 } from '../components/ui'
-import { FeedRow } from '../components/FeedRow'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
+import { timeAgo } from '../components/magazine/timeAgo'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { dateLocale } from '../i18n'
 import { PAGE } from './feed/feedQuery'
@@ -22,10 +29,18 @@ import { useFeedKeyboard } from './feed/useFeedKeyboard'
 import { useFeedList } from './feed/useFeedList'
 import { useFeedActions } from './feed/useFeedActions'
 
+function scoreTier(score?: number): string | undefined {
+  if (score == null) return undefined
+  if (score >= 80) return 'HIGH'
+  if (score >= 50) return 'MEDIUM'
+  return 'LOW'
+}
+
 export default function FeedPage() {
   const { t, i18n } = useTranslation()
   const locale = dateLocale(i18n.language)
   const listRef = useRef<HTMLDivElement>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['feed'],
@@ -41,12 +56,21 @@ export default function FeedPage() {
     document.getElementById('feed-search-input')?.focus()
   }, [])
 
+  const openDrawer = useCallback((id: number) => {
+    list.setSelectedId(id)
+    setDrawerOpen(true)
+  }, [list.setSelectedId])
+
+  const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+
   useFeedKeyboard({
     items: list.items,
     selectedId: list.selectedId,
+    drawerOpen,
     onSelect: list.setSelectedId,
-    onExpand: actions.expandItem,
-    onOpen: actions.openExternalAndMarkRead,
+    onOpenDrawer: openDrawer,
+    onCloseDrawer: closeDrawer,
+    onOpenExternal: actions.openExternalAndMarkRead,
     onToggleSaved: actions.toggleSaved,
     onMarkRead: actions.markItemSelectedRead,
     onFocusSearch: focusSearch,
@@ -57,6 +81,12 @@ export default function FeedPage() {
       ?.querySelector(`[data-item-id="${list.selectedId}"]`)
       ?.scrollIntoView({ block: 'nearest' })
   }, [list.selectedId])
+
+  const selectedItem = list.items.find((i) => i.id === list.selectedId) ?? null
+
+  useEffect(() => {
+    if (drawerOpen && !selectedItem) setDrawerOpen(false)
+  }, [drawerOpen, selectedItem])
 
   const runFetch = () => {
     fetchJob.mutate(list.sourceType ? { sourceType: list.sourceType } : undefined, {
@@ -185,21 +215,76 @@ export default function FeedPage() {
 
       {list.items.length > 0 ? (
         <div ref={listRef}>
-          {list.items.map((item) => (
-            <div key={item.id} className="group">
-              <FeedRow
-                item={item}
-                selected={item.id === list.selectedId}
-                onSelect={() => list.setSelectedId(item.id)}
-                locale={locale}
-                onToggleSaved={() => actions.toggleSaved(item)}
-                onMarkRead={() => actions.markItemSelectedRead(item)}
-                onNotInterested={() => actions.dismissItem(item)}
-                onOpenExternal={() => actions.markReadOnOpen(item)}
-                expandSignal={actions.expandSignals[item.id]}
-              />
-            </div>
-          ))}
+          <MagGrid dimmed={drawerOpen}>
+            {list.items.map((item) => {
+              const lead = item.summary || item.scoreReason || undefined
+              return (
+                <MagCard
+                  key={item.id}
+                  dataId={item.id}
+                  title={item.titleDisplay || item.title}
+                  titleSecondary={
+                    item.titleDisplay && item.titleDisplay !== item.title ? item.title : undefined
+                  }
+                  lead={lead}
+                  score={item.score}
+                  tier={scoreTier(item.score)}
+                  unread={!item.read}
+                  selected={item.id === list.selectedId}
+                  dimmed={drawerOpen && item.id !== list.selectedId}
+                  onSelect={() => list.setSelectedId(item.id)}
+                  onOpen={() => openDrawer(item.id)}
+                  meta={
+                    <>
+                      <SourceBadge type={item.primarySourceType} />
+                      <span className="tabular-nums">
+                        {timeAgo(item.publishedAt ?? item.createdAt, locale)}
+                      </span>
+                      {item.scoreSource && item.scoreSource !== 'unknown' ? (
+                        <ScoreSourceBadge source={item.scoreSource} />
+                      ) : null}
+                      {item.stars != null ? (
+                        <span>
+                          ★
+                          {item.stars >= 1000
+                            ? `${(item.stars / 1000).toFixed(1)}k`
+                            : item.stars}
+                          {item.starsDelta7d != null && item.starsDelta7d > 0 ? (
+                            <span className="text-moss"> +{item.starsDelta7d}</span>
+                          ) : null}
+                        </span>
+                      ) : null}
+                      {!item.read ? (
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+                      ) : null}
+                      {item.saved ? <span className="text-moss">★</span> : null}
+                    </>
+                  }
+                  actions={
+                    <>
+                      <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
+                        {item.saved ? t('feed.unsave') : t('feed.save')}
+                      </MagAction>
+                      {!item.read ? (
+                        <MagAction onClick={() => actions.markItemSelectedRead(item)}>
+                          {t('feed.read')}
+                        </MagAction>
+                      ) : null}
+                      <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
+                        {t('feed.notInterested')}
+                      </MagAction>
+                      <MagAction
+                        href={item.canonicalUrl}
+                        onClick={() => actions.markReadOnOpen(item)}
+                      >
+                        {t('feed.open')} ↗
+                      </MagAction>
+                    </>
+                  }
+                />
+              )
+            })}
+          </MagGrid>
         </div>
       ) : null}
 
@@ -228,6 +313,58 @@ export default function FeedPage() {
           <kbd>⌘K</kbd> {t('nav.search')}
         </span>
       </p>
+
+      <ImmersiveDrawer
+        open={drawerOpen && !!selectedItem}
+        onClose={closeDrawer}
+        title={selectedItem ? selectedItem.titleDisplay || selectedItem.title : undefined}
+        subtitle={
+          selectedItem ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <SourceBadge type={selectedItem.primarySourceType} />
+              <span className="tabular-nums">
+                {timeAgo(selectedItem.publishedAt ?? selectedItem.createdAt, locale)}
+              </span>
+              {selectedItem.score != null ? (
+                <span className="font-mono tabular-nums">{Math.round(selectedItem.score)}</span>
+              ) : null}
+            </div>
+          ) : null
+        }
+        footer={
+          selectedItem ? (
+            <div className="flex flex-wrap items-center gap-1">
+              <MagAction onClick={() => actions.toggleSaved(selectedItem)} tone="moss">
+                {selectedItem.saved ? t('feed.unsave') : t('feed.save')}
+              </MagAction>
+              {!selectedItem.read ? (
+                <MagAction onClick={() => actions.markItemSelectedRead(selectedItem)}>
+                  {t('feed.read')}
+                </MagAction>
+              ) : null}
+              <MagAction onClick={() => actions.dismissItem(selectedItem)} tone="ember">
+                {t('feed.notInterested')}
+              </MagAction>
+              <MagAction
+                href={selectedItem.canonicalUrl}
+                onClick={() => actions.markReadOnOpen(selectedItem)}
+              >
+                {t('feed.open')} ↗
+              </MagAction>
+              <span className="ml-auto text-[11px] text-faint">{t('magazine.drawerNavHint')}</span>
+            </div>
+          ) : null
+        }
+      >
+        {selectedItem ? (
+          <>
+            {selectedItem.summary ? (
+              <p className="mb-4 text-sm leading-relaxed text-ink/90">{selectedItem.summary}</p>
+            ) : null}
+            <ItemDetailBody itemId={selectedItem.id} />
+          </>
+        ) : null}
+      </ImmersiveDrawer>
     </div>
   )
 }

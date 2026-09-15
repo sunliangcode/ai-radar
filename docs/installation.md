@@ -42,10 +42,10 @@ cp .env.example .env
 # optional context budget: OPENAI_CONTEXT_WINDOW_TOKENS=8192 OPENAI_MAX_COMPLETION_TOKENS=1024
 # optional Ollama residency: OPENAI_KEEP_ALIVE=5m (use 0 to unload after each call)
 # host tip: OLLAMA_NUM_PARALLEL=1 keeps a single runner; OPENAI_KEEP_ALIVE=0 lowers peak RAM
-# optional fetch HTTP timeout: FETCH_TIMEOUT_MS=60000 (also editable in Settings → Advanced)
+# optional fetch HTTP timeout: FETCH_TIMEOUT_MS=60000 (pipeline default; override in .env / application.yml)
 # optional title translate sidecar: RADAR_TRANSLATE_URL=http://127.0.0.1:8765
 #   RADAR_TRANSLATE_ENABLED=false to skip Argos
-# optional delivery: FEISHU_WEBHOOK_URL, WEBHOOK_URL, SMTP_*
+# optional delivery: SMTP_* for email transport; FEISHU_WEBHOOK_URL legacy only (prefer Settings scan-bind)
 ```
 
 **Default LLM** is local Ollama (no API key required for `localhost`). Cloud endpoints still need `OPENAI_API_KEY`. Context window defaults to **8192** tokens (also sent as Ollama `num_ctx` for local endpoints) and is adjustable under **Settings → AI model**; oversized prompts are truncated. Local calls use `OPENAI_KEEP_ALIVE` (default **0** = unload after each call; set `5m` if you want short residency). Live token/s, in-flight progress, and prompt/response previews appear on the **AI monitor** page (`/monitor`, `GET /api/ai/monitor`). News pull HTTP read timeout defaults to **60s** and is adjustable under **Settings → Advanced**.
@@ -138,13 +138,18 @@ In the UI: Sources → Fetch → Items → Briefs → Settings.
 
 ## Delivery channels
 
-| Channel | Env / Settings |
-| --- | --- |
-| Feishu | `FEISHU_WEBHOOK_URL` or Settings |
-| Webhook | `WEBHOOK_URL` (+ optional headers JSON) |
-| Email | `SMTP_HOST`, `SMTP_TO`, `SMTP_PASSWORD`, … |
+Customer UI (**Settings → Preferences & notifications**): inbox email + Feishu scan-to-bind + push time.
 
-Push runs daily at `radar.push-cron` (default `08:00` `Asia/Shanghai`). Fetch every `radar.fetch-interval-ms` (default 2h). Overlapping jobs are mutex-blocked (`409`).
+Deployer (`.env` / `application.yml`): SMTP transport, optional legacy Feishu webhook, generic webhook, LLM, pipeline knobs. See comments in `backend/.env.example`.
+
+| Channel | Customer | Deployer |
+| --- | --- | --- |
+| Feishu | Scan QR in Settings (binds open_id; one-click unbind) | Optional legacy `FEISHU_WEBHOOK_URL` if you already have a custom bot |
+| Email | Inbox address only (`smtpTo`) | `SMTP_HOST` / `SMTP_USERNAME` / `SMTP_PASSWORD` (+ optional port/from/starttls) |
+| Webhook | — | `WEBHOOK_URL` (+ optional `WEBHOOK_HEADERS` JSON) |
+| Outbox | — | `./data/outbox/` files when `radar.delivery.outbox-enabled=true` (default) |
+
+Push runs daily at `radar.push-cron` (default `08:00` `Asia/Shanghai`; customer can pick a preset hour in Settings). Fetch every `radar.fetch-interval-ms` (default 2h). Overlapping jobs are mutex-blocked (`409`).
 
 No channels configured → fetch still works; push logs `no_channels` and skips.
 
@@ -203,10 +208,10 @@ cp .env.example .env
 # 上下文预算可选：OPENAI_CONTEXT_WINDOW_TOKENS=8192 OPENAI_MAX_COMPLETION_TOKENS=1024
 # Ollama 常驻可选：OPENAI_KEEP_ALIVE=5m（设为 0 则每次调用后卸载）
 # 本机建议：OLLAMA_NUM_PARALLEL=1；更省内存可用 OPENAI_KEEP_ALIVE=0
-# 拉取超时可选：FETCH_TIMEOUT_MS=60000（也可在 设置 → 高级 调节）
+# 拉取超时可选：FETCH_TIMEOUT_MS=60000（流水线默认，在 .env / application.yml 覆盖）
 # 标题翻译侧车：RADAR_TRANSLATE_URL=http://127.0.0.1:8765
 #   RADAR_TRANSLATE_ENABLED=false 可关闭 Argos
-# 推送可选：FEISHU_WEBHOOK_URL、WEBHOOK_URL、SMTP_*
+# 推送：客户在设置里填邮箱 / 扫码绑飞书；部署者配 SMTP_*（可选遗留 FEISHU_WEBHOOK_URL、WEBHOOK_URL）
 ```
 
 **默认 LLM** 为本地 Ollama（`localhost` 无需 API Key）。云端接口仍需 `OPENAI_API_KEY`。上下文窗口默认 **8192** tokens（本地会作为 Ollama `num_ctx` 下发），可在 **设置 → AI 模型** 调节；超长 prompt 会截断。本地调用使用 `OPENAI_KEEP_ALIVE`（默认 **0**，每次调用后卸载；需要短驻留可设 `5m`）。**AI 监控** 页面（`/monitor`）显示进行中进度、输入/输出预览与 token/s（`GET /api/ai/monitor`）。新闻拉取 HTTP 读超时默认 **60s**，可在 **设置 → 高级** 调节。
@@ -261,13 +266,18 @@ curl -s http://localhost:8080/api/items | jq .
 
 ### 投递渠道
 
-| 渠道 | Env / Settings |
-| --- | --- |
-| 飞书 | `FEISHU_WEBHOOK_URL` 或 Settings |
-| Webhook | `WEBHOOK_URL`（可选 headers JSON） |
-| 邮件 | `SMTP_HOST`, `SMTP_TO`, `SMTP_PASSWORD`, … |
+客户 UI（**设置 → 偏好与通知**）：接收邮箱 + 飞书扫码绑定 + 推送时间。
 
-推送按 `radar.push-cron` 每日执行（默认 `08:00` `Asia/Shanghai`）。抓取间隔 `radar.fetch-interval-ms`（默认 2h）。重叠任务互斥（`409`）。
+部署者（`.env` / `application.yml`）：SMTP 传输、可选旧版飞书 Webhook、通用 Webhook、LLM、流水线参数。详见 `backend/.env.example` 注释。
+
+| 渠道 | 客户 | 部署者 |
+| --- | --- | --- |
+| 飞书 | 设置里扫码绑定（一键解除） | 可选遗留 `FEISHU_WEBHOOK_URL`（已有自定义机器人时） |
+| 邮件 | 只填接收邮箱 | `SMTP_HOST` / `SMTP_USERNAME` / `SMTP_PASSWORD`（可选 port/from/starttls） |
+| Webhook | — | `WEBHOOK_URL`（可选 `WEBHOOK_HEADERS`） |
+| Outbox | — | `radar.delivery.outbox-enabled=true` 时写入 `./data/outbox/`（默认开） |
+
+推送按 `radar.push-cron` 每日执行（默认 `08:00` `Asia/Shanghai`；客户可在设置里选常用时刻）。抓取间隔 `radar.fetch-interval-ms`（默认 2h）。重叠任务互斥（`409`）。
 
 未配置渠道时抓取仍可用；推送会记录 `no_channels` 并跳过。
 

@@ -90,6 +90,15 @@ public class AppSettingsEntity {
     @Column(name = "smtp_starttls")
     private Boolean smtpStarttls;
 
+    @Column(name = "feishu_app_id")
+    private String feishuAppId;
+
+    @Column(name = "feishu_app_secret")
+    private String feishuAppSecret;
+
+    @Column(name = "feishu_open_id")
+    private String feishuOpenId;
+
     @Column(name = "source_weights_json")
     private String sourceWeightsJson;
 
@@ -312,6 +321,30 @@ public class AppSettingsEntity {
 
     public void setSmtpStarttls(Boolean smtpStarttls) {
         this.smtpStarttls = smtpStarttls;
+    }
+
+    public String getFeishuAppId() {
+        return feishuAppId;
+    }
+
+    public void setFeishuAppId(String feishuAppId) {
+        this.feishuAppId = feishuAppId;
+    }
+
+    public String getFeishuAppSecret() {
+        return feishuAppSecret;
+    }
+
+    public void setFeishuAppSecret(String feishuAppSecret) {
+        this.feishuAppSecret = feishuAppSecret;
+    }
+
+    public String getFeishuOpenId() {
+        return feishuOpenId;
+    }
+
+    public void setFeishuOpenId(String feishuOpenId) {
+        this.feishuOpenId = feishuOpenId;
     }
 
     public String getSourceWeightsJson() {

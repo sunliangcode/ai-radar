@@ -1,8 +1,28 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Item } from '../../lib/api'
-import { Button, EmptyState, ListSkeleton, ScoreBar, StateBox } from '../../components/ui'
+import {
+  Button,
+  EmptyState,
+  ImmersiveDrawer,
+  ItemDetailBody,
+  ListSkeleton,
+  MagAction,
+  MagCard,
+  MagGrid,
+  SourceBadge,
+  StateBox,
+} from '../../components/ui'
+import { timeAgo } from '../../components/magazine/timeAgo'
 import { errorText } from '../../lib/errors'
+
+function scoreTier(score?: number): string | undefined {
+  if (score == null) return undefined
+  if (score >= 80) return 'HIGH'
+  if (score >= 50) return 'MEDIUM'
+  return 'LOW'
+}
 
 export function SavedItemsSection({
   items,
@@ -26,6 +46,8 @@ export function SavedItemsSection({
   onOpenExternal: (item: Item) => void
 }) {
   const { t } = useTranslation()
+  const [drawerId, setDrawerId] = useState<number | null>(null)
+  const drawerItem = items.find((i) => i.id === drawerId) ?? null
 
   return (
     <section>
@@ -56,64 +78,102 @@ export function SavedItemsSection({
         />
       ) : null}
       {!error && items.length > 0 ? (
-        <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
+        <MagGrid dimmed={drawerId != null}>
           {items.map((item) => (
-            <li key={item.id} className="row-py px-4">
-              <div className="flex items-start gap-3">
-                <div className="pt-0.5 w-12 shrink-0">
-                  <ScoreBar
-                    score={item.score}
-                    source={item.scoreSource}
-                    reason={item.scoreReason}
-                    size="sm"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={item.canonicalUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => onOpenExternal(item)}
-                    className="font-medium text-ink hover:underline"
+            <MagCard
+              key={item.id}
+              dataId={item.id}
+              title={item.titleDisplay || item.title}
+              lead={item.summary || item.scoreReason}
+              score={item.score}
+              tier={scoreTier(item.score)}
+              unread={!item.read}
+              selected={item.id === drawerId}
+              dimmed={drawerId != null && item.id !== drawerId}
+              onOpen={() => setDrawerId(item.id)}
+              meta={
+                <>
+                  <SourceBadge type={item.primarySourceType} />
+                  {item.publishedAt ? (
+                    <span className="tabular-nums">{timeAgo(item.publishedAt, locale)}</span>
+                  ) : null}
+                  {item.read ? <span>{t('watching.readBadge')}</span> : null}
+                </>
+              }
+              actions={
+                <>
+                  {!item.read ? (
+                    <MagAction onClick={() => onMarkRead(item.id)}>{t('common.markRead')}</MagAction>
+                  ) : null}
+                  <MagAction
+                    disabled={patchPending}
+                    onClick={() => onUnsave(item.id)}
+                    tone="ember"
                   >
-                    {item.title}
-                  </a>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                    {item.primarySourceType ? (
-                      <span className="font-mono">{item.primarySourceType}</span>
-                    ) : null}
-                    {item.publishedAt ? (
-                      <span className="font-mono tabular-nums">
-                        {new Date(item.publishedAt).toLocaleDateString(locale)}
-                      </span>
-                    ) : null}
-                    {item.read ? <span className="font-mono">{t('watching.readBadge')}</span> : null}
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {!item.read ? (
-                      <button
-                        type="button"
-                        onClick={() => onMarkRead(item.id)}
-                        className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-border hover:text-ink"
-                      >
-                        {t('common.markRead')}
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={patchPending}
-                      onClick={() => onUnsave(item.id)}
-                      className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-border hover:text-ink disabled:opacity-50"
-                    >
-                      {t('watching.unsave')}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </li>
+                    {t('watching.unsave')}
+                  </MagAction>
+                  <MagAction
+                    href={item.canonicalUrl}
+                    onClick={() => onOpenExternal(item)}
+                  >
+                    {t('feed.open')} ↗
+                  </MagAction>
+                </>
+              }
+            />
           ))}
-        </ul>
+        </MagGrid>
       ) : null}
+
+      <ImmersiveDrawer
+        open={!!drawerItem}
+        onClose={() => setDrawerId(null)}
+        title={drawerItem ? drawerItem.titleDisplay || drawerItem.title : undefined}
+        subtitle={
+          drawerItem ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <SourceBadge type={drawerItem.primarySourceType} />
+              {drawerItem.publishedAt ? (
+                <span className="tabular-nums">{timeAgo(drawerItem.publishedAt, locale)}</span>
+              ) : null}
+            </div>
+          ) : null
+        }
+        footer={
+          drawerItem ? (
+            <div className="flex flex-wrap gap-1">
+              {!drawerItem.read ? (
+                <MagAction onClick={() => onMarkRead(drawerItem.id)}>{t('common.markRead')}</MagAction>
+              ) : null}
+              <MagAction
+                disabled={patchPending}
+                onClick={() => {
+                  onUnsave(drawerItem.id)
+                  setDrawerId(null)
+                }}
+                tone="ember"
+              >
+                {t('watching.unsave')}
+              </MagAction>
+              <MagAction
+                href={drawerItem.canonicalUrl}
+                onClick={() => onOpenExternal(drawerItem)}
+              >
+                {t('feed.open')} ↗
+              </MagAction>
+            </div>
+          ) : null
+        }
+      >
+        {drawerItem ? (
+          <>
+            {drawerItem.summary ? (
+              <p className="mb-4 text-sm leading-relaxed text-ink/90">{drawerItem.summary}</p>
+            ) : null}
+            <ItemDetailBody itemId={drawerItem.id} />
+          </>
+        ) : null}
+      </ImmersiveDrawer>
     </section>
   )
 }

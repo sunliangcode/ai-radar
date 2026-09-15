@@ -187,8 +187,8 @@ export function SystemHealthCard() {
         {t('settingsHub.healthCli')}{' '}
         <code className="rounded bg-border/60 px-1 font-mono">./scripts/status.sh</code>
         {' · '}
-        <Link to="/settings/llm" className="text-accent hover:underline">
-          {t('settingsHub.llm')}
+        <Link to="/settings/preferences" className="text-accent hover:underline">
+          {t('settingsHub.preferences')}
         </Link>
       </p>
     </Card>

@@ -63,12 +63,104 @@ body {
 
 .row-py { padding-top: var(--row-py); padding-bottom: var(--row-py); }
 
-/* Feed row: card style */
+/* Magazine cards (Feed / Today / Watching) */
+.mag-card {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+.mag-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 12px 0 0 12px;
+  background: var(--color-border);
+}
+.mag-card.tier-high::before { background: var(--color-ember); }
+.mag-card.tier-med::before { background: var(--color-accent); }
+.mag-card.tier-low::before { background: var(--color-muted); }
+.mag-card.tier-default::before { background: var(--color-accent); }
+.mag-card:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+.mag-card.selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface));
+}
+.mag-card.is-read { opacity: 0.72; }
+.mag-card.is-dimmed { opacity: 0.45; }
+.mag-card.is-read.is-dimmed { opacity: 0.35; }
+
+.mag-grid-dimmed { opacity: 0.55; transition: opacity 180ms ease; }
+
+.mag-hero {
+  position: relative;
+  overflow: hidden;
+}
+.mag-hero-high {
+  border-color: color-mix(in srgb, var(--color-ember) 45%, var(--color-border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-ember) 8%, var(--color-surface)),
+      var(--color-surface) 55%
+    );
+}
+
+.mag-drawer {
+  animation: mag-drawer-in 200ms ease-out;
+}
+.mag-drawer-backdrop {
+  animation: mag-fade-in 160ms ease-out;
+}
+@keyframes mag-drawer-in {
+  from { transform: translateY(12px); opacity: 0.85; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes mag-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (min-width: 768px) {
+  @keyframes mag-drawer-in {
+    from { transform: translateX(16px); opacity: 0.85; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mag-card,
+  .mag-grid-dimmed {
+    transition: none;
+  }
+  .mag-card:hover {
+    transform: none;
+  }
+  .mag-drawer,
+  .mag-drawer-backdrop {
+    animation: none;
+  }
+}
+
+/* Legacy feed-row kept for any leftover references */
 .feed-row {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 6px;
   margin-bottom: 8px;
+  position: relative;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .feed-row:hover { border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border)); }
@@ -76,23 +168,6 @@ body {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 1px var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface));
-}
-.feed-row.selected::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 6px 0 0 6px;
-  background: var(--color-accent);
-}
-.feed-row { position: relative; }
-.feed-row-detail {
-  background: var(--color-border);
-  border-radius: 0 0 6px 6px;
-  margin: 0 -1px -1px -1px;
-  border-top: 1px solid var(--color-border);
 }
 
 /* Skeleton shimmer */

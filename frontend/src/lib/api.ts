@@ -256,38 +256,42 @@ export type WatchingGroup = {
 export type Settings = {
   interestProfile: string
   summaryLanguage: string
-  scoreThreshold: number
-  maxItems: number
-  lookbackHours: number
-  fetchIntervalMs: number
   pushCron: string
   timezone: string
-  uiBaseUrl: string
   pushOnlyWhenItems: boolean
-  openaiBaseUrl: string
-  openaiModel: string
-  contextWindowTokens: number
-  maxCompletionTokens: number
-  aiParallelism: number
-  fetchTimeoutMs: number
+  smtpTo: string
+  emailTransportReady: boolean
+  emailConfigured: boolean
+  feishuBound: boolean
+  feishuBindAvailable: boolean
+  feishuConfigured: boolean
   openaiConfigured: boolean
   openaiApiKeyConfigured?: boolean
-  feishuWebhookUrl: string
-  feishuConfigured: boolean
-  webhookUrl: string
-  webhookConfigured: boolean
-  webhookHeaders?: string
-  smtpHost: string
-  smtpPort: number
-  smtpUsername: string
-  smtpFrom: string
-  smtpTo: string
-  smtpStarttls: boolean
-  smtpPasswordConfigured: boolean
-  emailConfigured: boolean
-  localTokenConfigured: boolean
-  sourceWeights?: Record<string, number>
+  openaiBaseUrl?: string
+  openaiModel?: string
+  localTokenConfigured?: boolean
+  uiBaseUrl?: string
+  fetchIntervalMs?: number
+  scoreThreshold?: number
+  maxItems?: number
+  lookbackHours?: number
+  fetchTimeoutMs?: number
+  contextWindowTokens?: number
+  maxCompletionTokens?: number
+  aiParallelism?: number
   retentionDays?: number
+  sourceWeights?: Record<string, number>
+  webhookConfigured?: boolean
+  smtpPasswordConfigured?: boolean
+}
+
+export type FeishuBindStatus = {
+  sessionId: string
+  status: 'pending' | 'waiting_scan' | 'bound' | 'failed' | 'expired' | string
+  qrUrl?: string
+  expiresIn?: number
+  error?: string
+  welcomeHint?: boolean
 }
 
 export type AiMonitorCall = {
@@ -527,6 +531,12 @@ export const api = {
   settings: () => request<Settings>('/api/settings'),
   saveSettings: (body: Partial<Settings>) =>
     request<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  feishuBindStart: () =>
+    request<FeishuBindStatus>('/api/delivery/feishu/bind/start', { method: 'POST' }),
+  feishuBindStatus: (sessionId: string) =>
+    request<FeishuBindStatus>(`/api/delivery/feishu/bind/${encodeURIComponent(sessionId)}`),
+  feishuUnbind: () =>
+    request<{ ok: boolean; feishuBound: boolean }>('/api/delivery/feishu/bind', { method: 'DELETE' }),
   aiMonitor: () => request<AiMonitor>('/api/ai/monitor'),
   aiMonitorStreamUrl: () => {
     const token = localStorage.getItem('localToken')
