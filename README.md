@@ -59,6 +59,12 @@ Check health anytime:
 ./scripts/status.sh
 ```
 
+Backup the local database (WAL-safe, writes to `data/backups/`):
+
+```bash
+./scripts/backup.sh
+```
+
 Stop the background process started by `install.sh`:
 
 ```bash

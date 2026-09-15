@@ -1,11 +1,13 @@
 import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { Settings } from '../../lib/api'
-import { Button, Card, Field, Input, Select } from '../../components/ui'
-import { useImportPack } from '../../hooks/useImportPack'
+import { api } from '../../lib/api'
+import { errorText } from '../../lib/errors'
+import { formatRelativeInstant } from '../../lib/format'
+import { Button, Card, Field, Input, useToast } from '../../components/ui'
+import { PackPicker } from '../../components/PackPicker'
 import { SettingsField } from './SettingsField'
-
-const PACK_IDS = ['ai-core', 'ai-cn', 'ai-signals'] as const
 
 export function AdvancedSection({
   form,
@@ -20,10 +22,33 @@ export function AdvancedSection({
   onTokenChange: (token: string) => void
   localTokenConfigured?: boolean
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
-  const [packId, setPackId] = useState('ai-core')
-  const importPack = useImportPack({ invalidate: [['settings'], ['sources']] })
+  const qc = useQueryClient()
+  const { push } = useToast()
+  const cleanup = useMutation({
+    mutationFn: api.cleanupJob,
+    onSuccess: (body) => {
+      void qc.invalidateQueries({ queryKey: ['feed'] })
+      const deleted = Number(body?.deletedItems ?? 0)
+      push('success', t('settings.cleanupDone', { count: deleted }))
+    },
+    onError: (e) => push('error', t('common.loadFailed', { message: errorText(e, t) })),
+  })
+  const schedule = useQuery({
+    queryKey: ['jobs-schedule'],
+    queryFn: api.jobsSchedule,
+    enabled: open,
+    retry: 1,
+  })
+  const nextFetch = formatRelativeInstant(schedule.data?.nextFetchAt)
+  const nextPush = formatRelativeInstant(schedule.data?.nextPushAt)
+  const nextFetchAbs = schedule.data?.nextFetchAt
+    ? new Date(schedule.data.nextFetchAt).toLocaleString(i18n.language)
+    : null
+  const nextPushAbs = schedule.data?.nextPushAt
+    ? new Date(schedule.data.nextPushAt).toLocaleString(i18n.language)
+    : null
 
   return (
     <Card padding="none">
@@ -70,6 +95,25 @@ export function AdvancedSection({
               <SettingsField field="timezone" label={t('settings.timezone')} value={form.timezone} patch={patch} />
               <SettingsField field="uiBaseUrl" label={t('settings.uiBaseUrl')} value={form.uiBaseUrl} patch={patch} />
             </div>
+            <p className="mt-2 text-xs text-muted">
+              {t('settings.scheduleLiveHint')}{' '}
+              {nextFetch ? (
+                <span className="font-mono text-ink">
+                  {t('settingsHub.healthNextFetch')}: {nextFetch}
+                  {nextFetchAbs ? ` · ${nextFetchAbs}` : ''}
+                </span>
+              ) : null}
+              {nextFetch && nextPush ? ' · ' : null}
+              {nextPush ? (
+                <span className="font-mono text-ink">
+                  {t('settingsHub.healthNextPush')}: {nextPush}
+                  {nextPushAbs ? ` · ${nextPushAbs}` : ''}
+                </span>
+              ) : null}
+              {schedule.data?.pushCronError ? (
+                <span className="text-ember"> · {schedule.data.pushCronError}</span>
+              ) : null}
+            </p>
           </section>
 
           <section>
@@ -98,6 +142,28 @@ export function AdvancedSection({
           </section>
 
           <section>
+            <h4 className="mb-2 text-sm font-medium text-ink">{t('settings.maintenanceSection')}</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SettingsField
+                field="retentionDays"
+                label={t('settings.retentionDays')}
+                value={form.retentionDays ?? 0}
+                patch={patch}
+                type="number"
+                min={0}
+                max={3650}
+                hint={t('settings.retentionDaysHint')}
+              />
+              <div className="flex items-end">
+                <Button type="button" variant="ghost" onClick={() => cleanup.mutate()}>
+                  {t('settings.runCleanup')}
+                </Button>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted">{t('settings.backupHint')}</p>
+          </section>
+
+          <section>
             <h4 className="mb-2 text-sm font-medium text-ink">{t('settings.securitySection')}</h4>
             <p className="mb-3 text-sm text-muted">
               {t('settings.localTokenServer')}{' '}
@@ -120,28 +186,11 @@ export function AdvancedSection({
 
           <section>
             <h4 className="mb-2 text-sm font-medium text-ink">{t('settings.packSection')}</h4>
-            <div className="flex flex-wrap items-center gap-3">
-              <Select
-                className="w-auto text-sm"
-                value={packId}
-                onChange={(e) => setPackId(e.target.value)}
-                aria-label={t('settings.importPack')}
-              >
-                {PACK_IDS.map((id) => (
-                  <option key={id} value={id}>
-                    {t(`settings.pack.${id}`)}
-                  </option>
-                ))}
-              </Select>
-              <Button
-                type="button"
-                variant="ghost"
-                loading={importPack.isPending}
-                onClick={() => importPack.mutate(packId)}
-              >
-                {importPack.isPending ? t('settings.importing') : t('settings.importPack')}
-              </Button>
-            </div>
+            <PackPicker
+              buttonLabel={t('settings.importPack')}
+              variant="ghost"
+              invalidate={[['settings'], ['sources']]}
+            />
           </section>
         </div>
       ) : null}

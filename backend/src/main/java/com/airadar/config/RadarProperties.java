@@ -18,6 +18,12 @@ public class RadarProperties {
     private int aiParallelism = 1;
     private int fetchParallelism = 8;
     private long fetchIntervalMs = 7_200_000L;
+    /** Delay before the first scheduled fetch after boot (ms). */
+    private long fetchInitialDelayMs = 60_000L;
+    /** Interval between scheduled event-clustering runs (ms). */
+    private long clusterIntervalMs = 3_600_000L;
+    /** Delay before the first scheduled cluster after boot (ms). */
+    private long clusterInitialDelayMs = 120_000L;
     /** HTTP read timeout for RestClient-backed news connectors (ms). */
     private int fetchTimeoutMs = 60_000;
     private String pushCron = "0 0 8 * * *";
@@ -135,6 +141,30 @@ public class RadarProperties {
 
     public void setFetchIntervalMs(long fetchIntervalMs) {
         this.fetchIntervalMs = fetchIntervalMs;
+    }
+
+    public long getFetchInitialDelayMs() {
+        return fetchInitialDelayMs;
+    }
+
+    public void setFetchInitialDelayMs(long fetchInitialDelayMs) {
+        this.fetchInitialDelayMs = fetchInitialDelayMs;
+    }
+
+    public long getClusterIntervalMs() {
+        return clusterIntervalMs;
+    }
+
+    public void setClusterIntervalMs(long clusterIntervalMs) {
+        this.clusterIntervalMs = clusterIntervalMs;
+    }
+
+    public long getClusterInitialDelayMs() {
+        return clusterInitialDelayMs;
+    }
+
+    public void setClusterInitialDelayMs(long clusterInitialDelayMs) {
+        this.clusterInitialDelayMs = clusterInitialDelayMs;
     }
 
     public int getFetchTimeoutMs() {

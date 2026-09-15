@@ -90,7 +90,7 @@ export function Sidebar({
                   to={`/feed?sourceType=${encodeURIComponent(type)}`}
                   className={`flex items-center gap-2 rounded px-2.5 py-1 text-xs hover:bg-border ${count > 0 ? 'font-medium text-ink' : 'text-faint'}`}
                 >
-                  <span className="flex-1 font-mono">{type}</span>
+                  <span className="flex-1 truncate">{t(`sourceType.${type}`, { defaultValue: type })}</span>
                   {count > 0 ? (
                     <span className="font-mono text-[10px] text-moss">{count}</span>
                   ) : null}

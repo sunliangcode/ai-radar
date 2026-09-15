@@ -12,7 +12,7 @@ ai-radar/
 ├── packs/         # Source pack manifests
 ├── docs/          # Extensibility docs
 ├── scripts/       # Smoke and helper scripts
-├── aim/           # Execution plans (historical / internal)
+├── aim/           # Historical iteration notes (not current specs)
 ├── Dockerfile
 ├── docker-compose.yml
 └── install.sh
@@ -29,7 +29,7 @@ Contributions are welcome across:
 - MCP sidecar and pack manifests
 - Docs, tests, and install / Docker experience
 
-Planning notes under `aim/` are historical — prefer updating `CHANGELOG.md` and product docs for user-visible work.
+Notes under `aim/` are historical iteration only — prefer updating `CHANGELOG.md` and product docs for user-visible work.
 
 ## Setup
 

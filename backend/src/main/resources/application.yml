@@ -57,6 +57,9 @@ radar:
   ai-failure-cooldown-ms: ${AI_FAILURE_COOLDOWN_MS:60000}
   fetch-parallelism: 8
   fetch-interval-ms: 7200000
+  fetch-initial-delay-ms: ${RADAR_FETCH_INITIAL_DELAY_MS:60000}
+  cluster-interval-ms: 3600000
+  cluster-initial-delay-ms: 120000
   fetch-timeout-ms: ${FETCH_TIMEOUT_MS:60000}
   push-cron: "0 0 8 * * *"
   timezone: Asia/Shanghai

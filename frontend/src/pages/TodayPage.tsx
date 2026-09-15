@@ -1,23 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useState } from 'react'
 import { api, type ImpactCard } from '../lib/api'
 import { Button, ListSkeleton, PageHeader, StateBox, useToast } from '../components/ui'
+import { PackPicker } from '../components/PackPicker'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { useSources } from '../hooks/useSources'
-import { useImportPack } from '../hooks/useImportPack'
 import { errorText } from '../lib/errors'
 
 export default function TodayPage() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const sources = useSources()
-  const defaultPack = i18n.language.startsWith('zh') ? 'ai-cn' : 'ai-core'
-  const [packId, setPackId] = useState(defaultPack)
 
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['intelligence-home'],
@@ -42,8 +39,6 @@ export default function TodayPage() {
     },
     onError: (err) => pushToast('error', errorText(err, t)),
   })
-
-  const importPack = useImportPack({ successMessage: 'home.gettingStarted.imported' })
 
   const data = home.data
   const sourceCount = sources.data?.length ?? 0
@@ -96,20 +91,10 @@ export default function TodayPage() {
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             {!hasSources ? (
-              <>
-                <select
-                  className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                  value={packId}
-                  onChange={(e) => setPackId(e.target.value)}
-                >
-                  <option value="ai-core">{t('home.pack.ai-core')}</option>
-                  <option value="ai-cn">{t('home.pack.ai-cn')}</option>
-                  <option value="ai-signals">{t('home.pack.ai-signals')}</option>
-                </select>
-                <Button loading={importPack.isPending} onClick={() => importPack.mutate(packId)}>
-                  {t('home.gettingStarted.import')}
-                </Button>
-              </>
+              <PackPicker
+                buttonLabel={t('home.gettingStarted.import')}
+                successMessage="home.gettingStarted.imported"
+              />
             ) : null}
             <Button onClick={runFetch} loading={isPending}>
               {hasSources ? t('common.fetchNow') : t('home.gettingStarted.step2')}

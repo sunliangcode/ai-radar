@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api, type ChangeCard, type Item, type WatchingGroup } from '../lib/api'
-import { Button, EmptyState, ListSkeleton, PageHeader, ScoreBar, StateBox, useToast } from '../components/ui'
+import { api } from '../lib/api'
+import { PageHeader, useToast } from '../components/ui'
 import { useMarkItemRead } from '../hooks/useMarkItemRead'
 import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
-
-const TIMELINE_PREVIEW = 3
+import { TimelineSection, TIMELINE_PREVIEW } from './watching/TimelineSection'
+import { TrackedChangesSection } from './watching/TrackedChangesSection'
+import { SavedItemsSection } from './watching/SavedItemsSection'
 
 export default function WatchingPage() {
   const { t, i18n } = useTranslation()
@@ -19,7 +20,10 @@ export default function WatchingPage() {
   const [showAllTimeline, setShowAllTimeline] = useState(false)
 
   const changes = useQuery({ queryKey: ['changes-watching'], queryFn: () => api.changes(40) })
-  const saved = useQuery({ queryKey: ['watching-saved'], queryFn: () => api.items('?saved=true&sort=score&limit=50') })
+  const saved = useQuery({
+    queryKey: ['watching-saved'],
+    queryFn: () => api.items('?saved=true&sort=score&limit=50'),
+  })
   const timeline = useQuery({ queryKey: ['watching-timeline'], queryFn: api.watchingTimeline })
 
   const patchItem = useMutation({
@@ -65,181 +69,35 @@ export default function WatchingPage() {
         }
       />
 
-      {groups.length > 0 ? (
-        <section className="mb-8">
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-base font-semibold text-ink">{t('watching.timeline')}</h2>
-            {groups.length > TIMELINE_PREVIEW ? (
-              <button
-                type="button"
-                onClick={() => setShowAllTimeline((v) => !v)}
-                className="text-xs text-accent hover:underline"
-              >
-                {showAllTimeline ? t('watching.collapseTimeline') : t('watching.expandTimeline')}
-              </button>
-            ) : null}
-          </div>
-          <div className="space-y-3">
-            {visibleGroups.map((g: WatchingGroup) => (
-              <div key={g.eventId} className="rounded-lg border border-border bg-surface p-4">
-                <div className="flex items-baseline justify-between">
-                  <Link
-                    to={`/changes/${g.eventId}`}
-                    state={{ from: '/watching' }}
-                    className="font-medium text-ink hover:underline"
-                  >
-                    {g.title}
-                  </Link>
-                  <span className="font-mono text-[11px] text-muted">{g.entryCount}</span>
-                </div>
-                <ol className="mt-2 space-y-1.5 border-l-2 border-border pl-3">
-                  {g.entries.map((e) => (
-                    <li key={e.id} className="relative">
-                      <span className="absolute -left-[0.42rem] top-1.5 h-1.5 w-1.5 rounded-full bg-muted" />
-                      <p className="font-mono text-[10px] text-muted">{e.at ? new Date(e.at).toLocaleString(locale) : ''}</p>
-                      <p className="text-sm text-ink">{e.label}</p>
-                      {e.note ? <p className="text-xs text-muted">{e.note}</p> : null}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      <TimelineSection
+        groups={groups}
+        visibleGroups={visibleGroups}
+        showAll={showAllTimeline}
+        locale={locale}
+        onToggleShowAll={() => setShowAllTimeline((v) => !v)}
+      />
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-base font-semibold text-ink">{t('watching.trackedChanges')}</h2>
-        {changes.isLoading ? <ListSkeleton rows={3} /> : null}
-        {changes.isError ? (
-          <StateBox>
-            <p className="mb-3">{t('common.loadFailed', { message: errorText(changes.error, t) })}</p>
-            <Button variant="ghost" onClick={() => void changes.refetch()}>
-              {t('common.retry')}
-            </Button>
-          </StateBox>
-        ) : null}
-        {!changes.isLoading && !changes.isError && tracked.length === 0 ? (
-          <EmptyState title={t('watching.noTracked')} description={t('watching.noTrackedHint')} />
-        ) : null}
-        {!changes.isError && tracked.length > 0 ? (
-          <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
-            {tracked.map((c: ChangeCard) => (
-              <li key={c.id} className="row-py px-4">
-                <div className="flex items-start gap-3">
-                  <div className="pt-0.5">
-                    <ScoreBar score={c.priority ? Math.min(100, Math.round(c.priority / 1000)) : c.score} size="sm" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      to={`/changes/${c.id}`}
-                      state={{ from: '/watching' }}
-                      className="font-medium text-ink hover:underline"
-                    >
-                      {c.title}
-                    </Link>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                      {c.tier ? <span className="font-mono">{c.tier}</span> : null}
-                      <span className="font-mono">
-                        {t('common.itemsCount', { count: c.itemCount ?? 0 })}
-                      </span>
-                      {c.lastUpdatedAt ? (
-                        <span className="font-mono tabular-nums">
-                          {new Date(c.lastUpdatedAt).toLocaleString(locale)}
-                        </span>
-                      ) : null}
-                    </div>
-                    {c.why ? <p className="mt-1 text-sm text-muted">{c.why}</p> : null}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
+      <TrackedChangesSection
+        tracked={tracked}
+        loading={changes.isLoading}
+        error={changes.isError ? changes.error : null}
+        locale={locale}
+        onRetry={() => void changes.refetch()}
+      />
 
-      <section>
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-base font-semibold text-ink">{t('watching.savedItems')}</h2>
-          <span className="font-mono text-xs text-muted">
-            {t('watching.savedCount', { count: savedItems.length })}
-          </span>
-        </div>
-        {saved.isLoading ? <ListSkeleton rows={3} /> : null}
-        {saved.isError ? (
-          <StateBox>
-            <p className="mb-3">{t('common.loadFailed', { message: errorText(saved.error, t) })}</p>
-            <Button variant="ghost" onClick={() => void saved.refetch()}>
-              {t('common.retry')}
-            </Button>
-          </StateBox>
-        ) : null}
-        {!saved.isLoading && !saved.isError && savedItems.length === 0 ? (
-          <EmptyState
-            title={t('watching.noSaved')}
-            description={t('watching.noSavedHint')}
-            primary={
-              <Link to="/feed">
-                <Button>{t('watching.goFeed')}</Button>
-              </Link>
-            }
-          />
-        ) : null}
-        {!saved.isError && savedItems.length > 0 ? (
-          <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
-            {savedItems.map((item: Item) => (
-              <li key={item.id} className="row-py px-4">
-                <div className="flex items-start gap-3">
-                  <div className="pt-0.5 w-12 shrink-0">
-                    <ScoreBar score={item.score} source={item.scoreSource} reason={item.scoreReason} size="sm" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <a
-                      href={item.canonicalUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={() => {
-                        if (!item.read) markItemRead.mutate({ id: item.id, read: true })
-                      }}
-                      className="font-medium text-ink hover:underline"
-                    >
-                      {item.title}
-                    </a>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                      {item.primarySourceType ? <span className="font-mono">{item.primarySourceType}</span> : null}
-                      {item.publishedAt ? (
-                        <span className="font-mono tabular-nums">
-                          {new Date(item.publishedAt).toLocaleDateString(locale)}
-                        </span>
-                      ) : null}
-                      {item.read ? <span className="font-mono">{t('watching.readBadge')}</span> : null}
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {!item.read ? (
-                        <button
-                          type="button"
-                          onClick={() => patchItem.mutate({ id: item.id, read: true })}
-                          className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-border hover:text-ink"
-                        >
-                          {t('common.markRead')}
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        disabled={patchItem.isPending}
-                        onClick={() => patchItem.mutate({ id: item.id, saved: false })}
-                        className="rounded px-1.5 py-0.5 text-xs text-muted hover:bg-border hover:text-ink disabled:opacity-50"
-                      >
-                        {t('watching.unsave')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
+      <SavedItemsSection
+        items={savedItems}
+        loading={saved.isLoading}
+        error={saved.isError ? saved.error : null}
+        locale={locale}
+        patchPending={patchItem.isPending}
+        onRetry={() => void saved.refetch()}
+        onMarkRead={(id) => patchItem.mutate({ id, read: true })}
+        onUnsave={(id) => patchItem.mutate({ id, saved: false })}
+        onOpenExternal={(item) => {
+          if (!item.read) markItemRead.mutate({ id: item.id, read: true })
+        }}
+      />
     </div>
   )
 }

@@ -287,6 +287,7 @@ export type Settings = {
   emailConfigured: boolean
   localTokenConfigured: boolean
   sourceWeights?: Record<string, number>
+  retentionDays?: number
 }
 
 export type AiMonitorCall = {
@@ -437,6 +438,21 @@ export type Health = {
   error?: string
 }
 
+export type JobsSchedule = {
+  fetchIntervalMs: number
+  pushCron: string
+  timezone: string
+  clusterIntervalMs?: number
+  nextFetchAt?: string | null
+  nextPushAt?: string | null
+  nextClusterAt?: string | null
+  lastFetchAt?: string | null
+  lastPushAt?: string | null
+  lastClusterAt?: string | null
+  pushCronError?: string | null
+  running?: boolean
+}
+
 export const api = {
   health: () => request<Health>('/api/health'),
   llmProbe: () => request<LlmProbe>('/api/health/llm'),
@@ -522,9 +538,11 @@ export const api = {
     return request<Record<string, unknown>>(`/api/jobs/fetch${q}`, { method: 'POST' })
   },
   fetchProgress: () => request<FetchProgress>('/api/jobs/fetch/progress'),
+  jobsSchedule: () => request<JobsSchedule>('/api/jobs/schedule'),
   pushJob: () => request<Record<string, unknown>>('/api/jobs/push', { method: 'POST' }),
   clusterJob: () => request<Record<string, unknown>>('/api/jobs/cluster', { method: 'POST' }),
   impactJob: () => request<Record<string, unknown>>('/api/jobs/impact', { method: 'POST' }),
+  cleanupJob: () => request<Record<string, unknown>>('/api/jobs/cleanup', { method: 'POST' }),
   events: (q: string = '') => request<RadarEvent[]>(`/api/events${q}`),
   event: (id: number) => request<RadarEvent>(`/api/events/${id}`),
   changes: (limit: number = 40) => request<ChangeCard[]>(`/api/changes?limit=${limit}`),

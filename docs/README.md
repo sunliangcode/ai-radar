@@ -17,4 +17,4 @@ Also:
 - [Security](../SECURITY.md)
 - [Changelog](../CHANGELOG.md)
 - [Third-party notices (Argos Translate)](../THIRD_PARTY_NOTICES.md)
-- [Roadmap / plans](../aim/README.md)
+- [Historical iteration](../aim/README.md)

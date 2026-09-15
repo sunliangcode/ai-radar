@@ -3,6 +3,7 @@ package com.airadar.settings;
 import com.airadar.config.RadarProperties;
 import com.airadar.persistence.AppSettingsEntity;
 import com.airadar.persistence.AppSettingsRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +25,16 @@ public class SettingsService {
 
     private final RadarProperties properties;
     private final AppSettingsRepository repository;
+    private final ApplicationEventPublisher events;
 
-    public SettingsService(RadarProperties properties, AppSettingsRepository repository) {
+    public SettingsService(
+            RadarProperties properties,
+            AppSettingsRepository repository,
+            ApplicationEventPublisher events
+    ) {
         this.properties = properties;
         this.repository = repository;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -74,6 +81,7 @@ public class SettingsService {
         dto.put("emailConfigured", notBlank(s.smtpHost()) && notBlank(s.smtpTo()));
         dto.put("localTokenConfigured", notBlank(properties.getLocalToken()));
         dto.put("sourceWeights", parseWeights(s.sourceWeightsJson()));
+        dto.put("retentionDays", s.retentionDays() != null ? s.retentionDays() : 0);
         return dto;
     }
 
@@ -204,8 +212,14 @@ public class SettingsService {
                 row.setSourceWeightsJson(null);
             }
         }
+        if (body.containsKey("retentionDays")) {
+            Integer days = asInt(body.get("retentionDays"));
+            row.setRetentionDays(days != null && days < 0 ? 0 : days);
+        }
         repository.save(row);
         applyLiveOverrides(effective());
+        // @Scheduled resolves ${radar.*} once at startup; the job coordinator re-arms on this event.
+        events.publishEvent(new SettingsUpdatedEvent(this));
         return toPublicDto();
     }
 
@@ -318,7 +332,8 @@ public class SettingsService {
                 first(row != null ? row.getSmtpFrom() : null, blankToNull(smtp.getFrom())),
                 firstNonBlank(envOrDb(smtp.getTo(), row != null ? row.getSmtpTo() : null)),
                 firstBool(row != null ? row.getSmtpStarttls() : null, smtp.isStarttls()),
-                row != null ? row.getSourceWeightsJson() : null
+                row != null ? row.getSourceWeightsJson() : null,
+                row != null ? row.getRetentionDays() : null
         );
     }
 
@@ -445,7 +460,8 @@ public class SettingsService {
             String smtpFrom,
             String smtpTo,
             Boolean smtpStarttls,
-            String sourceWeightsJson
+            String sourceWeightsJson,
+            Integer retentionDays
     ) {
     }
 }

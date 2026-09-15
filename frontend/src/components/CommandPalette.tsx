@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { api, type Item } from '../lib/api'
 import { errorText } from '../lib/errors'
+import { formatPushResult, type PushResultBody } from '../lib/formatPushResult'
 import { useMarkItemRead } from '../hooks/useMarkItemRead'
 import { useToast } from './ui'
 
@@ -54,7 +55,34 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'feed', label: t('nav.feed'), hint: '/feed', run: () => navigate('/feed') },
       { id: 'watching', label: t('nav.watching'), hint: '/watching', run: () => navigate('/watching') },
       { id: 'actions', label: t('nav.actions'), hint: '/actions', run: () => navigate('/actions') },
+      { id: 'briefs', label: t('nav.briefs'), hint: '/briefs', run: () => navigate('/briefs') },
       { id: 'settings', label: t('nav.settings'), hint: '/settings', run: () => navigate('/settings') },
+      {
+        id: 'push-now',
+        label: t('common.pushNow'),
+        hint: t('palette.jobs'),
+        run: () => {
+          void api
+            .pushJob()
+            .then((body) => {
+              const result = body as PushResultBody
+              const failed = (result.results ?? []).some((r) => r.success === false && !r.skipped)
+              pushToast(failed ? 'error' : 'success', formatPushResult(result, t))
+            })
+            .catch((err) => pushToast('error', t('common.loadFailed', { message: errorText(err, t) })))
+        },
+      },
+      {
+        id: 'impact-now',
+        label: t('today.recomputeImpact'),
+        hint: t('palette.jobs'),
+        run: () => {
+          void api
+            .impactJob()
+            .then(() => pushToast('success', t('today.impactDone')))
+            .catch((err) => pushToast('error', t('common.loadFailed', { message: errorText(err, t) })))
+        },
+      },
       {
         id: 'mark-all-read',
         label: armed === 'mark-all-read' ? t('feed.markAllReadConfirm') : t('feed.markAllRead'),

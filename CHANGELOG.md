@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `JobScheduleCoordinator` — programmatic fetch / push / cluster schedule that re-arms from live settings; `@Scheduled` no longer freezes `${radar.*}` at boot
+- `GET /api/jobs/schedule` — next/last run times, current cron/interval, and push-cron errors
+- Settings save now hot-reloads the job schedule (no backend restart after changing fetch interval or push cron)
+- Settings notify section + command palette: **Send today's brief** (manual push)
+- Command palette: jump to Briefs, recompute impact, and trigger push
+- Settings → System health shows next auto-fetch / auto-push; Advanced → Schedule shows the live plan after save
+- Settings notify section shows a readable push result (channel / item count / failure reason)
+- Dirty settings forms confirm before in-app navigation (in addition to browser unload)
+- Feed shortcut footer labels each key (`j/k` move, `o` expand, `s` save, …)
+- Optional item retention (`retentionDays`) + `POST /api/jobs/cleanup`; scheduled fetch runs it automatically when enabled
+- `scripts/backup.sh` — WAL-safe SQLite backup into `data/backups/` (keeps last 14)
 - `scripts/status.sh` — local health snapshot (backend, Argos translate, PID files, ports)
 - `scripts/check.sh` — local CI-parity checks (backend tests, frontend lint/test/build, mcp syntax)
 - Settings hub **System health** card (backend / DB / title-translate, same signals as `status.sh`)
@@ -28,6 +39,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Sidebar source filters use localized source-type display names instead of raw enum keys (`HACKER_NEWS` → Hacker News)
 - Zhihu source seed is portable: enable only when the local CLI exists; stop force-pinning a machine-specific `cliPath` over working custom paths
 - Pipeline no longer holds one long SQLite transaction across network/LLM I/O
 - Persist uses bulk URL lookup + `saveAll`; web enrich runs with bounded parallelism

@@ -64,6 +64,7 @@ export default function SettingsPage() {
       smtpTo: form.smtpTo,
       smtpStarttls: form.smtpStarttls,
       sourceWeights: form.sourceWeights,
+      retentionDays: form.retentionDays,
     })
   }
 

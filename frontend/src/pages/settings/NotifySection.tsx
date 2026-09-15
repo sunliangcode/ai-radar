@@ -1,6 +1,9 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import type { Settings } from '../../lib/api'
-import { Card } from '../../components/ui'
+import { api, type Settings } from '../../lib/api'
+import { errorText } from '../../lib/errors'
+import { formatPushResult, type PushResultBody } from '../../lib/formatPushResult'
+import { Button, Card, useToast } from '../../components/ui'
 import { SettingsField } from './SettingsField'
 
 export function NotifySection({
@@ -13,9 +16,27 @@ export function NotifySection({
   smtpPasswordConfigured?: boolean
 }) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const { push } = useToast()
+  const pushNow = useMutation({
+    mutationFn: api.pushJob,
+    onSuccess: (body) => {
+      void qc.invalidateQueries({ queryKey: ['jobs-schedule'] })
+      const result = body as PushResultBody
+      const failed = (result.results ?? []).some((r) => r.success === false && !r.skipped)
+      push(failed ? 'error' : 'success', formatPushResult(result, t))
+    },
+    onError: (e) => push('error', t('common.loadFailed', { message: errorText(e, t) })),
+  })
+
   return (
     <Card>
-      <h3 className="mb-3 font-serif text-lg">{t('settings.notifySection')}</h3>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="font-serif text-lg">{t('settings.notifySection')}</h3>
+        <Button type="button" variant="ghost" loading={pushNow.isPending} onClick={() => pushNow.mutate()}>
+          {pushNow.isPending ? t('common.pushing') : t('common.pushNow')}
+        </Button>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <SettingsField field="feishuWebhookUrl" label={t('settings.feishuWebhook')} value={form.feishuWebhookUrl} patch={patch} />
         <SettingsField field="smtpTo" label={t('settings.smtpTo')} value={form.smtpTo} patch={patch} />

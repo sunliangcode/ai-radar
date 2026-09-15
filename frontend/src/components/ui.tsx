@@ -5,7 +5,7 @@
  *  - providers/  PrefsProvider (theme & density), ToastProvider
  *  - primitives/ Button, Input, Select, Textarea, Field, Card, Badge, Chip,
  *                ProgressBar, Skeleton, States, ConfirmDialog, PageHeader, FormSaveBar
- *  - score/      ScoreBar, legacy ScorePill & ItemRow
+ *  - score/      ScoreBar, legacy ScorePill
  *  - feedback/   FeedbackBar
  *  - fetch/      FetchProgressPanel, FetchResultSummary
  *
@@ -32,7 +32,6 @@ export { FormSaveBar } from './primitives/FormSaveBar'
 
 export { ScoreBar } from './score/ScoreBar'
 export { ScorePill } from './score/ScorePill'
-export { ItemRow } from './score/ItemRow'
 
 export { FeedbackBar } from './feedback/FeedbackBar'
 

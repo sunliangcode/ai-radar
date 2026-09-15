@@ -93,6 +93,10 @@ public class AppSettingsEntity {
     @Column(name = "source_weights_json")
     private String sourceWeightsJson;
 
+    /** Keep news items this many days; null/0 keeps forever. Saved and event-linked items are never deleted. */
+    @Column(name = "retention_days")
+    private Integer retentionDays;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -316,6 +320,14 @@ public class AppSettingsEntity {
 
     public void setSourceWeightsJson(String sourceWeightsJson) {
         this.sourceWeightsJson = sourceWeightsJson;
+    }
+
+    public Integer getRetentionDays() {
+        return retentionDays;
+    }
+
+    public void setRetentionDays(Integer retentionDays) {
+        this.retentionDays = retentionDays;
     }
 
     public Instant getUpdatedAt() {

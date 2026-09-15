@@ -59,6 +59,12 @@ cd ai-radar
 ./scripts/status.sh
 ```
 
+备份本地数据库（WAL 安全，默认写入 `data/backups/`）：
+
+```bash
+./scripts/backup.sh
+```
+
 停止由 `install.sh` 拉起的后台进程：
 
 ```bash

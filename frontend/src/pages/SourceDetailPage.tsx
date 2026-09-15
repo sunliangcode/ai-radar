@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { ItemRow, PageHeader, StateBox } from '../components/ui'
+import { PageHeader, ScoreBar, StateBox } from '../components/ui'
 import { errorText } from '../lib/errors'
 
 function formatConfigValue(value: unknown): string {
@@ -61,13 +61,28 @@ export default function SourceDetailPage() {
       {!s.sampleItems?.length ? <StateBox>{t('sources.noSampleItems')}</StateBox> : null}
       <div className="rounded-xl border border-border bg-surface/70 px-4">
         {s.sampleItems?.map((item) => (
-          <ItemRow
-            key={item.id}
-            title={item.title}
-            score={item.score}
-            summary={item.summary}
-            url={item.canonicalUrl}
-          />
+          <article key={item.id} className="row-py border-b border-border/70 last:border-0">
+            <div className="flex items-start gap-3">
+              <div className="pt-0.5 w-12 shrink-0">
+                <ScoreBar score={item.score} size="sm" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <a
+                  href={item.canonicalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-ink transition duration-150 hover:underline"
+                >
+                  {item.title}
+                </a>
+                {item.summary ? (
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted">
+                    {item.summary}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </article>
         ))}
       </div>
     </div>

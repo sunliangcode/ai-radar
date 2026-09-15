@@ -1,6 +1,8 @@
 package com.airadar.api;
 
+import com.airadar.job.JobScheduleCoordinator;
 import com.airadar.job.RadarJobs;
+import com.airadar.maintenance.RetentionService;
 import com.airadar.pipeline.PipelineResult;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,9 +19,22 @@ import java.util.Map;
 public class JobsController {
 
     private final RadarJobs radarJobs;
+    private final JobScheduleCoordinator scheduleCoordinator;
+    private final RetentionService retentionService;
 
-    public JobsController(RadarJobs radarJobs) {
+    public JobsController(
+            RadarJobs radarJobs,
+            JobScheduleCoordinator scheduleCoordinator,
+            RetentionService retentionService
+    ) {
         this.radarJobs = radarJobs;
+        this.scheduleCoordinator = scheduleCoordinator;
+        this.retentionService = retentionService;
+    }
+
+    @GetMapping("/schedule")
+    public ResponseEntity<Map<String, Object>> schedule() {
+        return ResponseEntity.ok(scheduleCoordinator.snapshot());
     }
 
     @PostMapping("/fetch")
@@ -55,5 +70,10 @@ public class JobsController {
     @PostMapping("/impact")
     public ResponseEntity<Map<String, Object>> impact() {
         return ResponseEntity.ok(radarJobs.runImpact());
+    }
+
+    @PostMapping("/cleanup")
+    public ResponseEntity<Map<String, Object>> cleanup() {
+        return ResponseEntity.ok(retentionService.run());
     }
 }

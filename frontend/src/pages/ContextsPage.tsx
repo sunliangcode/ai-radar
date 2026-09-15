@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type UserContext } from '../lib/api'
 import { Button, FormSaveBar, PageHeader, StateBox, useToast } from '../components/ui'
@@ -69,11 +69,6 @@ export default function ContextsPage() {
     onError: (e) => pushToast('error', errorText(e, t)),
   })
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    save.mutate()
-  }
-
   function discard() {
     if (baseline == null) return
     const parsed = JSON.parse(baseline) as { payload: UserContext['payload']; rawText: string }
@@ -91,7 +86,7 @@ export default function ContextsPage() {
     <div className="space-y-10">
       <PageHeader title={t('contexts.title')} subtitle={t('contexts.subtitle')} />
 
-      <form className="space-y-6" onSubmit={onSubmit}>
+      <div className="space-y-6">
         <section>
           <h3 className="mb-3 font-serif text-lg text-ink">{t('contexts.whoSection')}</h3>
           <div className="space-y-4 rounded-xl border border-border bg-surface/70 p-4">
@@ -211,12 +206,9 @@ export default function ContextsPage() {
               onSave={() => save.mutate()}
               onDiscard={discard}
             />
-            <Button type="submit" loading={save.isPending} disabled={!isDirty}>
-              {save.isPending ? t('common.saving') : t('contexts.confirmSave')}
-            </Button>
           </div>
         </section>
-      </form>
+      </div>
     </div>
   )
 }

@@ -38,6 +38,7 @@
     "fetching": "Updating…",
     "pushing": "Sending…",
     "pushNow": "Send today's brief",
+    "pushDone": "Brief sent",
     "itemsCount": "{{count}} articles",
     "lastFetched": "updated {{time}}",
     "yes": "Yes",
@@ -50,6 +51,7 @@
     "undo": "Undo",
     "confirm": "Confirm",
     "unsavedChanges": "Unsaved changes",
+    "unsavedLeaveConfirm": "You have unsaved changes. Leave this page?",
     "discard": "Discard",
     "notFoundHint": "No page matches this address — the link may be stale or mistyped.",
     "backToToday": "Back to Today",
@@ -77,7 +79,18 @@
   },
   "palette": {
     "placeholder": "Search articles, or type to jump…",
-    "empty": "No matches"
+    "empty": "No matches",
+    "jobs": "jobs"
+  },
+  "push": {
+    "noChannels": "No delivery channel configured — add a Feishu webhook or SMTP under Settings",
+    "noItems": "Nothing to push today",
+    "skipped": "Skipped",
+    "allOk": "Pushed · {{count}} items",
+    "partial": "Partial push {{ok}}/{{failed}} · {{count}} items",
+    "channelOk": "ok {{count}}",
+    "channelFail": "failed",
+    "channelSkipped": "skipped"
   },
   "feed": {
     "title": "Feed",
@@ -111,6 +124,11 @@
     "next": "Next",
     "pageInfo": "Page {{page}} / {{totalPages}}",
     "shortcuts": "Shortcuts:",
+    "keyMove": "move",
+    "keyExpand": "expand",
+    "keySave": "save",
+    "keyRead": "read",
+    "keySearch": "search",
     "save": "Save",
     "unsave": "Unsave",
     "read": "Read",
@@ -195,6 +213,9 @@
     "healthLlmNotConfiguredHint": "No usable LLM detected (no local endpoint and no API key) — scoring and summaries fall back to rules. Configure it under AI model.",
     "healthLlmUntestedHint": "Configured, but no calls yet — run Update now once to verify it responds.",
     "healthLlmFailedHint": "The last model call failed, so scoring and summaries have fallen back to rules.",
+    "healthNextFetch": "Next auto-fetch",
+    "healthNextPush": "Next auto-push",
+    "healthScheduleHint": "Schedule changes apply immediately after save — no restart needed.",
     "healthCli": "CLI check:",
     "howItWorks": "How scoring works",
     "howItWorksBody": "Each item's score stacks two layers: (1) rules — interest-keyword hits, source weight (GitHub/HN boosted), and heat (log stars/points); (2) AI — once an LLM is ready, impact analysis runs on changes. Rule scores are always explainable; the bonus reasons are listed under each item. Without an LLM, the system only ranks and clusters — it will not fabricate templated 'why this matters to you' copy.",
@@ -614,7 +635,14 @@
     "weightsSection": "Source weights (rule-score boost)",
     "weightsHint": "Drag sliders to set the score boost per source (0–20). Leave at 0 for defaults. Save at the bottom to apply immediately.",
     "invalidNumber": "Enter a number",
-    "outOfRange": "Must be between {{min}} and {{max}}"
+    "outOfRange": "Must be between {{min}} and {{max}}",
+    "scheduleLiveHint": "Takes effect immediately after save (no restart). Current plan:",
+    "maintenanceSection": "Data maintenance",
+    "retentionDays": "Keep items for N days (0 = forever)",
+    "retentionDaysHint": "Items older than N days that are not saved and not linked to an event are deleted. Saved items and event evidence stay.",
+    "runCleanup": "Run cleanup now",
+    "cleanupDone": "Cleanup done — removed {{count}} items",
+    "backupHint": "Backup: ./scripts/backup.sh copies data/radar.db safely into data/backups/."
   },
   "sourceType": {
     "ZHIHU": "Zhihu",

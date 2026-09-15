@@ -15,7 +15,7 @@ Not a Maven/npm monorepo — independent packages under one repo:
 | `translate-service/` | Argos Translate en→zh sidecar (Python 3.10+) |
 | `packs/` | Source pack JSON (copied into backend classpath at package time) |
 | `docs/` | Extensibility + ops docs (prefer these over `aim/`) |
-| `aim/` | Historical execution plans — do not treat as current product truth |
+| `aim/` | Historical iteration notes — do not treat as current product truth |
 
 Runtime data lives in `data/` (repo root, used by `install.sh`) and `backend/data/` (when Maven is run from `backend/`). Both are gitignored.
 

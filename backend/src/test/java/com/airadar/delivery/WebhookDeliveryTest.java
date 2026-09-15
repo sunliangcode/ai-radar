@@ -45,7 +45,7 @@ class WebhookDeliveryTest {
                 "http://localhost:8080", true,
                 "http://localhost:11434/v1", "qwen3.5:2b-mlx", 8192, 1024, 1,
                 "", server.url("/hook").toString(), "{\"X-Token\":\"abc\"}",
-                "", 587, "", "", "", true, null
+                "", 587, "", "", "", true, null, null
         ));
 
         WebhookDelivery delivery = new WebhookDelivery(settingsService, RestClient.builder(), new ObjectMapper());

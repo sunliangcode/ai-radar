@@ -20,6 +20,16 @@ Stop:
 
 `stop.sh` reads `data/ai-radar.pid` and `data/argos-translate.pid` (and frees ports `8080` / `8765` if leftover processes are still listening).
 
+Backup the SQLite database (WAL-safe; keeps the last 14 copies under `data/backups/`):
+
+```bash
+./scripts/backup.sh
+# restore: stop the backend, then
+#   cp data/backups/radar-YYYYmmdd-HHMMSS.db data/radar.db
+```
+
+Optional retention: Settings → Advanced → **Keep items for N days** (default `0` = forever). Items older than N days that are not saved and not linked to an event are deleted after each scheduled fetch (and via `POST /api/jobs/cleanup`).
+
 ---
 
 ## Configure
@@ -148,7 +158,7 @@ frontend/    React + Vite + Tailwind
 mcp/         Read-only MCP sidecar
 packs/       Source pack manifests
 docs/        Documentation
-aim/         execution plans
+aim/         historical iteration notes
 Dockerfile / docker-compose.yml / install.sh / stop.sh
 ```
 

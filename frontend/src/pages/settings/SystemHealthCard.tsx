@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { formatRelativeInstant } from '../../lib/format'
 import { Card } from '../../components/ui'
 
 function StatusDot({ ok, warn }: { ok: boolean; warn?: boolean }) {
@@ -38,6 +39,27 @@ function Row({
   )
 }
 
+function ScheduleRow({ label, iso, hint }: { label: string; iso?: string | null; hint?: string }) {
+  const { i18n } = useTranslation()
+  const rel = formatRelativeInstant(iso)
+  const abs = iso ? new Date(iso).toLocaleString(i18n.language) : null
+  const value = rel ? `${rel}${abs ? ` · ${abs}` : ''}` : '—'
+  return (
+    <div className="flex items-start gap-2 py-1.5">
+      <span className="mt-1.5">
+        <StatusDot ok={Boolean(iso)} warn={!iso} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
+          <span className="text-muted">{label}</span>
+          <span className={`font-mono text-xs ${iso ? 'text-moss' : 'text-ember'}`}>{value}</span>
+        </div>
+        {hint ? <p className="mt-0.5 text-xs text-muted">{hint}</p> : null}
+      </div>
+    </div>
+  )
+}
+
 export function SystemHealthCard() {
   const { t } = useTranslation()
   const health = useQuery({
@@ -46,8 +68,15 @@ export function SystemHealthCard() {
     refetchInterval: 30_000,
     retry: 1,
   })
+  const schedule = useQuery({
+    queryKey: ['jobs-schedule'],
+    queryFn: api.jobsSchedule,
+    refetchInterval: 60_000,
+    retry: 1,
+  })
 
   const h = health.data
+  const sched = schedule.data
   const translate = h?.translate
   const translateStatus = translate?.status ?? 'unknown'
   const backendOk = health.isSuccess && h?.status === 'ok'
@@ -82,7 +111,10 @@ export function SystemHealthCard() {
         <button
           type="button"
           className="text-xs text-accent hover:underline"
-          onClick={() => void health.refetch()}
+          onClick={() => {
+            void health.refetch()
+            void schedule.refetch()
+          }}
         >
           {t('settingsHub.healthRefresh')}
         </button>
@@ -137,6 +169,16 @@ export function SystemHealthCard() {
                   ? t('settingsHub.healthTranslateDisabledHint')
                   : translate?.baseUrl
             }
+          />
+          <ScheduleRow
+            label={t('settingsHub.healthNextFetch')}
+            iso={sched?.nextFetchAt}
+            hint={t('settingsHub.healthScheduleHint')}
+          />
+          <ScheduleRow
+            label={t('settingsHub.healthNextPush')}
+            iso={sched?.nextPushAt}
+            hint={sched?.pushCronError ?? (sched ? `${sched.pushCron} · ${sched.timezone}` : undefined)}
           />
         </div>
       ) : null}

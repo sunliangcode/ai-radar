@@ -38,6 +38,7 @@
     "fetching": "更新中…",
     "pushing": "发送中…",
     "pushNow": "发送今日日报",
+    "pushDone": "日报已发送",
     "itemsCount": "{{count}} 条",
     "lastFetched": "上次更新 {{time}}",
     "yes": "是",
@@ -50,6 +51,7 @@
     "undo": "撤销",
     "confirm": "确认",
     "unsavedChanges": "有未保存的更改",
+    "unsavedLeaveConfirm": "有未保存的更改，确定离开吗？",
     "discard": "放弃更改",
     "notFoundHint": "这个地址没有对应的页面，可能是链接过期或输错了。",
     "backToToday": "返回 Today",
@@ -77,7 +79,18 @@
   },
   "palette": {
     "placeholder": "搜索条目，或输入以跳转…",
-    "empty": "没有匹配结果"
+    "empty": "没有匹配结果",
+    "jobs": "任务"
+  },
+  "push": {
+    "noChannels": "未配置通知通道 — 先在设置里填飞书 Webhook 或 SMTP",
+    "noItems": "今日没有可推送的内容",
+    "skipped": "已跳过",
+    "allOk": "推送成功 · {{count}} 条",
+    "partial": "推送部分成功 {{ok}}/{{failed}} · {{count}} 条",
+    "channelOk": "成功 {{count}} 条",
+    "channelFail": "失败",
+    "channelSkipped": "已跳过"
   },
   "feed": {
     "title": "Feed",
@@ -111,6 +124,11 @@
     "next": "下一页",
     "pageInfo": "第 {{page}} / {{totalPages}} 页",
     "shortcuts": "快捷键：",
+    "keyMove": "移动",
+    "keyExpand": "展开",
+    "keySave": "收藏",
+    "keyRead": "已读",
+    "keySearch": "搜索",
     "save": "收藏",
     "unsave": "取消收藏",
     "read": "已读",
@@ -195,6 +213,9 @@
     "healthLlmNotConfiguredHint": "未检测到可用的 LLM（本地端点或 API Key）— 评分与摘要目前用规则模式。去「AI 模型」里配置。",
     "healthLlmUntestedHint": "已配置，但还没有调用记录 — 先跑一次「立即更新」验证连通性。",
     "healthLlmFailedHint": "最近一次模型调用失败，已回落到规则模式。",
+    "healthNextFetch": "下次自动抓取",
+    "healthNextPush": "下次自动推送",
+    "healthScheduleHint": "保存调度设置后立即生效，无需重启。",
     "healthCli": "命令行自检：",
     "howItWorks": "评分是怎么来的",
     "howItWorksBody": "每条条目分数由两部分叠加：(1) 规则——命中你的兴趣词、来源权重（GitHub/HN 加权）、热度（star/points 对数）；(2) AI——LLM 就绪后对变化做影响分析。规则分始终可解释，分数下方会列出加分原因。AI 未就绪时，系统只做规则排序与聚类，不会生成模板化的「为什么对你重要」。",
@@ -614,7 +635,14 @@
     "weightsSection": "来源权重（规则分加分）",
     "weightsHint": "拖动滑块调整每个来源对分数的加分（0–20）。留 0 用默认值。改完点底部保存，立即生效。",
     "invalidNumber": "请输入数字",
-    "outOfRange": "需在 {{min}} ~ {{max}} 之间"
+    "outOfRange": "需在 {{min}} ~ {{max}} 之间",
+    "scheduleLiveHint": "保存后立即生效（无需重启）。当前计划：",
+    "maintenanceSection": "数据维护",
+    "retentionDays": "条目保留天数（0 = 永久）",
+    "retentionDaysHint": "超过 N 天且未收藏、未挂到事件上的条目会被删除。已收藏与事件证据会保留。",
+    "runCleanup": "立即清理",
+    "cleanupDone": "清理完成，删除 {{count}} 条",
+    "backupHint": "备份：./scripts/backup.sh 会把 data/radar.db 安全拷贝到 data/backups/。"
   },
   "sourceType": {
     "ZHIHU": "知乎",

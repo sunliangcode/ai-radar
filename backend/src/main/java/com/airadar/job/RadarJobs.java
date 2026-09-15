@@ -3,6 +3,7 @@ package com.airadar.job;
 import com.airadar.delivery.DeliveryService;
 import com.airadar.event.EventClusterService;
 import com.airadar.impact.ImpactService;
+import com.airadar.maintenance.RetentionService;
 import com.airadar.pipeline.PipelineOrchestrator;
 import com.airadar.pipeline.PipelineRequest;
 import com.airadar.pipeline.PipelineResult;
@@ -10,7 +11,6 @@ import com.airadar.settings.SettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -18,6 +18,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Job entry points. Periodic triggers live in {@link JobScheduleCoordinator} so Settings can
+ * re-arm fetch / push / cluster without a restart ({@code @Scheduled} freezes ${radar.*} at boot).
+ */
 @Component
 public class RadarJobs {
 
@@ -30,6 +34,7 @@ public class RadarJobs {
     private final EventClusterService eventClusterService;
     private final ImpactService impactService;
     private final FetchProgress fetchProgress;
+    private final RetentionService retentionService;
     private final AtomicBoolean clusterRunning = new AtomicBoolean(false);
     private final AtomicBoolean impactRunning = new AtomicBoolean(false);
 
@@ -40,7 +45,8 @@ public class RadarJobs {
             SettingsService settingsService,
             EventClusterService eventClusterService,
             ImpactService impactService,
-            FetchProgress fetchProgress
+            FetchProgress fetchProgress,
+            RetentionService retentionService
     ) {
         this.orchestrator = orchestrator;
         this.deliveryService = deliveryService;
@@ -49,9 +55,9 @@ public class RadarJobs {
         this.eventClusterService = eventClusterService;
         this.impactService = impactService;
         this.fetchProgress = fetchProgress;
+        this.retentionService = retentionService;
     }
 
-    @Scheduled(fixedDelayString = "${radar.fetch-interval-ms:7200000}", initialDelayString = "${radar.fetch-initial-delay-ms:60000}")
     public void scheduledFetch() {
         if (!jobMutex.tryFetch()) {
             log.info("fetch_skipped reason=already_running");
@@ -66,9 +72,13 @@ public class RadarJobs {
         } finally {
             jobMutex.releaseFetch();
         }
+        try {
+            retentionService.run();
+        } catch (Exception e) {
+            log.warn("retention_after_fetch_failed error={}", e.getMessage());
+        }
     }
 
-    @Scheduled(cron = "${radar.push-cron:0 0 8 * * *}", zone = "${radar.timezone:Asia/Shanghai}")
     public void scheduledPush() {
         if (!jobMutex.tryPush()) {
             log.info("push_skipped reason=already_running");
@@ -85,7 +95,6 @@ public class RadarJobs {
         }
     }
 
-    @Scheduled(fixedDelayString = "${radar.cluster-interval-ms:3600000}", initialDelayString = "120000")
     public void scheduledCluster() {
         if (jobMutex.isFetchRunning()) {
             log.info("cluster_skipped reason=fetch_running");

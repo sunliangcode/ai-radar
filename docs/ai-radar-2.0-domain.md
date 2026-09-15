@@ -51,4 +51,4 @@ Context → Signal(Item) → Change ← Event → Impact → Opportunity/Risk �
 
 No vector DB, full knowledge graph, auto-running benchmark agents, new connectors, or multi-tenant SaaS.
 
-See also: [`aim/06-ai-radar-2.0.md`](../aim/06-ai-radar-2.0.md).
+Historical iteration notes: [`aim/README.md`](../aim/README.md).
