@@ -5,7 +5,14 @@ import { api } from '../../lib/api'
 import { errorText } from '../../lib/errors'
 
 /** Lazy-loaded item body for the immersive drawer (Zhihu HTML or plain text). */
-export function ItemDetailBody({ itemId }: { itemId: number }) {
+export function ItemDetailBody({
+  itemId,
+  lead,
+}: {
+  itemId: number
+  /** Optional AI summary shown once above the body (skipped when body repeats it). */
+  lead?: string | null
+}) {
   const { t } = useTranslation()
   const [showAllComments, setShowAllComments] = useState(false)
   const detail = useQuery({
@@ -16,6 +23,7 @@ export function ItemDetailBody({ itemId }: { itemId: number }) {
   if (detail.isLoading) {
     return (
       <div className="space-y-2" aria-busy="true">
+        {lead ? <p className="mb-2 text-sm leading-relaxed text-ink/90">{lead}</p> : null}
         <div className="skeleton h-4 w-2/3" />
         <div className="skeleton h-4 w-full" />
         <div className="skeleton h-4 w-5/6" />
@@ -26,9 +34,12 @@ export function ItemDetailBody({ itemId }: { itemId: number }) {
 
   if (detail.isError) {
     return (
-      <p className="text-xs text-ember">
-        {t('feed.detailError')} {errorText(detail.error, t)}
-      </p>
+      <>
+        {lead ? <p className="mb-4 text-sm leading-relaxed text-ink/90">{lead}</p> : null}
+        <p className="text-xs text-ember">
+          {t('feed.detailError')} {errorText(detail.error, t)}
+        </p>
+      </>
     )
   }
 
@@ -37,10 +48,14 @@ export function ItemDetailBody({ itemId }: { itemId: number }) {
 
   const comments = data.comments ?? []
   const visibleComments = showAllComments ? comments : comments.slice(0, 3)
+  const bodyText = data.kind === 'plain' ? (data.text ?? '').trim() : ''
+  const leadText = (lead ?? '').trim()
+  const showLead = Boolean(leadText) && leadText !== bodyText
 
   if (data.kind === 'zhihu') {
     return (
       <>
+        {showLead ? <p className="mb-4 text-sm leading-relaxed text-ink/90">{leadText}</p> : null}
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
           {data.author ? (
             <span className="flex items-center gap-1.5">
@@ -95,5 +110,10 @@ export function ItemDetailBody({ itemId }: { itemId: number }) {
     )
   }
 
-  return <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{data.text}</p>
+  return (
+    <>
+      {showLead ? <p className="mb-4 text-sm leading-relaxed text-ink/90">{leadText}</p> : null}
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{data.text}</p>
+    </>
+  )
 }

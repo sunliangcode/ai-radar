@@ -96,7 +96,7 @@ function Shell() {
         tabIndex={-1}
         className="px-4 py-5 outline-none md:px-8 md:py-7"
       >
-        <div className="mx-auto max-w-5xl">
+        <div className="mx-auto max-w-6xl">
           <ErrorBoundary>
             <Suspense fallback={<PageFallback />}>
               <Routes>

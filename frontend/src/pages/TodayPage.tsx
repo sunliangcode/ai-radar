@@ -187,6 +187,7 @@ export default function TodayPage() {
                   lead={card.why}
                   score={impactScore(card)}
                   tier={card.tier}
+                  coverLabel={card.tier === 'HIGH' ? 'HIGH' : card.tier === 'MEDIUM' || card.tier === 'MED' ? 'MED' : 'NOW'}
                   selected={card.id === drawerId}
                   dimmed={drawerId != null && card.id !== drawerId}
                   onOpen={() => setDrawerId(card.id)}

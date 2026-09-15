@@ -61,6 +61,9 @@ export function TrackedChangesSection({
               lead={c.why}
               score={changeScore(c)}
               tier={c.tier}
+              coverLabel={
+                c.tier === 'HIGH' ? 'HIGH' : c.tier === 'MEDIUM' || c.tier === 'MED' ? 'MED' : 'CHG'
+              }
               selected={c.id === drawerId}
               dimmed={drawerId != null && c.id !== drawerId}
               onOpen={() => setDrawerId(c.id)}
@@ -78,17 +81,17 @@ export function TrackedChangesSection({
                 </>
               }
               actions={
-                <>
-                  <MagAction onClick={() => setDrawerId(c.id)}>{t('today.heroOpen')}</MagAction>
-                  <Link
-                    to={`/changes/${c.id}`}
-                    state={{ from: '/watching' }}
-                    className="inline-flex items-center rounded-md px-2 py-1 text-xs text-muted transition hover:bg-border hover:text-ink"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {t('today.openChange')} →
-                  </Link>
-                </>
+                <MagAction onClick={() => setDrawerId(c.id)}>{t('today.heroOpen')}</MagAction>
+              }
+              secondaryActions={
+                <Link
+                  to={`/changes/${c.id}`}
+                  state={{ from: '/watching' }}
+                  className="inline-flex items-center rounded-md px-2 py-1 text-xs text-muted transition hover:bg-border hover:text-ink"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {t('today.openChange')} →
+                </Link>
               }
             />
           ))}

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import type { Item } from '../../lib/api'
 
 /**
- * Feed keyboard: j/k move; o/Enter open drawer; s save; m read; / search.
+ * Feed keyboard: j/k move; Enter open original; o open drawer; s save; m read; / search.
  * When the drawer is open, j/k still advances selection (drawer content follows).
  */
 export function useFeedKeyboard({
@@ -49,15 +49,17 @@ export function useFeedKeyboard({
         e.preventDefault()
         const prev = items[Math.max(0, (idx < 0 ? 0 : idx) - 1)]
         if (prev) onSelect(prev.id)
-      } else if (e.key === 'o' || e.key === 'Enter') {
+      } else if (e.key === 'Enter') {
         const cur = items[idx] ?? (selectedId == null ? items[0] : undefined)
         if (cur) {
           e.preventDefault()
-          if (e.shiftKey && e.key === 'Enter') {
-            onOpenExternal(cur)
-          } else {
-            onOpenDrawer(cur.id)
-          }
+          onOpenExternal(cur)
+        }
+      } else if (e.key === 'o') {
+        const cur = items[idx] ?? (selectedId == null ? items[0] : undefined)
+        if (cur) {
+          e.preventDefault()
+          onOpenDrawer(cur.id)
         }
       } else if (e.key === 's') {
         const cur = items[idx]

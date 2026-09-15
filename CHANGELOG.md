@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Feed cards: compact source chip + title-first layout (dropped empty cover band); click opens original URL; drawer shows a clear **Open original** CTA
+- Feed browse UI: 2–3 column waterfall grid, slim chip filters, collapsible shortcuts; Save / Not interested stay primary
+- Magazine MagCard / MagGrid shared by Today and Watching inherit the same cover + waterfall rhythm
+
 ### Added
 
 - Feishu scan-to-bind (Device Authorization Grant): Settings shows a QR code, stores app credentials + open_id, one-click unbind; push prefers IM API with legacy webhook fallback

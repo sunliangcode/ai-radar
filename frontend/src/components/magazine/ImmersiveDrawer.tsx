@@ -11,7 +11,10 @@ export function ImmersiveDrawer({
   open,
   onClose,
   title,
+  titleHref,
+  onTitleNavigate,
   subtitle,
+  headerAction,
   children,
   footer,
   labelledById = 'immersive-drawer-title',
@@ -19,7 +22,12 @@ export function ImmersiveDrawer({
   open: boolean
   onClose: () => void
   title?: ReactNode
+  /** Makes the title a link to the original article. */
+  titleHref?: string
+  onTitleNavigate?: () => void
   subtitle?: ReactNode
+  /** Prominent control in the header (e.g. open original). */
+  headerAction?: ReactNode
   children: ReactNode
   footer?: ReactNode
   labelledById?: string
@@ -71,11 +79,25 @@ export function ImmersiveDrawer({
         <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3 md:px-5">
           <div className="min-w-0 flex-1">
             {title ? (
-              <h2 id={labelledById} className="text-base font-semibold leading-snug text-ink">
-                {title}
-              </h2>
+              titleHref ? (
+                <a
+                  id={labelledById}
+                  href={titleHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={onTitleNavigate}
+                  className="block text-base font-semibold leading-snug text-ink hover:text-accent"
+                >
+                  {title}
+                </a>
+              ) : (
+                <h2 id={labelledById} className="text-base font-semibold leading-snug text-ink">
+                  {title}
+                </h2>
+              )
             ) : null}
             {subtitle ? <div className="mt-1 text-xs text-muted">{subtitle}</div> : null}
+            {headerAction ? <div className="mt-2.5">{headerAction}</div> : null}
           </div>
           <button
             ref={closeRef}

@@ -94,7 +94,7 @@
   },
   "feed": {
     "title": "Feed",
-    "subtitle": "The full signal stream. J/K to move, O for details, S to save, M to read.",
+    "subtitle": "The full signal stream. Enter opens the original; O for in-app details; S save; M read.",
     "searchPlaceholder": "Search title or body…",
     "clearSearch": "Clear search",
     "range": {
@@ -124,7 +124,10 @@
     "next": "Next",
     "pageInfo": "Page {{page}} / {{totalPages}}",
     "shortcuts": "Shortcuts:",
+    "shortcutsShow": "Keyboard shortcuts",
+    "shortcutsHide": "Hide shortcuts",
     "keyMove": "move",
+    "keyOpen": "open original",
     "keyExpand": "open details",
     "keySave": "save",
     "keyRead": "read",
@@ -133,6 +136,7 @@
     "unsave": "Unsave",
     "read": "Read",
     "open": "Open",
+    "openOriginal": "Open original",
     "notInterested": "Not interested",
     "notInterestedDone": "Hidden, and captured a dislike keyword",
     "savedHint": "Saved — extracting interest keywords and checking next actions",

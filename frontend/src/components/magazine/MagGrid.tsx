@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 
-/** Responsive magazine grid: 1 col mobile, 2 cols from lg. */
+/** Waterfall magazine grid: 2 cols mobile, 3 from md (CSS columns). */
 export function MagGrid({
   children,
   className,
@@ -15,7 +15,7 @@ export function MagGrid({
   return (
     <div
       className={cn(
-        'mag-grid grid grid-cols-1 gap-[var(--row-gap,0.75rem)] lg:grid-cols-2',
+        'mag-grid',
         dimmed && 'mag-grid-dimmed',
         className,
       )}

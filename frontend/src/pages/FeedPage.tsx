@@ -14,7 +14,6 @@ import {
   MagCard,
   MagGrid,
   PageHeader,
-  ScoreSourceBadge,
   SourceBadge,
   StateBox,
 } from '../components/ui'
@@ -41,6 +40,7 @@ export default function FeedPage() {
   const locale = dateLocale(i18n.language)
   const listRef = useRef<HTMLDivElement>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['feed'],
@@ -229,22 +229,21 @@ export default function FeedPage() {
                   lead={lead}
                   score={item.score}
                   tier={scoreTier(item.score)}
+                  sourceType={item.primarySourceType}
+                  tags={item.tags}
                   unread={!item.read}
                   selected={item.id === list.selectedId}
                   dimmed={drawerOpen && item.id !== list.selectedId}
+                  href={item.canonicalUrl}
                   onSelect={() => list.setSelectedId(item.id)}
-                  onOpen={() => openDrawer(item.id)}
+                  onOpen={() => actions.markReadOnOpen(item)}
                   meta={
                     <>
-                      <SourceBadge type={item.primarySourceType} />
                       <span className="tabular-nums">
                         {timeAgo(item.publishedAt ?? item.createdAt, locale)}
                       </span>
-                      {item.scoreSource && item.scoreSource !== 'unknown' ? (
-                        <ScoreSourceBadge source={item.scoreSource} />
-                      ) : null}
                       {item.stars != null ? (
-                        <span>
+                        <span className="text-faint">
                           ★
                           {item.stars >= 1000
                             ? `${(item.stars / 1000).toFixed(1)}k`
@@ -254,9 +253,6 @@ export default function FeedPage() {
                           ) : null}
                         </span>
                       ) : null}
-                      {!item.read ? (
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
-                      ) : null}
                       {item.saved ? <span className="text-moss">★</span> : null}
                     </>
                   }
@@ -265,20 +261,26 @@ export default function FeedPage() {
                       <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
                         {item.saved ? t('feed.unsave') : t('feed.save')}
                       </MagAction>
+                      <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
+                        {t('feed.notInterested')}
+                      </MagAction>
+                    </>
+                  }
+                  secondaryActions={
+                    <>
+                      <MagAction
+                        onClick={() => {
+                          list.setSelectedId(item.id)
+                          openDrawer(item.id)
+                        }}
+                      >
+                        {t('feed.expand')}
+                      </MagAction>
                       {!item.read ? (
                         <MagAction onClick={() => actions.markItemSelectedRead(item)}>
                           {t('feed.read')}
                         </MagAction>
                       ) : null}
-                      <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
-                        {t('feed.notInterested')}
-                      </MagAction>
-                      <MagAction
-                        href={item.canonicalUrl}
-                        onClick={() => actions.markReadOnOpen(item)}
-                      >
-                        {t('feed.open')} ↗
-                      </MagAction>
                     </>
                   }
                 />
@@ -292,32 +294,48 @@ export default function FeedPage() {
         <FeedPagination page={list.page} total={list.total} pageSize={PAGE} onChange={list.changePage} />
       ) : null}
 
-      <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-        <span>{t('feed.shortcuts')}</span>
-        <span>
-          <kbd>j</kbd>/<kbd>k</kbd> {t('feed.keyMove')}
-        </span>
-        <span>
-          <kbd>o</kbd> {t('feed.keyExpand')}
-        </span>
-        <span>
-          <kbd>s</kbd> {t('feed.keySave')}
-        </span>
-        <span>
-          <kbd>m</kbd> {t('feed.keyRead')}
-        </span>
-        <span>
-          <kbd>/</kbd> {t('feed.keySearch')}
-        </span>
-        <span>
-          <kbd>⌘K</kbd> {t('nav.search')}
-        </span>
-      </p>
+      <div className="mt-4">
+        <button
+          type="button"
+          className="text-xs text-muted hover:text-ink"
+          aria-expanded={shortcutsOpen}
+          onClick={() => setShortcutsOpen((v) => !v)}
+        >
+          {shortcutsOpen ? t('feed.shortcutsHide') : t('feed.shortcutsShow')}
+        </button>
+        {shortcutsOpen ? (
+          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span>
+              <kbd>j</kbd>/<kbd>k</kbd> {t('feed.keyMove')}
+            </span>
+            <span>
+              <kbd>Enter</kbd> {t('feed.keyOpen')}
+            </span>
+            <span>
+              <kbd>o</kbd> {t('feed.keyExpand')}
+            </span>
+            <span>
+              <kbd>s</kbd> {t('feed.keySave')}
+            </span>
+            <span>
+              <kbd>m</kbd> {t('feed.keyRead')}
+            </span>
+            <span>
+              <kbd>/</kbd> {t('feed.keySearch')}
+            </span>
+            <span>
+              <kbd>⌘K</kbd> {t('nav.search')}
+            </span>
+          </p>
+        ) : null}
+      </div>
 
       <ImmersiveDrawer
         open={drawerOpen && !!selectedItem}
         onClose={closeDrawer}
         title={selectedItem ? selectedItem.titleDisplay || selectedItem.title : undefined}
+        titleHref={selectedItem?.canonicalUrl}
+        onTitleNavigate={() => selectedItem && actions.markReadOnOpen(selectedItem)}
         subtitle={
           selectedItem ? (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -329,6 +347,19 @@ export default function FeedPage() {
                 <span className="font-mono tabular-nums">{Math.round(selectedItem.score)}</span>
               ) : null}
             </div>
+          ) : null
+        }
+        headerAction={
+          selectedItem?.canonicalUrl ? (
+            <a
+              href={selectedItem.canonicalUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => actions.markReadOnOpen(selectedItem)}
+              className="inline-flex items-center rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+            >
+              {t('feed.openOriginal')} ↗
+            </a>
           ) : null
         }
         footer={
@@ -348,22 +379,16 @@ export default function FeedPage() {
               <MagAction
                 href={selectedItem.canonicalUrl}
                 onClick={() => actions.markReadOnOpen(selectedItem)}
+                tone="accent"
               >
-                {t('feed.open')} ↗
+                {t('feed.openOriginal')} ↗
               </MagAction>
               <span className="ml-auto text-[11px] text-faint">{t('magazine.drawerNavHint')}</span>
             </div>
           ) : null
         }
       >
-        {selectedItem ? (
-          <>
-            {selectedItem.summary ? (
-              <p className="mb-4 text-sm leading-relaxed text-ink/90">{selectedItem.summary}</p>
-            ) : null}
-            <ItemDetailBody itemId={selectedItem.id} />
-          </>
-        ) : null}
+        {selectedItem ? <ItemDetailBody itemId={selectedItem.id} lead={selectedItem.summary} /> : null}
       </ImmersiveDrawer>
     </div>
   )

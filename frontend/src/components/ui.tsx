@@ -40,6 +40,7 @@ export { FetchProgressPanel } from './fetch/FetchProgressPanel'
 export { FetchResultSummary } from './fetch/FetchResultSummary'
 
 export { MagCard, MagAction } from './magazine/MagCard'
+export { coverShortLabel, coverSourceClass } from './magazine/magCover'
 export { MagGrid } from './magazine/MagGrid'
 export { ImmersiveDrawer } from './magazine/ImmersiveDrawer'
 export { HeroFocusCard } from './magazine/HeroFocusCard'

@@ -33,7 +33,6 @@ export function SavedItemsSection({
   onRetry,
   onMarkRead,
   onUnsave,
-  onOpenExternal,
 }: {
   items: Item[]
   loading: boolean
@@ -43,7 +42,8 @@ export function SavedItemsSection({
   onRetry: () => void
   onMarkRead: (id: number) => void
   onUnsave: (id: number) => void
-  onOpenExternal: (item: Item) => void
+  /** @deprecated Card click opens href + marks read via onMarkRead. */
+  onOpenExternal?: (item: Item) => void
 }) {
   const { t } = useTranslation()
   const [drawerId, setDrawerId] = useState<number | null>(null)
@@ -87,13 +87,17 @@ export function SavedItemsSection({
               lead={item.summary || item.scoreReason}
               score={item.score}
               tier={scoreTier(item.score)}
+              sourceType={item.primarySourceType}
+              tags={item.tags}
               unread={!item.read}
               selected={item.id === drawerId}
               dimmed={drawerId != null && item.id !== drawerId}
-              onOpen={() => setDrawerId(item.id)}
+              href={item.canonicalUrl}
+              onOpen={() => {
+                if (!item.read) onMarkRead(item.id)
+              }}
               meta={
                 <>
-                  <SourceBadge type={item.primarySourceType} />
                   {item.publishedAt ? (
                     <span className="tabular-nums">{timeAgo(item.publishedAt, locale)}</span>
                   ) : null}
@@ -101,23 +105,20 @@ export function SavedItemsSection({
                 </>
               }
               actions={
+                <MagAction
+                  disabled={patchPending}
+                  onClick={() => onUnsave(item.id)}
+                  tone="ember"
+                >
+                  {t('watching.unsave')}
+                </MagAction>
+              }
+              secondaryActions={
                 <>
+                  <MagAction onClick={() => setDrawerId(item.id)}>{t('feed.expand')}</MagAction>
                   {!item.read ? (
                     <MagAction onClick={() => onMarkRead(item.id)}>{t('common.markRead')}</MagAction>
                   ) : null}
-                  <MagAction
-                    disabled={patchPending}
-                    onClick={() => onUnsave(item.id)}
-                    tone="ember"
-                  >
-                    {t('watching.unsave')}
-                  </MagAction>
-                  <MagAction
-                    href={item.canonicalUrl}
-                    onClick={() => onOpenExternal(item)}
-                  >
-                    {t('feed.open')} ↗
-                  </MagAction>
                 </>
               }
             />
@@ -129,6 +130,10 @@ export function SavedItemsSection({
         open={!!drawerItem}
         onClose={() => setDrawerId(null)}
         title={drawerItem ? drawerItem.titleDisplay || drawerItem.title : undefined}
+        titleHref={drawerItem?.canonicalUrl}
+        onTitleNavigate={() => {
+          if (drawerItem && !drawerItem.read) onMarkRead(drawerItem.id)
+        }}
         subtitle={
           drawerItem ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -137,6 +142,21 @@ export function SavedItemsSection({
                 <span className="tabular-nums">{timeAgo(drawerItem.publishedAt, locale)}</span>
               ) : null}
             </div>
+          ) : null
+        }
+        headerAction={
+          drawerItem?.canonicalUrl ? (
+            <a
+              href={drawerItem.canonicalUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => {
+                if (!drawerItem.read) onMarkRead(drawerItem.id)
+              }}
+              className="inline-flex items-center rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+            >
+              {t('feed.openOriginal')} ↗
+            </a>
           ) : null
         }
         footer={
@@ -157,21 +177,19 @@ export function SavedItemsSection({
               </MagAction>
               <MagAction
                 href={drawerItem.canonicalUrl}
-                onClick={() => onOpenExternal(drawerItem)}
+                onClick={() => {
+                  if (!drawerItem.read) onMarkRead(drawerItem.id)
+                }}
+                tone="accent"
               >
-                {t('feed.open')} ↗
+                {t('feed.openOriginal')} ↗
               </MagAction>
             </div>
           ) : null
         }
       >
         {drawerItem ? (
-          <>
-            {drawerItem.summary ? (
-              <p className="mb-4 text-sm leading-relaxed text-ink/90">{drawerItem.summary}</p>
-            ) : null}
-            <ItemDetailBody itemId={drawerItem.id} />
-          </>
+          <ItemDetailBody itemId={drawerItem.id} lead={drawerItem.summary} />
         ) : null}
       </ImmersiveDrawer>
     </section>
