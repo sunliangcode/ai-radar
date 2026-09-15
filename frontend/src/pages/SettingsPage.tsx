@@ -9,6 +9,7 @@ import { LlmSection } from './settings/LlmSection'
 import { WeightsSection } from './settings/WeightsSection'
 import { NotifySection } from './settings/NotifySection'
 import { AdvancedSection } from './settings/AdvancedSection'
+import { errorText } from '../lib/errors'
 
 export default function SettingsPage() {
   const { t } = useTranslation()
@@ -68,7 +69,7 @@ export default function SettingsPage() {
 
   if (settings.isLoading) return <StateBox>{t('settings.loading')}</StateBox>
   if (settings.isError) {
-    return <StateBox>{t('common.loadFailed', { message: (settings.error as Error).message })}</StateBox>
+    return <StateBox>{t('common.loadFailed', { message: errorText(settings.error, t) })}</StateBox>
   }
 
   return (

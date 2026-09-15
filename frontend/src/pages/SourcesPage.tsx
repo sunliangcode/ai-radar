@@ -10,6 +10,7 @@ import { useSources } from '../hooks/useSources'
 import { useConnectors } from '../hooks/useConnectors'
 import { useImportPack } from '../hooks/useImportPack'
 import { dateLocale } from '../i18n'
+import { errorText } from '../lib/errors'
 
 const LIST_FIELDS = new Set([
   'subreddits',
@@ -92,7 +93,7 @@ export default function SourcesPage() {
             : t('sources.disabledToast'),
       )
     },
-    onError: (e) => pushToast('error', (e as Error).message),
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
   const remove = useMutation({
     mutationFn: api.deleteSource,
@@ -100,7 +101,7 @@ export default function SourcesPage() {
       qc.invalidateQueries({ queryKey: ['sources'] })
       pushToast('success', t('sources.deleted'))
     },
-    onError: (e) => pushToast('error', (e as Error).message),
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
   const importPack = useImportPack()
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
@@ -247,7 +248,7 @@ export default function SourcesPage() {
             <Button type="submit" loading={create.isPending}>
               {create.isPending ? t('common.saving') : t('sources.create')}
             </Button>
-            {create.isError ? <span className="ml-3 text-sm text-ember">{(create.error as Error).message}</span> : null}
+            {create.isError ? <span className="ml-3 text-sm text-ember">{errorText(create.error, t)}</span> : null}
           </div>
         </form>
       ) : null}
@@ -259,6 +260,7 @@ export default function SourcesPage() {
         confirmLabel={t('sources.delete')}
         cancelLabel={t('common.cancel')}
         danger
+        pending={remove.isPending}
         onConfirm={() => {
           const target = deleteTarget
           setDeleteTarget(null)
@@ -269,7 +271,7 @@ export default function SourcesPage() {
 
       {sources.isLoading ? <StateBox>{t('sources.loading')}</StateBox> : null}
       {sources.isError ? (
-        <StateBox>{t('common.loadFailed', { message: (sources.error as Error).message })}</StateBox>
+        <StateBox>{t('common.loadFailed', { message: errorText(sources.error, t) })}</StateBox>
       ) : null}
       {isEmpty && !open ? (
         <EmptyState
@@ -320,17 +322,7 @@ export default function SourcesPage() {
                   variant="ghost"
                   disabled={isPending || !s.enabled}
                   title={s.enabled ? t('sources.testFetchHint') : t('sources.testFetchDisabled')}
-                  onClick={() =>
-                    fetchJob.mutate(
-                      { sourceType: s.type },
-                      {
-                        onSuccess: async () => {
-                          await dismiss()
-                        },
-                        onError: () => dismiss(),
-                      },
-                    )
-                  }
+                  onClick={() => fetchJob.mutate({ sourceType: s.type })}
                 >
                   {isPending ? t('common.fetching') : t('sources.testFetch')}
                 </Button>

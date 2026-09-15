@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api, type ActionCard } from '../lib/api'
 import { FeedbackBar } from '../components/feedback/FeedbackBar'
 import { EmptyState, ListSkeleton, PageHeader, StateBox, StatusBadge, useToast } from '../components/ui'
+import { errorText } from '../lib/errors'
 
 type Filter = 'open' | 'watching' | 'started' | 'useful' | 'ignored' | 'all'
 
@@ -58,7 +59,7 @@ export default function ActionsPage() {
 
       {actions.isLoading ? <ListSkeleton rows={4} /> : null}
       {actions.isError ? (
-        <StateBox>{t('common.loadFailed', { message: (actions.error as Error).message })}</StateBox>
+        <StateBox>{t('common.loadFailed', { message: errorText(actions.error, t) })}</StateBox>
       ) : null}
       {!actions.isLoading && visibleStatuses.every((s) => !(grouped[s]?.length)) ? (
         <EmptyState title={t('actions.empty')} description={t('actions.emptyHint')} />
@@ -100,7 +101,7 @@ function ActionRow({ action }: { action: ActionCard }) {
       await qc.invalidateQueries({ queryKey: ['actions'] })
       pushToast('success', t('actions.statusUpdated'))
     },
-    onError: (err) => pushToast('error', t('common.loadFailed', { message: (err as Error).message })),
+    onError: (err) => pushToast('error', t('common.loadFailed', { message: errorText(err, t) })),
   })
 
   const status = action.status ?? 'open'

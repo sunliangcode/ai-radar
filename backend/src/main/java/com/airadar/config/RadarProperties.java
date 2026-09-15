@@ -25,6 +25,11 @@ public class RadarProperties {
     private String uiBaseUrl = "http://localhost:8080";
     private boolean pushOnlyWhenItems = true;
     private String localToken = "";
+    /**
+     * After a live-LLM failure, skip further live calls for this long and use heuristics directly.
+     * Avoids paying the retry ladder for every batch when the endpoint is simply down.
+     */
+    private long aiFailureCooldownMs = 60_000L;
     private final OpenAi openai = new OpenAi();
     private final Github github = new Github();
     private final ProductHunt producthunt = new ProductHunt();
@@ -33,6 +38,7 @@ public class RadarProperties {
     private final WebFetch webFetch = new WebFetch();
     private String rsshubBase = "https://rsshub.umzzz.com";
     private final Delivery delivery = new Delivery();
+    private final Translate translate = new Translate();
 
     public int getScoreThreshold() {
         return scoreThreshold;
@@ -184,6 +190,14 @@ public class RadarProperties {
         this.localToken = localToken;
     }
 
+    public long getAiFailureCooldownMs() {
+        return aiFailureCooldownMs;
+    }
+
+    public void setAiFailureCooldownMs(long aiFailureCooldownMs) {
+        this.aiFailureCooldownMs = Math.max(0L, aiFailureCooldownMs);
+    }
+
     public OpenAi getOpenai() {
         return openai;
     }
@@ -218,6 +232,68 @@ public class RadarProperties {
 
     public Delivery getDelivery() {
         return delivery;
+    }
+
+    public Translate getTranslate() {
+        return translate;
+    }
+
+    public static class Translate {
+        /** When false, titles are not sent to the Argos sidecar. */
+        private boolean enabled = true;
+        private String baseUrl = "http://127.0.0.1:8765";
+        private String from = "en";
+        private String to = "zh";
+        private int connectTimeoutMs = 2_000;
+        private int readTimeoutMs = 15_000;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getFrom() {
+            return from;
+        }
+
+        public void setFrom(String from) {
+            this.from = from;
+        }
+
+        public String getTo() {
+            return to;
+        }
+
+        public void setTo(String to) {
+            this.to = to;
+        }
+
+        public int getConnectTimeoutMs() {
+            return connectTimeoutMs;
+        }
+
+        public void setConnectTimeoutMs(int connectTimeoutMs) {
+            this.connectTimeoutMs = connectTimeoutMs;
+        }
+
+        public int getReadTimeoutMs() {
+            return readTimeoutMs;
+        }
+
+        public void setReadTimeoutMs(int readTimeoutMs) {
+            this.readTimeoutMs = readTimeoutMs;
+        }
     }
 
     public static class OpenAi {

@@ -37,6 +37,7 @@ class OpenAiCompatibleAiServiceSerialTest {
         props.getOpenai().setBaseUrl(server.url("v1").toString().replaceAll("/$", ""));
         props.getOpenai().setApiKey("sk-test");
         props.getOpenai().setModel("test-model");
+        props.getOpenai().setKeepAlive("5m");
         props.setSummaryLanguage("en");
 
         InterestSignalsService interest = mock(InterestSignalsService.class);
@@ -49,7 +50,8 @@ class OpenAiCompatibleAiServiceSerialTest {
                 props,
                 interest,
                 new AiCallMonitor(),
-                new AiCallGate()
+                new AiCallGate(),
+                new AiHealthTracker()
         );
     }
 

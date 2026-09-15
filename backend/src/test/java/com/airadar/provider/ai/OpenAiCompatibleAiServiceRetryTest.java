@@ -48,7 +48,8 @@ class OpenAiCompatibleAiServiceRetryTest {
                 props,
                 interest,
                 new AiCallMonitor(),
-                new AiCallGate()
+                new AiCallGate(),
+                new AiHealthTracker()
         );
     }
 

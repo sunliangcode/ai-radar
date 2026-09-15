@@ -1,4 +1,19 @@
 services:
+  argos-translate:
+    build: ./translate-service
+    ports:
+      - "8765:8765"
+    volumes:
+      # Persist Argos package cache / installed models across rebuilds when needed
+      - argos-data:/root/.local/share/argos-translate
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8765/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
   ai-radar:
     build: .
     ports:
@@ -10,8 +25,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:sqlite:file:/app/data/radar.db?journal_mode=WAL&busy_timeout=30000&foreign_keys=on
       RADAR_BRIEFS_DIR: /app/data/briefs
       RADAR_UI_BASE_URL: http://localhost:8080
+      RADAR_TRANSLATE_URL: http://argos-translate:8765
+      RADAR_TRANSLATE_ENABLED: "true"
     volumes:
       - ./data:/app/data
+    depends_on:
+      argos-translate:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
@@ -19,3 +39,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+
+volumes:
+  argos-data:

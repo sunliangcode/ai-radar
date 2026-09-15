@@ -33,11 +33,27 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     invalidateKeysRef.current = onSuccessInvalidate ?? DEFAULT_INVALIDATE
   }, [onSuccessInvalidate])
 
+  /**
+   * Refresh everything the job may have changed, without touching the visible phase.
+   *
+   * <p>Callers used to call {@link dismiss} right after a job finished, which also reset the phase
+   * to {@code idle} — so the fetch result summary (kept/failed counts, "retry failed sources")
+   * flashed for a single frame and was never readable.
+   */
+  const invalidateAll = useCallback(async () => {
+    for (const key of invalidateKeysRef.current) {
+      await qc.invalidateQueries({ queryKey: key })
+    }
+    await qc.invalidateQueries({ queryKey: PROGRESS_KEY })
+  }, [qc])
+
   const finishFromJob = useCallback(async () => {
     const finalSnap = await api.fetchProgress().catch(() => qc.getQueryData<FetchProgress>(PROGRESS_KEY))
     setSummaryProgress(finalSnap ?? EMPTY_PROGRESS)
     setPhase('summary')
-  }, [qc])
+    // Keep the summary on screen; the user dismisses it when done reading.
+    void invalidateAll()
+  }, [invalidateAll, qc])
 
   const fetchJob = useMutation({
     mutationFn: (opts?: { sourceType?: string }) => api.fetchJob(opts),
@@ -113,14 +129,11 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
   }, [polling, qc])
 
   const dismiss = useCallback(async () => {
-    for (const key of invalidateKeysRef.current) {
-      await qc.invalidateQueries({ queryKey: key })
-    }
-    await qc.invalidateQueries({ queryKey: PROGRESS_KEY })
+    await invalidateAll()
     setSummaryProgress(null)
     setJobError(null)
     setPhase('idle')
-  }, [qc])
+  }, [invalidateAll])
 
   const liveProgress: FetchProgress | undefined =
     progressQuery.data ?? (polling ? EMPTY_PROGRESS : undefined)

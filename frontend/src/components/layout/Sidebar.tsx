@@ -1,6 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Activity, ArrowRight, List, Newspaper, Search, Settings, Star } from 'lucide-react'
+import { Activity, ArrowRight, FileText, List, Newspaper, Search, Settings, Star } from 'lucide-react'
 import { LanguageSwitcher, ThemeDensityControls } from './PrefsControls'
 
 const NAV_ICONS = {
@@ -9,6 +9,7 @@ const NAV_ICONS = {
   '/feed': List,
   '/watching': Star,
   '/actions': ArrowRight,
+  '/briefs': FileText,
   '/settings': Settings,
 } as const
 
@@ -31,6 +32,7 @@ export function Sidebar({
     { to: '/feed', label: t('nav.feed'), end: false },
     { to: '/watching', label: t('nav.watching'), end: false },
     { to: '/actions', label: t('nav.actions'), end: false },
+    { to: '/briefs', label: t('nav.briefs'), end: false },
     { to: '/settings', label: t('nav.settings'), end: false },
   ]
 

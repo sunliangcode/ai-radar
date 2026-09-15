@@ -19,6 +19,8 @@ import com.airadar.provider.ai.AiCallMonitor;
 import com.airadar.provider.ai.AiService;
 import com.airadar.provider.ai.ScoreResult;
 import com.airadar.provider.ai.SummarizeResult;
+import com.airadar.provider.translate.TitleLocale;
+import com.airadar.provider.translate.TitleTranslator;
 import com.airadar.provider.webfetch.WebContentFetcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +59,7 @@ public class PipelineOrchestrator {
     private final WebContentFetcher webContentFetcher;
     private final TransactionTemplate transactionTemplate;
     private final AiCallMonitor aiCallMonitor;
+    private final TitleTranslator titleTranslator;
 
     public PipelineOrchestrator(
             SourceRepository sourceRepository,
@@ -71,7 +74,8 @@ public class PipelineOrchestrator {
             FetchProgress fetchProgress,
             WebContentFetcher webContentFetcher,
             TransactionTemplate transactionTemplate,
-            AiCallMonitor aiCallMonitor
+            AiCallMonitor aiCallMonitor,
+            TitleTranslator titleTranslator
     ) {
         this.sourceRepository = sourceRepository;
         this.newsItemRepository = newsItemRepository;
@@ -86,6 +90,7 @@ public class PipelineOrchestrator {
         this.webContentFetcher = webContentFetcher;
         this.transactionTemplate = transactionTemplate;
         this.aiCallMonitor = aiCallMonitor;
+        this.titleTranslator = titleTranslator;
     }
 
     /**
@@ -386,9 +391,6 @@ public class PipelineOrchestrator {
                 try {
                     SummarizeResult result = aiService.summarizeDetailed(item);
                     item.setSummary(result.summary());
-                    if (result.titleDisplay() != null && !result.titleDisplay().isBlank()) {
-                        item.setTitleDisplay(result.titleDisplay());
-                    }
                 } catch (Exception e) {
                     log.warn("ai_summary_item_failed title={} error={}", item.getTitle(), e.getMessage());
                     item.setSummary(fallbackSummary(item));
@@ -396,6 +398,7 @@ public class PipelineOrchestrator {
             } else if (item.getSummary() == null || item.getSummary().isBlank()) {
                 item.setSummary(fallbackSummary(item));
             }
+            applyTitleDisplay(item);
             item.setUpdatedAt(Instant.now());
             persistOne(item);
             if (translating) {
@@ -407,7 +410,38 @@ public class PipelineOrchestrator {
     }
 
     /**
-     * True when this kept item still needs an LLM summarize/translate call.
+     * Fills {@code titleDisplay} via Argos when primary language is zh and the title looks English.
+     * Does not overwrite an existing display title; failures leave the original title for the UI.
+     */
+    private void applyTitleDisplay(NewsItem item) {
+        if (item == null) {
+            return;
+        }
+        if (item.getTitleDisplay() != null && !item.getTitleDisplay().isBlank()) {
+            return;
+        }
+        if (!"zh".equalsIgnoreCase(properties.getSummaryLanguage())) {
+            return;
+        }
+        if (!TitleLocale.needsEnToZh(item.getTitle())) {
+            return;
+        }
+        RadarProperties.Translate cfg = properties.getTranslate();
+        if (!cfg.isEnabled()) {
+            return;
+        }
+        try {
+            String translated = titleTranslator.translate(item.getTitle(), cfg.getFrom(), cfg.getTo());
+            if (translated != null && !translated.isBlank()) {
+                item.setTitleDisplay(translated.trim());
+            }
+        } catch (Exception e) {
+            log.warn("title_translate_failed title={} error={}", item.getTitle(), e.getMessage());
+        }
+    }
+
+    /**
+     * True when this kept item still needs an LLM summarize call.
      * Hydrates summary/titleDisplay from DB when present so repeats are skipped.
      */
     private boolean needsAiTranslate(NewsItem item, java.util.Set<NewsItem> kept) {

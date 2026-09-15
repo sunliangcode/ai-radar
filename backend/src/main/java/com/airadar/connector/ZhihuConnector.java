@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,6 +34,26 @@ public class ZhihuConnector implements SourceConnector {
     public static final String DEFAULT_SOURCE_NAME = "知乎推荐";
     public static final int DEFAULT_LIMIT = 5;
     public static final int DEFAULT_COMMENT_LIMIT = 10;
+
+    /** Env override, else the historical machine-local default. */
+    public static String preferredCliPath() {
+        String fromEnv = System.getenv("ZHIHU_CLI_PATH");
+        if (fromEnv != null && !fromEnv.isBlank()) {
+            return fromEnv.trim();
+        }
+        return DEFAULT_CLI;
+    }
+
+    public static boolean isCliExecutable(String path) {
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+        try {
+            return Files.isExecutable(Path.of(path.trim()));
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     private static final Duration TIMEOUT = Duration.ofSeconds(120);
     private static final Pattern ANSI = Pattern.compile("\\u001B\\[[;\\d]*[A-Za-z]");

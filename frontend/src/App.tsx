@@ -1,22 +1,51 @@
-import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import ActionsPage from './pages/ActionsPage'
-import BriefDetailPage from './pages/BriefDetailPage'
-import ChangeDetailPage from './pages/ChangeDetailPage'
-import ContextsPage from './pages/ContextsPage'
-import FeedPage from './pages/FeedPage'
-import SettingsPage from './pages/SettingsPage'
-import SettingsHubPage from './pages/SettingsHubPage'
-import SourceDetailPage from './pages/SourceDetailPage'
-import SourcesPage from './pages/SourcesPage'
-import TodayPage from './pages/TodayPage'
-import WatchingPage from './pages/WatchingPage'
-import AiMonitorPage from './pages/AiMonitorPage'
-import { PrefsProvider, ToastProvider } from './components/ui'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { PrefsProvider, StateBox, ToastProvider } from './components/ui'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Sidebar } from './components/layout/Sidebar'
 import { CommandPalette } from './components/CommandPalette'
 import { useSources } from './hooks/useSources'
 import { useUnreadCounts } from './hooks/useUnreadCounts'
+
+// Route-level code splitting: each page is a separate chunk so the shell and
+// Today page load without pulling in every other route's code.
+const ActionsPage = lazy(() => import('./pages/ActionsPage'))
+const BriefDetailPage = lazy(() => import('./pages/BriefDetailPage'))
+const ChangeDetailPage = lazy(() => import('./pages/ChangeDetailPage'))
+const ContextsPage = lazy(() => import('./pages/ContextsPage'))
+const FeedPage = lazy(() => import('./pages/FeedPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const SettingsHubPage = lazy(() => import('./pages/SettingsHubPage'))
+const SourceDetailPage = lazy(() => import('./pages/SourceDetailPage'))
+const SourcesPage = lazy(() => import('./pages/SourcesPage'))
+const TodayPage = lazy(() => import('./pages/TodayPage'))
+const WatchingPage = lazy(() => import('./pages/WatchingPage'))
+const AiMonitorPage = lazy(() => import('./pages/AiMonitorPage'))
+const BriefsPage = lazy(() => import('./pages/BriefsPage'))
+
+function NotFoundPage() {
+  const { t } = useTranslation()
+  return (
+    <StateBox>
+      <h3 className="text-lg font-medium text-ink">{t('common.notFound')}</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm text-muted">{t('common.notFoundHint')}</p>
+      <Link to="/" className="mt-4 inline-block text-sm text-accent hover:underline">
+        {t('common.backToToday')}
+      </Link>
+    </StateBox>
+  )
+}
+
+function PageFallback() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading">
+      <div className="h-7 w-40 animate-pulse rounded bg-border/60" />
+      <div className="h-4 w-64 max-w-full animate-pulse rounded bg-border/40" />
+      <div className="h-40 animate-pulse rounded-lg bg-border/40" />
+    </div>
+  )
+}
 
 function Shell() {
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -68,29 +97,35 @@ function Shell() {
         className="px-4 py-5 outline-none md:px-8 md:py-7"
       >
         <div className="mx-auto max-w-4xl">
-          <Routes>
-            <Route path="/monitor" element={<AiMonitorPage />} />
-            <Route path="/" element={<TodayPage />} />
-            <Route path="/feed" element={<FeedPage />} />
-            <Route path="/watching" element={<WatchingPage />} />
-            <Route path="/settings" element={<SettingsHubPage />} />
-            <Route path="/settings/context" element={<ContextsPage />} />
-            <Route path="/settings/sources" element={<SourcesPage />} />
-            <Route path="/settings/sources/:id" element={<SourceDetailPage />} />
-            <Route path="/settings/llm" element={<SettingsPage />} />
-            <Route path="/changes/:id" element={<ChangeDetailPage />} />
-            <Route path="/actions" element={<ActionsPage />} />
-            <Route path="/briefs/:date" element={<BriefDetailPage />} />
-            {/* Legacy redirects */}
-            <Route path="/changes" element={<Navigate to="/feed" replace />} />
-            <Route path="/items" element={<Navigate to="/feed" replace />} />
-            <Route path="/contexts" element={<Navigate to="/settings/context" replace />} />
-            <Route path="/sources" element={<Navigate to="/settings/sources" replace />} />
-            <Route path="/sources/:id" element={<SourceIdRedirect />} />
-            <Route path="/events" element={<Navigate to="/feed" replace />} />
-            <Route path="/events/:id" element={<EventRedirect />} />
-            <Route path="/briefs" element={<Navigate to="/" replace />} />
-          </Routes>
+          <ErrorBoundary>
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route path="/monitor" element={<AiMonitorPage />} />
+                <Route path="/" element={<TodayPage />} />
+                <Route path="/feed" element={<FeedPage />} />
+                <Route path="/watching" element={<WatchingPage />} />
+                <Route path="/settings" element={<SettingsHubPage />} />
+                <Route path="/settings/context" element={<ContextsPage />} />
+                <Route path="/settings/sources" element={<SourcesPage />} />
+                <Route path="/settings/sources/:id" element={<SourceDetailPage />} />
+                <Route path="/settings/llm" element={<SettingsPage />} />
+                <Route path="/changes/:id" element={<ChangeDetailPage />} />
+                <Route path="/actions" element={<ActionsPage />} />
+                <Route path="/briefs/:date" element={<BriefDetailPage />} />
+                <Route path="/briefs" element={<BriefsPage />} />
+                {/* Legacy redirects */}
+                <Route path="/changes" element={<Navigate to="/feed" replace />} />
+                <Route path="/items" element={<Navigate to="/feed" replace />} />
+                <Route path="/contexts" element={<Navigate to="/settings/context" replace />} />
+                <Route path="/sources" element={<Navigate to="/settings/sources" replace />} />
+                <Route path="/sources/:id" element={<SourceIdRedirect />} />
+                <Route path="/events" element={<Navigate to="/feed" replace />} />
+                <Route path="/events/:id" element={<EventRedirect />} />
+                {/* Unknown URLs used to render a blank main area with no explanation. */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />

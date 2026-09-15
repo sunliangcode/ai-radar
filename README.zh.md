@@ -15,7 +15,7 @@ AI Radar 不只是告诉你 AI 世界发生了什么，而是告诉你哪些变�
 
 [演示](#演示) · [快速开始](#快速开始) · [文档](#文档)
 
-**技术栈：** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI 兼容 LLM（默认本地 Ollama）
+**技术栈：** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI 兼容 LLM（默认本地 Ollama） · Argos Translate（英→中标题）
 
 ## 演示
 
@@ -53,6 +53,12 @@ cd ai-radar
 
 打开 [http://localhost:8080](http://localhost:8080)。
 
+随时查看健康状态：
+
+```bash
+./scripts/status.sh
+```
+
 停止由 `install.sh` 拉起的后台进程：
 
 ```bash
@@ -64,7 +70,7 @@ Docker、开发模式、环境变量与推送渠道见：[docs/installation.md](
 ## 核心能力
 
 - **个人 Context** — 画像、项目与技术栈，相关性围绕「你」，而不是全球热榜。
-- **主语言** — 摘要与展示标题支持中文 / 英文；有 AI 时英文源会按主语言本地化。
+- **主语言** — 摘要由 LLM 按中文 / 英文生成；英文标题经本地 **Argos Translate** 侧车译为中文展示，不再占用 LLM。
 - **实时 Feed** — 每条一句话 AI 总结；分析完一条就能在列表里看到一条。
 - **喜欢 / 不喜欢关键词** — 收藏或不感兴趣会写入偏好短语，可在设置中增删。
 - **变化发现** — 重要外部变化，而不是无尽原始信息流。
@@ -87,6 +93,8 @@ Docker、开发模式、环境变量与推送渠道见：[docs/installation.md](
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+第三方翻译依赖（Argos Translate / 模型）：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## Star History
 

@@ -18,7 +18,7 @@ export default defineConfig({
   },
   build: {
     outDir: embed
-      ? path.resolve(__dirname, '../backend/src/main/resources/static')
+      ? path.resolve(import.meta.dirname, '../backend/src/main/resources/static')
       : 'dist',
     emptyOutDir: true,
   },

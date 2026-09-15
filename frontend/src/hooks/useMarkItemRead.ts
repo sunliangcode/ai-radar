@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { useTranslation } from 'react-i18next'
 import { api, type Item } from '../lib/api'
 import { useToast } from '../components/ui'
+import { errorText } from '../lib/errors'
 
 type FeedPageData = { items: Item[]; total: number; offset?: number; limit?: number }
 
@@ -65,7 +66,7 @@ export function useMarkItemRead() {
       })
     },
     onError: (err) => {
-      pushToast('error', t('common.loadFailed', { message: (err as Error).message }))
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
     },
   })
 }

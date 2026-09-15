@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { FeedbackBar } from '../components/feedback/FeedbackBar'
 import { PageHeader, ScorePill, StateBox, StatusBadge } from '../components/ui'
 import { dateLocale } from '../i18n'
+import { errorText } from '../lib/errors'
 
 type LocationState = { from?: string }
 
@@ -34,7 +35,7 @@ export default function ChangeDetailPage() {
   }
 
   if (q.isLoading) return <StateBox>{t('changes.loading')}</StateBox>
-  if (q.isError) return <StateBox>{t('common.loadFailed', { message: (q.error as Error).message })}</StateBox>
+  if (q.isError) return <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox>
   if (!q.data) return <StateBox>{t('common.notFound')}</StateBox>
 
   const c = q.data

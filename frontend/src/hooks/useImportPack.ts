@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { useToast } from '../components/providers/ToastProvider'
+import { errorText } from '../lib/errors'
 
 /**
  * Import a curated source pack. Replaces the near-identical mutations that
@@ -23,6 +24,6 @@ export function useImportPack(options?: {
       }
       push('success', t(options?.successMessage ?? 'settings.packImported'))
     },
-    onError: (e) => push('error', (e as Error).message),
+    onError: (e) => push('error', errorText(e, t)),
   })
 }

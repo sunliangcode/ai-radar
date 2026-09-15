@@ -29,6 +29,10 @@
 5. [04-event-intelligence.md](./04-event-intelligence.md) — 事件演化与情报
 6. [05-extensibility.md](./05-extensibility.md) — 插件 / MCP / 市场预埋
 7. [06-ai-radar-2.0.md](./06-ai-radar-2.0.md) — AI Radar 2.0（个人决策系统）
+8. [07-usability-pass.md](./07-usability-pass.md) — 易用性打磨（可移植 Zhihu 种子、status 脚本、安装健康检查）
+9. [08-system-health-ui.md](./08-system-health-ui.md) — 设置页系统状态卡片与本地 check 脚本
+10. [09-performance-and-dead-ends.md](./09-performance-and-dead-ends.md) — 首屏拆包、空态与网络错误可读化
+11. [10-usability-hardening.md](./10-usability-hardening.md) — AI 可见性、Impact 触达、静默失败与安装加固
 
 **建议实现顺序严格按 01 → 05**；每步通过验收后再进入下一步。步骤 6 在 1.0 底盘之上推进，长文背景见 [AI_Radar_新思路.md](./AI_Radar_新思路.md)。
 
@@ -132,6 +136,10 @@ ai-intelligence-radar/
 | 4 事件情报 | [04-event-intelligence.md](./04-event-intelligence.md) | 已实现 |
 | 5 扩展预埋 | [05-extensibility.md](./05-extensibility.md) | 已实现 |
 | 6 AI Radar 2.0 | [06-ai-radar-2.0.md](./06-ai-radar-2.0.md) | 已实现（MVP） |
+| 7 易用性打磨 | [07-usability-pass.md](./07-usability-pass.md) | 已完成 |
+| 8 系统状态可见性 | [08-system-health-ui.md](./08-system-health-ui.md) | 已完成 |
+| 9 性能与空态 | [09-performance-and-dead-ends.md](./09-performance-and-dead-ends.md) | 已完成 |
+| 10 易用性加固 | [10-usability-hardening.md](./10-usability-hardening.md) | 已完成 |
 
 ## 每个步骤文件的固定结构
 

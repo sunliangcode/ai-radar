@@ -33,7 +33,7 @@ Planning notes under `aim/` are historical — prefer updating `CHANGELOG.md` an
 
 ## Setup
 
-Requires **Java 21**, **Node 20+**, and optionally an OpenAI-compatible API key.
+Requires **Java 21**, **Node 20.12+** (Vite 8 needs `util.styleText`), and optionally an OpenAI-compatible API key.
 
 **Backend**
 
@@ -72,12 +72,15 @@ node server.mjs
 ```bash
 cd backend && ./mvnw test
 cd frontend && npm run lint && npm run test && npm run build
+# or all of the above in one shot:
+./scripts/check.sh
 ```
 
 Optional smoke:
 
 ```bash
-./scripts/smoke-extensibility.sh
+./scripts/smoke-extensibility.sh   # needs a running backend
+./scripts/status.sh                # health snapshot (backend + translate)
 ```
 
 ## Pull requests

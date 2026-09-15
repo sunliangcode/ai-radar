@@ -20,6 +20,9 @@ data/
 *.db
 *.db-journal
 
+# Translate sidecar venv
+translate-service/.venv/
+
 # Secrets
 backend/.env
 .env

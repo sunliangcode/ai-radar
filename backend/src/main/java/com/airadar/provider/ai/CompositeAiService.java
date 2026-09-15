@@ -2,6 +2,7 @@ package com.airadar.provider.ai;
 
 import com.airadar.config.RadarProperties;
 import com.airadar.domain.NewsItem;
+import com.airadar.support.Failures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Primary;
@@ -18,15 +19,18 @@ public class CompositeAiService implements AiService {
     private final RadarProperties properties;
     private final OpenAiCompatibleAiService openAi;
     private final HeuristicAiService heuristic;
+    private final AiHealthTracker health;
 
     public CompositeAiService(
             RadarProperties properties,
             OpenAiCompatibleAiService openAi,
-            HeuristicAiService heuristic
+            HeuristicAiService heuristic,
+            AiHealthTracker health
     ) {
         this.properties = properties;
         this.openAi = openAi;
         this.heuristic = heuristic;
+        this.health = health;
     }
 
     @Override
@@ -35,14 +39,17 @@ public class CompositeAiService implements AiService {
             return List.of();
         }
         if (!llmReady()) {
-            log.info("ai_mode=heuristic reason=llm_not_ready items={}", items.size());
+            // Distinguish "not configured" from "configured but cooling down after a failure" —
+            // conflating them made the log claim the model was unconfigured when it was merely down.
+            String reason = properties.getOpenai().isLlmReady() ? "llm_failure_cooldown" : "llm_not_ready";
+            log.info("ai_mode=heuristic reason={} items={}", reason, items.size());
             return heuristic.score(items);
         }
         try {
             log.info("ai_mode=openai items={}", items.size());
             return openAi.score(items);
         } catch (Exception e) {
-            log.warn("ai_mode=heuristic reason=openai_failed error={}", e.getMessage());
+            log.warn("ai_mode=heuristic reason=openai_failed error={}", Failures.describe(e));
             return heuristic.score(items);
         }
     }
@@ -55,7 +62,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.summarize(item);
         } catch (Exception e) {
-            log.warn("ai_summary_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_summary_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.summarize(item);
         }
     }
@@ -68,7 +75,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.summarizeDetailed(item);
         } catch (Exception e) {
-            log.warn("ai_summary_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_summary_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.summarizeDetailed(item);
         }
     }
@@ -84,7 +91,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.summarizeBatch(items);
         } catch (Exception e) {
-            log.warn("ai_summary_batch_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_summary_batch_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.summarizeBatch(items);
         }
     }
@@ -100,7 +107,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.summarizeDetailedBatch(items);
         } catch (Exception e) {
-            log.warn("ai_summary_batch_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_summary_batch_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.summarizeDetailedBatch(items);
         }
     }
@@ -113,7 +120,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.extractPreferenceKeyword(title, summary, kind);
         } catch (Exception e) {
-            log.warn("ai_pref_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_pref_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.extractPreferenceKeyword(title, summary, kind);
         }
     }
@@ -126,7 +133,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.suggestItemAction(title, url, summary);
         } catch (Exception e) {
-            log.warn("ai_item_action_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_item_action_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.suggestItemAction(title, url, summary);
         }
     }
@@ -139,7 +146,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.assignEvent(item, candidates);
         } catch (Exception e) {
-            log.warn("ai_assign_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_assign_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.assignEvent(item, candidates);
         }
     }
@@ -152,7 +159,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.refreshEventIntelligence(eventTitle, memberItems);
         } catch (Exception e) {
-            log.warn("ai_event_intel_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_event_intel_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.refreshEventIntelligence(eventTitle, memberItems);
         }
     }
@@ -165,7 +172,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.extractItems(content, extractionPrompt);
         } catch (Exception e) {
-            log.warn("ai_extract_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_extract_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.extractItems(content, extractionPrompt);
         }
     }
@@ -178,7 +185,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.extractContext(text);
         } catch (Exception e) {
-            log.warn("ai_context_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_context_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.extractContext(text);
         }
     }
@@ -191,7 +198,7 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.analyzeImpact(contextJson, title, summary, eventImpact, memoryHints);
         } catch (Exception e) {
-            log.warn("ai_impact_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_impact_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.analyzeImpact(contextJson, title, summary, eventImpact, memoryHints);
         }
     }
@@ -204,12 +211,21 @@ public class CompositeAiService implements AiService {
         try {
             return openAi.suggestOpportunity(contextJson, title, why, recommendation);
         } catch (Exception e) {
-            log.warn("ai_opportunity_fallback=heuristic error={}", e.getMessage());
+            log.warn("ai_opportunity_fallback=heuristic error={}", Failures.describe(e));
             return heuristic.suggestOpportunity(contextJson, title, why, recommendation);
         }
     }
 
     private boolean llmReady() {
-        return properties.getOpenai().isLlmReady();
+        if (!properties.getOpenai().isLlmReady()) {
+            return false;
+        }
+        // A model that just failed is almost certainly still down; do not pay the retry ladder for
+        // every batch. Reset as soon as any call (or the UI "Test connection" probe) succeeds.
+        if (health.isRecentlyFailing(properties.getAiFailureCooldownMs())) {
+            log.debug("ai_mode=heuristic reason=llm_failure_cooldown");
+            return false;
+        }
+        return true;
     }
 }

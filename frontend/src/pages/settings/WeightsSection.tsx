@@ -25,7 +25,7 @@ export function WeightsSection({
       <div className="grid gap-2 sm:grid-cols-2">
         {WEIGHT_KEYS.map((key) => (
           <label key={key} className="flex items-center gap-2 text-sm">
-            <span className="w-32 font-mono text-xs text-muted">{key}</span>
+            <span className="w-32 text-xs text-muted">{t(`sourceType.${key}`, { defaultValue: key })}</span>
             <input
               type="range"
               min={0}

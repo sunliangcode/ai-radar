@@ -16,4 +16,5 @@ Also:
 - [Contributing](../CONTRIBUTING.md)
 - [Security](../SECURITY.md)
 - [Changelog](../CHANGELOG.md)
+- [Third-party notices (Argos Translate)](../THIRD_PARTY_NOTICES.md)
 - [Roadmap / plans](../aim/README.md)

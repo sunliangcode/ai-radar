@@ -1,9 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type Item } from '../lib/api'
-import { Button, ConfirmDialog, EmptyState, ListSkeleton, PageHeader, StateBox, useToast } from '../components/ui'
+import { errorText } from '../lib/errors'
+import {
+  Button,
+  buttonVariants,
+  ConfirmDialog,
+  EmptyState,
+  ListSkeleton,
+  PageHeader,
+  StateBox,
+  useToast,
+} from '../components/ui'
 import { FeedRow } from '../components/FeedRow'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
@@ -36,6 +46,7 @@ export default function FeedPage() {
 
   const sources = useSources()
   const connectors = useConnectors()
+  const hasSources = (sources.data?.length ?? 0) > 0
 
   const channelTypes = useMemo(() => {
     const set = new Set<string>()
@@ -113,7 +124,19 @@ export default function FeedPage() {
       if (vars.dismissed) {
         patchFeedItemInCache(qc, vars.id, { dismissed: true, read: true }, { remove: true })
         void qc.invalidateQueries({ queryKey: ['preference-keywords'] })
-        pushToast('success', t('feed.notInterestedDone'))
+        // Dismissing is destructive and used to be irreversible from the UI.
+        pushToast('success', t('feed.notInterestedDone'), {
+          label: t('common.undo'),
+          onClick: () => {
+            void api
+              .patchItem(vars.id, { dismissed: false })
+              .then(() => {
+                void qc.invalidateQueries({ queryKey: ['feed'] })
+                void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+              })
+              .catch(() => undefined)
+          },
+        })
       } else {
         const patchFields: Partial<Item> = {}
         if (vars.read != null) patchFields.read = vars.read
@@ -130,6 +153,14 @@ export default function FeedPage() {
       }
       void qc.invalidateQueries({ queryKey: ['unread-counts'] })
     },
+    onError: (err, vars) => {
+      // The row was already patched optimistically, so a failure that stays silent looks like a
+      // glitch: the star flips, then reverts on the next refetch. Always explain it.
+      if (vars.dismissed) {
+        void qc.invalidateQueries({ queryKey: ['feed'] })
+      }
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
   })
   const markAll = useMutation({
     mutationFn: api.markAllRead,
@@ -139,7 +170,7 @@ export default function FeedPage() {
       pushToast('success', t('feed.markAllReadDone'))
     },
     onError: (err) => {
-      pushToast('error', t('common.loadFailed', { message: (err as Error).message }))
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
     },
   })
 
@@ -204,12 +235,11 @@ export default function FeedPage() {
 
   const runFetch = () => {
     fetchJob.mutate(sourceType ? { sourceType } : undefined, {
-      onSuccess: async () => {
-        await dismiss()
+      // Do NOT dismiss here: that would hide the result summary before it can be read.
+      onSuccess: () => {
         setPage(1)
         setSelectedId(null)
       },
-      onError: () => dismiss(),
     })
   }
 
@@ -235,9 +265,15 @@ export default function FeedPage() {
         subtitle={t('feed.subtitle')}
         actions={
           <>
-            <Button onClick={runFetch} loading={isPending}>
-              {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
-            </Button>
+            {hasSources ? (
+              <Button onClick={runFetch} loading={isPending}>
+                {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
+              </Button>
+            ) : (
+              <Link to="/settings/sources" className={buttonVariants()}>
+                {t('feed.addSource')}
+              </Link>
+            )}
             <Button variant="ghost" onClick={() => setConfirmMarkAllOpen(true)} disabled={markAll.isPending}>
               {t('feed.markAllRead')}
             </Button>
@@ -250,6 +286,7 @@ export default function FeedPage() {
         title={t('feed.markAllReadConfirm')}
         confirmLabel={t('common.confirm')}
         cancelLabel={t('common.cancel')}
+        pending={markAll.isPending}
         onConfirm={() => {
           setConfirmMarkAllOpen(false)
           markAll.mutate()
@@ -287,7 +324,7 @@ export default function FeedPage() {
       {searchMode && searchQuery.isLoading ? <ListSkeleton rows={4} /> : null}
       {!searchMode && feedQuery.isError ? (
         <StateBox>
-          <p className="mb-3">{t('common.loadFailed', { message: (feedQuery.error as Error).message })}</p>
+          <p className="mb-3">{t('common.loadFailed', { message: errorText(feedQuery.error, t) })}</p>
           <Button variant="ghost" onClick={() => void feedQuery.refetch()}>
             {t('common.retry')}
           </Button>
@@ -295,7 +332,7 @@ export default function FeedPage() {
       ) : null}
       {searchMode && searchQuery.isError ? (
         <StateBox>
-          <p className="mb-3">{t('common.loadFailed', { message: (searchQuery.error as Error).message })}</p>
+          <p className="mb-3">{t('common.loadFailed', { message: errorText(searchQuery.error, t) })}</p>
           <Button variant="ghost" onClick={() => void searchQuery.refetch()}>
             {t('common.retry')}
           </Button>
@@ -307,9 +344,29 @@ export default function FeedPage() {
       !feedQuery.isError &&
       !(searchMode && searchQuery.isError) ? (
         <EmptyState
-          title={searchMode ? t('feed.noSearchResult') : t('feed.empty')}
-          description={searchMode ? t('feed.noSearchResultHint') : t('feed.emptyHint')}
-          primary={<Button onClick={runFetch}>{t('common.fetchNow')}</Button>}
+          title={
+            searchMode
+              ? t('feed.noSearchResult')
+              : hasSources
+                ? t('feed.empty')
+                : t('feed.emptyNoSources')
+          }
+          description={
+            searchMode
+              ? t('feed.noSearchResultHint')
+              : hasSources
+                ? t('feed.emptyHint')
+                : t('feed.emptyNoSourcesHint')
+          }
+          primary={
+            searchMode ? undefined : hasSources ? (
+              <Button onClick={runFetch}>{t('common.fetchNow')}</Button>
+            ) : (
+              <Link to="/settings/sources" className={buttonVariants()}>
+                {t('feed.addSource')}
+              </Link>
+            )
+          }
         />
       ) : null}
 

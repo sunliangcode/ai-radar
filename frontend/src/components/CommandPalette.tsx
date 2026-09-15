@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { api, type Item } from '../lib/api'
+import { errorText } from '../lib/errors'
 import { useMarkItemRead } from '../hooks/useMarkItemRead'
+import { useToast } from './ui'
 
 type Command = {
   id: string
@@ -17,8 +19,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const navigate = useNavigate()
   const qc = useQueryClient()
   const markItemRead = useMarkItemRead()
+  const { push: pushToast } = useToast()
   const [q, setQ] = useState('')
   const [idx, setIdx] = useState(0)
+  // Bulk "mark all read" is destructive; arm it with a first Enter, execute on the second.
+  const [armed, setArmed] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -37,6 +42,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     if (open) {
       setQ('')
       setIdx(0)
+      setArmed(null)
       setTimeout(() => inputRef.current?.focus(), 20)
     }
   }, [open])
@@ -51,19 +57,28 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'settings', label: t('nav.settings'), hint: '/settings', run: () => navigate('/settings') },
       {
         id: 'mark-all-read',
-        label: t('feed.markAllRead'),
-        hint: t('nav.feed'),
+        label: armed === 'mark-all-read' ? t('feed.markAllReadConfirm') : t('feed.markAllRead'),
+        hint: armed === 'mark-all-read' ? t('common.confirm') : t('nav.feed'),
         run: () => {
-          void api.markAllRead().then(() => {
-            void qc.invalidateQueries({ queryKey: ['feed'] })
-            void qc.invalidateQueries({ queryKey: ['unread-counts'] })
-            void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-            navigate('/feed')
-          })
+          if (armed !== 'mark-all-read') {
+            setArmed('mark-all-read')
+            return
+          }
+          setArmed(null)
+          void api
+            .markAllRead()
+            .then(() => {
+              void qc.invalidateQueries({ queryKey: ['feed'] })
+              void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+              void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+              navigate('/feed')
+              pushToast('success', t('feed.markAllReadDone'))
+            })
+            .catch((err) => pushToast('error', t('common.loadFailed', { message: errorText(err, t) })))
         },
       },
     ],
-    [navigate, t, qc],
+    [armed, navigate, pushToast, qc, t],
   )
 
   const searchQuery = useQuery({

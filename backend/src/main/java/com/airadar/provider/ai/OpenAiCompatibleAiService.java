@@ -41,6 +41,7 @@ public class OpenAiCompatibleAiService implements AiService {
     private final InterestSignalsService interestSignals;
     private final AiCallMonitor monitor;
     private final AiCallGate aiCallGate;
+    private final AiHealthTracker health;
     private final String scorePromptTemplate;
     private final String summarizePromptTemplate;
     private final String summarizeBatchPromptTemplate;
@@ -59,7 +60,8 @@ public class OpenAiCompatibleAiService implements AiService {
             RadarProperties properties,
             InterestSignalsService interestSignals,
             AiCallMonitor monitor,
-            AiCallGate aiCallGate
+            AiCallGate aiCallGate,
+            AiHealthTracker health
     ) throws IOException {
         this.restClientBuilder = restClientBuilder;
         this.objectMapper = objectMapper;
@@ -67,6 +69,7 @@ public class OpenAiCompatibleAiService implements AiService {
         this.interestSignals = interestSignals;
         this.monitor = monitor;
         this.aiCallGate = aiCallGate;
+        this.health = health;
         this.scorePromptTemplate = readPrompt("prompts/score.md");
         this.summarizePromptTemplate = readPrompt("prompts/summarize.md");
         this.summarizeBatchPromptTemplate = readPrompt("prompts/summarize-batch.md");
@@ -140,11 +143,7 @@ public class OpenAiCompatibleAiService implements AiService {
         if (summary.isMissingNode() || summary.asText().isBlank()) {
             throw new IllegalStateException("Empty summary from model");
         }
-        String titleDisplay = response.path("titleDisplay").asText("").trim();
-        if (titleDisplay.isBlank()) {
-            titleDisplay = null;
-        }
-        return new SummarizeResult(summary.asText().trim(), titleDisplay);
+        return SummarizeResult.of(summary.asText().trim());
     }
 
     @Override
@@ -189,15 +188,10 @@ public class OpenAiCompatibleAiService implements AiService {
                     continue;
                 }
                 String summary = node.path("summary").asText("").trim();
-                String titleDisplay = node.path("titleDisplay").asText("").trim();
-                results.set(index, new SummarizeResult(summary, titleDisplay.isBlank() ? null : titleDisplay));
+                results.set(index, SummarizeResult.of(summary));
             }
         } else if (response.has("summary") && items.size() == 1) {
-            String titleDisplay = response.path("titleDisplay").asText("").trim();
-            results.set(0, new SummarizeResult(
-                    response.path("summary").asText("").trim(),
-                    titleDisplay.isBlank() ? null : titleDisplay
-            ));
+            results.set(0, SummarizeResult.of(response.path("summary").asText("").trim()));
         }
         for (int i = 0; i < results.size(); i++) {
             if (results.get(i).summary() == null || results.get(i).summary().isBlank()) {
@@ -585,17 +579,19 @@ public class OpenAiCompatibleAiService implements AiService {
                         operation, cfg.getModel(), promptTokens, completionTokens, contextWindow, latency, truncated,
                         finalPrompt, content, decodeMs
                 ));
+                health.recordSuccess();
 
                 String cleaned = stripCodeFence(content);
                 return objectMapper.readTree(cleaned);
             } catch (Exception e) {
                 lastError = e;
+                String reason = describeFailure(e);
                 long latency = System.currentTimeMillis() - start;
                 boolean canRetry = attempt < maxAttempts && isRetryableAiError(e);
                 if (canRetry) {
                     long sleepMs = backoffBase * (1L << (attempt - 1));
                     log.warn("AI call failed attempt={}/{} retrying in {}ms: {}",
-                            attempt, maxAttempts, sleepMs, e.getMessage());
+                            attempt, maxAttempts, sleepMs, reason);
                     monitor.clearInFlight(callId);
                     if (sleepMs > 0) {
                         try {
@@ -604,8 +600,9 @@ public class OpenAiCompatibleAiService implements AiService {
                             Thread.currentThread().interrupt();
                             monitor.complete(callId, AiCallMonitor.AiCallRecord.failure(
                                     operation, cfg.getModel(), estimatedPromptTokens, contextWindow, latency, truncated,
-                                    ie.getMessage(), finalPrompt
+                                    describeFailure(ie), finalPrompt
                             ));
+                            health.recordFailure(operation, "interrupted during retry");
                             throw new IllegalStateException("AI call interrupted during retry", ie);
                         }
                     }
@@ -613,12 +610,20 @@ public class OpenAiCompatibleAiService implements AiService {
                 }
                 monitor.complete(callId, AiCallMonitor.AiCallRecord.failure(
                         operation, cfg.getModel(), estimatedPromptTokens, contextWindow, latency, truncated,
-                        e.getMessage(), finalPrompt
+                        reason, finalPrompt
                 ));
-                throw new IllegalStateException("AI call failed: " + e.getMessage(), e);
+                health.recordFailure(operation, reason);
+                throw new IllegalStateException("AI call failed: " + reason, e);
             }
         }
-        throw new IllegalStateException("AI call failed: " + (lastError != null ? lastError.getMessage() : "unknown"), lastError);
+        throw new IllegalStateException("AI call failed: " + describeFailure(lastError), lastError);
+    }
+
+    /**
+     * Readable one-liner for a failed call — see {@link com.airadar.support.Failures#describe}.
+     */
+    static String describeFailure(Throwable e) {
+        return com.airadar.support.Failures.describe(e);
     }
 
     /** Transient network / upstream errors worth retrying; permanent auth/client errors are not. */

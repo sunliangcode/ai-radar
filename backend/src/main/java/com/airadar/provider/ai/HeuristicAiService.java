@@ -81,7 +81,7 @@ public class HeuristicAiService implements AiService {
         } else {
             summary = "[" + source + "] " + (title.isBlank() ? "Relevant update." : title + ".");
         }
-        return new SummarizeResult(summary, title.isBlank() ? null : title);
+        return SummarizeResult.of(summary);
     }
 
     @Override

@@ -17,6 +17,7 @@ import com.airadar.provider.ai.AiCallMonitor;
 import com.airadar.provider.ai.AiService;
 import com.airadar.provider.ai.ScoreResult;
 import com.airadar.provider.ai.SummarizeResult;
+import com.airadar.provider.translate.TitleTranslator;
 import com.airadar.provider.webfetch.WebContentFetcher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +53,7 @@ class PipelineOrchestratorTest {
     private NewsItemRepository newsItemRepository;
     private AiService aiService;
     private EventClusterService eventClusterService;
+    private TitleTranslator titleTranslator;
     private PipelineOrchestrator orchestrator;
 
     @BeforeEach
@@ -137,14 +139,21 @@ class PipelineOrchestratorTest {
         });
         when(aiService.summarizeDetailed(org.mockito.ArgumentMatchers.any(NewsItem.class))).thenAnswer(inv -> {
             NewsItem item = inv.getArgument(0);
-            return new SummarizeResult("Summary of " + item.getTitle(), item.getTitle());
+            return SummarizeResult.of("Summary of " + item.getTitle());
         });
         when(aiService.summarizeDetailedBatch(anyList())).thenAnswer(inv -> {
             List<NewsItem> items = inv.getArgument(0);
             return items.stream()
-                    .map(i -> new SummarizeResult("Summary of " + i.getTitle(), i.getTitle()))
+                    .map(i -> SummarizeResult.of("Summary of " + i.getTitle()))
                     .toList();
         });
+
+        titleTranslator = mock(TitleTranslator.class);
+        when(titleTranslator.translate(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString()
+        )).thenReturn("开源 LLM Agent 工具包");
 
         orchestrator = new PipelineOrchestrator(
                 sourceRepository,
@@ -159,7 +168,8 @@ class PipelineOrchestratorTest {
                 new FetchProgress(),
                 webContentFetcher,
                 transactionTemplate,
-                mock(AiCallMonitor.class)
+                mock(AiCallMonitor.class),
+                titleTranslator
         );
     }
 
@@ -177,6 +187,12 @@ class PipelineOrchestratorTest {
         verify(eventClusterService, atLeastOnce()).linkNewItems(anyList());
         assertEquals(ItemStatus.DONE, result.topItems().getFirst().getStatus());
         assertTrue(result.topItems().getFirst().getSummary().startsWith("Summary of"));
+        assertEquals("开源 LLM Agent 工具包", result.topItems().getFirst().getTitleDisplay());
+        verify(titleTranslator).translate(
+                org.mockito.ArgumentMatchers.eq("Open source LLM agent toolkit"),
+                org.mockito.ArgumentMatchers.eq("en"),
+                org.mockito.ArgumentMatchers.eq("zh")
+        );
     }
 
     @Test
@@ -200,5 +216,25 @@ class PipelineOrchestratorTest {
         verify(aiService, never()).summarizeDetailed(org.mockito.ArgumentMatchers.any(NewsItem.class));
         verify(aiService, never()).score(anyList());
         verify(newsItemRepository, atLeastOnce()).save(org.mockito.ArgumentMatchers.any(NewsItemEntity.class));
+        verify(titleTranslator, never()).translate(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString()
+        );
+    }
+
+    @Test
+    void keepsOriginalTitleWhenTranslatorUnavailable() throws Exception {
+        when(titleTranslator.translate(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString()
+        )).thenReturn(null);
+
+        PipelineResult result = orchestrator.run(new PipelineRequest(null, null, null));
+
+        assertEquals(1, result.kept());
+        assertTrue(result.topItems().getFirst().getSummary().startsWith("Summary of"));
+        assertEquals(null, result.topItems().getFirst().getTitleDisplay());
     }
 }

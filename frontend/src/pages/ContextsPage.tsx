@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type UserContext } from '../lib/api'
 import { Button, FormSaveBar, PageHeader, StateBox, useToast } from '../components/ui'
+import { errorText } from '../lib/errors'
 
 function listToText(values?: string[]) {
   return (values ?? []).join(', ')
@@ -46,7 +47,7 @@ export default function ContextsPage() {
       setBaseline(JSON.stringify({ payload, rawText }))
       pushToast('success', t('contexts.saved'))
     },
-    onError: (e) => pushToast('error', (e as Error).message),
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
 
   const extract = useMutation({
@@ -55,7 +56,7 @@ export default function ContextsPage() {
       setPayload(draft.payload)
       pushToast('success', t('contexts.extracted'))
     },
-    onError: (e) => pushToast('error', (e as Error).message),
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
 
   const importGithub = useMutation({
@@ -65,7 +66,7 @@ export default function ContextsPage() {
       if (draft.rawText) setRawText(draft.rawText)
       pushToast('success', t('contexts.imported'))
     },
-    onError: (e) => pushToast('error', (e as Error).message),
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
 
   function onSubmit(e: FormEvent) {
@@ -82,7 +83,7 @@ export default function ContextsPage() {
 
   if (ctx.isLoading) return <StateBox>{t('contexts.loading')}</StateBox>
   if (ctx.isError) {
-    return <StateBox>{t('common.loadFailed', { message: (ctx.error as Error).message })}</StateBox>
+    return <StateBox>{t('common.loadFailed', { message: errorText(ctx.error, t) })}</StateBox>
   }
   if (!payload) return <StateBox>{t('contexts.loading')}</StateBox>
 

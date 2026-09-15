@@ -20,7 +20,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (token) {
     headers.set('X-Local-Token', token)
   }
-  const res = await fetch(`${BASE}${path}`, { ...init, headers })
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, { ...init, headers })
+  } catch (err) {
+    // Backend not running / offline / DNS failure: make this a typed, localizable
+    // error instead of leaking the browser's raw "Failed to fetch".
+    const detail = err instanceof Error ? err.message : String(err)
+    throw new ApiError(0, 'network', detail)
+  }
   if (!res.ok) {
     let code = 'error'
     let message = res.statusText
@@ -387,8 +395,51 @@ export type ConnectorDescriptor = {
   configFields: ConnectorConfigField[]
 }
 
+export type TranslateHealth = {
+  enabled: boolean
+  baseUrl: string
+  status: 'up' | 'down' | 'disabled' | string
+  error?: string
+}
+
+export type LlmHealth = {
+  ready: boolean
+  mode: 'ai' | 'heuristic' | 'degraded' | string
+  model: string
+  baseUrl: string
+  local: boolean
+  hasApiKey: boolean
+  ok: boolean
+  successCount?: number
+  failureCount?: number
+  lastSuccessAt?: string | null
+  lastError?: string | null
+  lastErrorAt?: string | null
+  lastErrorOp?: string | null
+}
+
+export type LlmProbe = {
+  ok: boolean
+  model?: string
+  baseUrl?: string
+  latencyMs?: number
+  models?: string[]
+  modelPresent?: boolean
+  hint?: string
+  error?: string
+}
+
+export type Health = {
+  status: string
+  db: string
+  translate?: TranslateHealth
+  llm?: LlmHealth
+  error?: string
+}
+
 export const api = {
-  health: () => request<{ status: string; db: string }>('/api/health'),
+  health: () => request<Health>('/api/health'),
+  llmProbe: () => request<LlmProbe>('/api/health/llm'),
   items: async (q: string = '') => {
     const data = await request<Item[] | { items: Item[]; total: number; offset?: number; limit?: number }>(
       `/api/items${q}`,

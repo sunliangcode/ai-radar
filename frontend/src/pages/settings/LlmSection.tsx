@@ -1,6 +1,8 @@
+import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import type { Settings } from '../../lib/api'
-import { Card, Field, Input } from '../../components/ui'
+import { api, type Settings } from '../../lib/api'
+import { errorText } from '../../lib/errors'
+import { Button, Card, Field, Input } from '../../components/ui'
 import { SettingsField } from './SettingsField'
 
 const CONTEXT_PRESETS = [2048, 4096, 8192, 16384, 32768] as const
@@ -19,6 +21,8 @@ export function LlmSection({
   const { t } = useTranslation()
   const ctx = Number(form.contextWindowTokens || 4096)
   const maxComp = Number(form.maxCompletionTokens || 1024)
+  const probe = useMutation({ mutationFn: api.llmProbe })
+  const probeResult = probe.data
 
   return (
     <Card>
@@ -31,6 +35,30 @@ export function LlmSection({
         {t('settings.apiKeyConfigured')}{' '}
         <span className="font-mono text-ink">{apiKeyConfigured ? t('common.yes') : t('common.no')}</span>
       </p>
+      <p className="mb-3 text-xs text-muted">{t('settings.llmReadyHint')}</p>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <Button variant="ghost" size="sm" loading={probe.isPending} onClick={() => probe.mutate()}>
+          {probe.isPending ? t('settings.testing') : t('settings.testConnection')}
+        </Button>
+        {probeResult ? (
+          <span
+            className={`text-xs ${probeResult.ok ? 'text-moss' : 'text-ember'}`}
+            role="status"
+            aria-live="polite"
+          >
+            {probeResult.ok
+              ? probeResult.modelPresent === false
+                ? t('settings.testModelMissing', { model: probeResult.model })
+                : t('settings.testOk', { ms: probeResult.latencyMs ?? 0 })
+              : t('settings.testFailed', { message: probeResult.error ?? 'unknown' })}
+          </span>
+        ) : null}
+        {probe.isError ? (
+          <span className="text-xs text-ember" role="status">
+            {t('settings.testFailed', { message: errorText(probe.error, t) })}
+          </span>
+        ) : null}
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <SettingsField field="openaiBaseUrl" label={t('settings.baseUrl')} value={form.openaiBaseUrl} patch={patch} />
         <SettingsField field="openaiModel" label={t('settings.model')} value={form.openaiModel} patch={patch} />

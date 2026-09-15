@@ -16,9 +16,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
- * Seeds an empty database from pack JSON, then always ensures the fixed Zhihu source.
+ * Seeds an empty database from pack JSON, then ensures a Zhihu source exists.
+ * Zhihu stays portable: default-enable only when the local CLI binary is present.
  */
 @Component
 public class SourceSeeder implements ApplicationRunner {
@@ -60,42 +62,60 @@ public class SourceSeeder implements ApplicationRunner {
     }
 
     /**
-     * Every boot: create 「知乎推荐」 if missing; pin cliPath to the fixed binary path.
-     * Does not force {@code enabled} on existing rows so users can disable the source.
+     * Every boot: create 「知乎推荐」 if missing. New sources are enabled only when the
+     * preferred CLI is executable. Never force-enable, and never overwrite a working
+     * custom {@code cliPath}.
      */
-    private void ensureZhihu() {
+    void ensureZhihu() {
+        ensureZhihu(ZhihuConnector.preferredCliPath(), ZhihuConnector::isCliExecutable);
+    }
+
+    void ensureZhihu(String preferredCli, Predicate<String> executable) {
         try {
+            boolean preferredReady = executable.test(preferredCli);
             SourceEntity entity = sourceRepository.findFirstByType(SourceType.ZHIHU)
                     .orElseGet(SourceEntity::new);
             boolean isNew = entity.getId() == null;
             if (isNew) {
                 entity.setName(ZhihuConnector.DEFAULT_SOURCE_NAME);
                 entity.setType(SourceType.ZHIHU);
-                entity.setEnabled(true);
-                entity.setConfigJson(defaultZhihuConfigJson());
+                entity.setEnabled(preferredReady);
+                entity.setConfigJson(newZhihuConfigJson(preferredCli));
                 sourceRepository.save(entity);
-                log.info("ensured_zhihu_source created=true name={}", entity.getName());
+                log.info("ensured_zhihu_source created=true enabled={} cliReady={} cliPath={}",
+                        preferredReady, preferredReady, preferredCli);
                 return;
             }
-            if (pinCliPath(entity)) {
+            if (repairCliPath(entity, preferredCli, preferredReady, executable)) {
                 sourceRepository.save(entity);
-                log.info("ensured_zhihu_source created=false cliPath_pinned=true id={}", entity.getId());
+                log.info("ensured_zhihu_source created=false cliPath_repaired=true id={} cliPath={}",
+                        entity.getId(), preferredCli);
             }
         } catch (Exception e) {
             log.warn("ensure_zhihu_failed error={}", e.getMessage());
         }
     }
 
-    private String defaultZhihuConfigJson() throws Exception {
+    private String newZhihuConfigJson(String preferredCli) throws Exception {
         ObjectNode config = objectMapper.createObjectNode();
-        config.put("cliPath", ZhihuConnector.DEFAULT_CLI);
+        config.put("cliPath", preferredCli);
         config.put("limit", ZhihuConnector.DEFAULT_LIMIT);
         config.put("commentLimit", ZhihuConnector.DEFAULT_COMMENT_LIMIT);
         return objectMapper.writeValueAsString(config);
     }
 
-    /** @return true if config was changed */
-    private boolean pinCliPath(SourceEntity entity) throws Exception {
+    /**
+     * Fill a blank path, or replace a path that does not exist when a preferred binary is ready.
+     * Leaves a working custom path alone.
+     *
+     * @return true if config was changed
+     */
+    private boolean repairCliPath(
+            SourceEntity entity,
+            String preferredCli,
+            boolean preferredReady,
+            Predicate<String> executable
+    ) throws Exception {
         String raw = entity.getConfigJson();
         ObjectNode config;
         if (raw == null || raw.isBlank()) {
@@ -104,11 +124,18 @@ public class SourceSeeder implements ApplicationRunner {
             JsonNode parsed = objectMapper.readTree(raw);
             config = parsed.isObject() ? (ObjectNode) parsed : objectMapper.createObjectNode();
         }
-        String current = config.path("cliPath").asText("");
-        if (ZhihuConnector.DEFAULT_CLI.equals(current)) {
+        String current = config.path("cliPath").asText("").trim();
+        boolean currentReady = executable.test(current);
+        if (currentReady) {
             return false;
         }
-        config.put("cliPath", ZhihuConnector.DEFAULT_CLI);
+        if (!preferredReady) {
+            return false;
+        }
+        if (preferredCli.equals(current)) {
+            return false;
+        }
+        config.put("cliPath", preferredCli);
         entity.setConfigJson(objectMapper.writeValueAsString(config));
         return true;
     }

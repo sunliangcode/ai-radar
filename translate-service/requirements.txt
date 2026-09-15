@@ -1,0 +1,4 @@
+# Pinned runtime for AI Radar title translation (en→zh).
+# Direct dependency; transitive packages come from argostranslate.
+# See ../THIRD_PARTY_NOTICES.md for licenses and model attribution.
+argostranslate==1.11.0

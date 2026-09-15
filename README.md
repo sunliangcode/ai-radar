@@ -15,7 +15,7 @@ AI Radar turns AI news into decisions for your work — it watches the AI ecosys
 
 [Demo](#demo) · [Quick Start](#quick-start) · [Documentation](#documentation)
 
-**Stack:** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI-compatible LLM (default: local Ollama)
+**Stack:** Java 21 · Spring Boot 3 · SQLite · React/Vite/Tailwind · OpenAI-compatible LLM (default: local Ollama) · Argos Translate (en→zh titles)
 
 ## Demo
 
@@ -53,6 +53,12 @@ cd ai-radar
 
 Open [http://localhost:8080](http://localhost:8080).
 
+Check health anytime:
+
+```bash
+./scripts/status.sh
+```
+
 Stop the background process started by `install.sh`:
 
 ```bash
@@ -64,7 +70,7 @@ Docker, dev mode, environment variables, and delivery channels: [docs/installati
 ## Core features
 
 - **Personal Context** — Profile, projects, and stack so relevance is about *you*, not global trends.
-- **Primary language** — Summaries and display titles in Chinese or English; English sources are localized when AI is available.
+- **Primary language** — Summaries in Chinese or English via LLM; English titles are localized to Chinese with **Argos Translate** (offline sidecar), not the LLM.
 - **Live Feed** — One-sentence AI summary per item; new items show up as soon as they are analyzed.
 - **Like / dislike keywords** — Save or mark Not interested to teach preference phrases (editable in Settings).
 - **Change Detection** — Important external shifts, not an endless raw feed.
@@ -87,6 +93,8 @@ Docker, dev mode, environment variables, and delivery channels: [docs/installati
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+Third-party translation stack (Argos Translate / models): [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Star History
 

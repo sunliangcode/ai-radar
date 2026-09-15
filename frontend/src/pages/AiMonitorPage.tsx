@@ -8,6 +8,7 @@ import { MonitorQueueCard } from './monitor/MonitorQueueCard'
 import { LiveConsole } from './monitor/LiveConsole'
 import { InFlightProgress } from './monitor/InFlightProgress'
 import { MonitorStatsCard } from './monitor/MonitorStatsCard'
+import { errorText } from '../lib/errors'
 
 export default function AiMonitorPage() {
   const { t } = useTranslation()
@@ -16,7 +17,7 @@ export default function AiMonitorPage() {
 
   if (monitor.isLoading) return <StateBox>{t('settings.loading')}</StateBox>
   if (monitor.isError) {
-    return <StateBox>{t('common.loadFailed', { message: (monitor.error as Error).message })}</StateBox>
+    return <StateBox>{t('common.loadFailed', { message: errorText(monitor.error, t) })}</StateBox>
   }
 
   const queue = mon?.queue

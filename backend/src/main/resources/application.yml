@@ -53,6 +53,8 @@ radar:
   max-snippet-chars: 2000
   ai-batch-size: 3
   ai-parallelism: ${AI_PARALLELISM:1}
+  # After an LLM failure, skip live calls for this long (0 = always retry the model)
+  ai-failure-cooldown-ms: ${AI_FAILURE_COOLDOWN_MS:60000}
   fetch-parallelism: 8
   fetch-interval-ms: 7200000
   fetch-timeout-ms: ${FETCH_TIMEOUT_MS:60000}
@@ -61,11 +63,19 @@ radar:
   ui-base-url: http://localhost:8080
   push-only-when-items: true
   local-token: ${LOCAL_TOKEN:}
+  # Argos Translate sidecar for en→zh titleDisplay (not LLM)
+  translate:
+    enabled: ${RADAR_TRANSLATE_ENABLED:true}
+    base-url: ${RADAR_TRANSLATE_URL:http://127.0.0.1:8765}
+    from: en
+    to: zh
+    connect-timeout-ms: 2000
+    read-timeout-ms: 15000
   openai:
     api-key: ${OPENAI_API_KEY:}
     base-url: ${OPENAI_BASE_URL:http://localhost:11434/v1}
     model: ${OPENAI_MODEL:qwen3.5:2b-mlx}
-    context-window-tokens: ${OPENAI_CONTEXT_WINDOW_TOKENS:4096}
+    context-window-tokens: ${OPENAI_CONTEXT_WINDOW_TOKENS:8192}
     max-completion-tokens: ${OPENAI_MAX_COMPLETION_TOKENS:1024}
     keep-alive: ${OPENAI_KEEP_ALIVE:0}
     max-retries: ${OPENAI_MAX_RETRIES:2}

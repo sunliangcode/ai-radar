@@ -9,6 +9,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   danger,
+  pending,
   onConfirm,
   onCancel,
 }: {
@@ -18,6 +19,8 @@ export function ConfirmDialog({
   confirmLabel: string
   cancelLabel: string
   danger?: boolean
+  /** Disables both buttons while the confirmed action is in flight, preventing double submits. */
+  pending?: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -47,10 +50,16 @@ export function ConfirmDialog({
         </h3>
         {description ? <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p> : null}
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="ghost" onClick={onCancel}>
+          <Button variant="ghost" disabled={pending} onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button ref={confirmRef} variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>
+          <Button
+            ref={confirmRef}
+            variant={danger ? 'danger' : 'primary'}
+            loading={pending}
+            disabled={pending}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </div>

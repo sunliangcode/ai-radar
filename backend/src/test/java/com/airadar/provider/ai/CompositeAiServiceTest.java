@@ -43,7 +43,7 @@ class CompositeAiServiceTest {
 
         HeuristicAiService heuristic = heuristic(props);
         OpenAiCompatibleAiService openAi = mock(OpenAiCompatibleAiService.class);
-        CompositeAiService composite = new CompositeAiService(props, openAi, heuristic);
+        CompositeAiService composite = new CompositeAiService(props, openAi, heuristic, new AiHealthTracker());
 
         NewsItem item = new NewsItem();
         item.setTitle("LLM Agent release");
@@ -71,7 +71,7 @@ class CompositeAiServiceTest {
         HeuristicAiService heuristic = heuristic(props);
         OpenAiCompatibleAiService openAi = mock(OpenAiCompatibleAiService.class);
         when(openAi.summarizeBatch(anyList())).thenThrow(new IllegalStateException("boom"));
-        CompositeAiService composite = new CompositeAiService(props, openAi, heuristic);
+        CompositeAiService composite = new CompositeAiService(props, openAi, heuristic, new AiHealthTracker());
 
         NewsItem item = new NewsItem();
         item.setTitle("Only title");

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type FeedbackKind } from '../../lib/api'
 import { Chip } from '../primitives/Chip'
+import { errorText } from '../../lib/errors'
 
 const KINDS: FeedbackKind[] = ['useful', 'irrelevant', 'watch', 'ignore', 'tried']
 
@@ -61,7 +62,7 @@ export function FeedbackBar({
       ) : null}
       {feedback.isError ? (
         <span className="self-center text-xs text-ember" role="status">
-          {(feedback.error as Error).message}
+          {errorText(feedback.error, t)}
         </span>
       ) : null}
     </div>

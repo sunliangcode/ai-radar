@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { api, type PreferenceKeyword } from '../../lib/api'
 import { Button, Input } from '../../components/ui'
 import { useToast } from '../../components/providers/ToastProvider'
+import { errorText } from '../../lib/errors'
 
 export function PreferenceKeywordsEditor() {
   const { t } = useTranslation()
@@ -23,7 +24,7 @@ export function PreferenceKeywordsEditor() {
       void qc.invalidateQueries({ queryKey: ['preference-keywords'] })
       pushToast('success', t('settings.keywordAdded'))
     },
-    onError: (e) => pushToast('error', (e as Error).message),
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
 
   const remove = useMutation({
@@ -31,7 +32,7 @@ export function PreferenceKeywordsEditor() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['preference-keywords'] })
     },
-    onError: (e) => pushToast('error', (e as Error).message),
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
 
   const list = keywords.data?.keywords ?? []

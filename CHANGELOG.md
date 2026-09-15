@@ -6,21 +6,56 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `scripts/status.sh` — local health snapshot (backend, Argos translate, PID files, ports)
+- `scripts/check.sh` — local CI-parity checks (backend tests, frontend lint/test/build, mcp syntax)
+- Settings hub **System health** card (backend / DB / title-translate, same signals as `status.sh`)
+- `GET /api/health` now reports Argos translate sidecar status (`up` / `down` / `disabled`)
+- `install.sh` waits for `GET /api/health` after starting the backend
 - Connectors: Google News, GDELT, OSS Insight, GitHub Trending, V2EX, Telegram, Product Hunt, Twitter, WEB, EMAIL
 - Source packs `ai-cn` / `ai-signals`; empty DB seeds from `ai-core` + `ai-cn` packs
 - Web full-text enrich (`WEB_FETCH_*`), batch LLM summarize, `/api/connectors` descriptors
 - Fetch progress / result summary UI; schema-driven Sources form
+- `frontend/src/lib/errors.ts` — shared `errorText()` so every failure surface reads the same
+- Route-level code splitting (`React.lazy` + `Suspense`) and a localized "server unreachable" message
+- Top-level `ErrorBoundary` with a localized fallback — a render crash used to leave a blank page
+- Source-type display names (`zh`/`en`) for badges and the source-weight sliders, instead of raw enum keys
+- `AiHealthTracker` + `GET /api/health` `llm` block: whether scoring/summaries run on the live model or on rules, with the last failure reason
+- `GET /api/health/llm` live probe and a **Test connection** button under Settings → AI model
+- Settings → System health shows an **AI model** row; `scripts/status.sh` reports the LLM mode
+- **Briefs** page (`/briefs`) plus a sidebar entry — `/briefs/:date` was previously reachable only by typing the URL
+- 404 page for unknown routes (previously a blank main area)
+- `/api/health` reports configured LLM readiness (`ready`, `model`, `baseUrl`, `local`, `hasApiKey`)
 
 ### Changed
 
+- Zhihu source seed is portable: enable only when the local CLI exists; stop force-pinning a machine-specific `cliPath` over working custom paths
 - Pipeline no longer holds one long SQLite transaction across network/LLM I/O
 - Persist uses bulk URL lookup + `saveAll`; web enrich runs with bounded parallelism
 - Frontend `build:embed` writes into Spring `static/`; hashed assets are gitignored
 - Settings exposes push-only-when-items, SMTP STARTTLS, and browser local token
+- Feed empty state is no longer a dead end: with no sources it links to **Add a source**, otherwise it offers **Update now**
+- `vite.config.ts` uses `import.meta.dirname` (drops the Vite native-config-loader warning)
+- **Update now** on Today now recomputes impact automatically, and a **Recompute impact** button was added — Today/Actions used to stay empty forever because nothing ever triggered impact
+- Today's getting-started panel branches on whether sources exist (the "no sources" branch was unreachable after auto-seeding)
+- The fetch result summary is no longer auto-dismissed the instant a job finishes, so kept/failed counts and "retry failed sources" are actually readable
+- `SettingsHubPage` AI banner is three-state (live / degraded / rules) and derives from real call outcomes instead of a config string check
+- `install.sh` hard-fails without npm or on Node/Java below the required version, probes the LLM after startup, and ends with explicit next steps
+- Numeric settings keep a local draft and reject `NaN`/out-of-range input instead of PUTting it
+- Context window default is consistently **8192** across `.env.example`, `application.yml` and docs (docs said 4096)
+- `AI_PARALLELISM` docs no longer claim a tunable 1–8 range: LLM calls run single-threaded by design
+- A failed LLM call now enters a short cooldown (`AI_FAILURE_COOLDOWN_MS`, default 60s) instead of paying the retry ladder for every batch — a first fetch against a dead endpoint dropped from ~200s to ~5s, and the log reason distinguishes `llm_not_ready` from `llm_failure_cooldown`. A successful call or **Test connection** clears it immediately
+- `scripts/smoke-extensibility.sh` bounds every request with a timeout and prints progress, so it can no longer hang silently
+- `scripts/status.sh` actively verifies the LLM instead of trusting cached state, so it no longer reports a dead endpoint as live
 
 ### Fixed
 
+- Align `OPENAI_KEEP_ALIVE` docs/tests with runtime default `0` (unload after each local call)
 - Home / Sources / Briefs keep content visible while a fetch job runs
+- LLM failures logged as the unactionable `AI call failed: null`; failures now name the exception and walk the cause chain (`Failures.describe`)
+- Silent mutation failures in the Feed (save / read / not-interested) and the command palette's bulk "mark all read" now toast the error, and bulk mark-all-read needs a confirming second Enter
+- "Not interested" is undoable from its toast and no longer permanently hides an item on a single misclick
+- `WatchingPage` shows an error + retry instead of "nothing here yet" when its queries fail; settings hub surfaces a settings load failure
+- `ConfirmDialog` disables its buttons while the confirmed action is in flight (prevents double deletes)
 
 ## [0.1.0] - 2026-09-08
 

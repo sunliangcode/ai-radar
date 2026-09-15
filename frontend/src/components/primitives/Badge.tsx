@@ -39,8 +39,9 @@ const SOURCE_COLORS: Record<string, string> = {
   REDDIT: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
 }
 
-/** Colored source-type badge (ZHIHU / GITHUB / HACKER_NEWS / …). */
+/** Colored source-type badge (ZHIHU / GITHUB / HACKER_NEWS / …), labelled with a display name. */
 export function SourceBadge({ type, className }: { type?: string; className?: string }) {
+  const { t } = useTranslation()
   if (!type) return null
   return (
     <span
@@ -50,7 +51,7 @@ export function SourceBadge({ type, className }: { type?: string; className?: st
         className,
       )}
     >
-      {type}
+      {t(`sourceType.${type}`, { defaultValue: type })}
     </span>
   )
 }

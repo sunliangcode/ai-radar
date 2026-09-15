@@ -2,13 +2,24 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { PageHeader } from '../components/ui'
+import { errorText } from '../lib/errors'
+import { PageHeader, StateBox } from '../components/ui'
+import { SystemHealthCard } from './settings/SystemHealthCard'
 
 export default function SettingsHubPage() {
   const { t } = useTranslation()
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings })
-  const s = settings.data
-  const aiReady = s?.openaiConfigured
+  const health = useQuery({
+    queryKey: ['health'],
+    queryFn: api.health,
+    refetchInterval: 30_000,
+    retry: 1,
+  })
+  // "AI is on" must reflect real call outcomes, not just a config string check: a local Ollama URL
+  // counts as configured even when nothing is listening.
+  const llmMode = health.data?.llm?.mode
+  const aiReady = llmMode === 'ai'
+  const aiDegraded = llmMode === 'degraded'
 
   const cards = [
     {
@@ -24,23 +35,48 @@ export default function SettingsHubPage() {
     {
       to: '/settings/llm',
       title: t('settingsHub.llm'),
-      desc: aiReady ? t('settingsHub.llmReady') : t('settingsHub.llmNotReady'),
-      badge: aiReady ? t('settingsHub.on') : t('settingsHub.off'),
-      badgeCls: aiReady ? 'text-moss border-moss/40' : 'text-ember border-ember/40',
+      desc: aiReady
+        ? t('settingsHub.llmReady')
+        : aiDegraded
+          ? t('settingsHub.llmDegraded')
+          : t('settingsHub.llmNotReady'),
+      badge: aiReady ? t('settingsHub.on') : aiDegraded ? t('settingsHub.degraded') : t('settingsHub.off'),
+      badgeCls: aiReady
+        ? 'text-moss border-moss/40'
+        : aiDegraded
+          ? 'text-ember border-ember/40'
+          : 'text-muted border-border',
     },
   ]
+
+  const bannerCls = aiReady
+    ? 'border-moss/40 bg-moss/5'
+    : aiDegraded
+      ? 'border-ember/40 bg-ember/5'
+      : 'border-border bg-surface'
+  const bannerText = aiReady
+    ? t('settingsHub.aiOn')
+    : aiDegraded
+      ? t('settingsHub.aiDegraded')
+      : t('settingsHub.aiOff')
 
   return (
     <div>
       <PageHeader title={t('settingsHub.title')} subtitle={t('settingsHub.subtitle')} />
 
+      {settings.isError ? (
+        <div className="mb-6">
+          <StateBox>
+            <p className="mb-3">{t('common.loadFailed', { message: errorText(settings.error, t) })}</p>
+          </StateBox>
+        </div>
+      ) : null}
+
       {/* AI status banner */}
-      <div
-        className={`mb-6 rounded-lg border px-4 py-3 text-sm ${
-          aiReady ? 'border-moss/40 bg-moss/5' : 'border-ember/40 bg-ember/5'
-        }`}
-      >
-        {aiReady ? t('settingsHub.aiOn') : t('settingsHub.aiOff')}
+      <div className={`mb-6 rounded-lg border px-4 py-3 text-sm ${bannerCls}`}>{bannerText}</div>
+
+      <div className="mb-6">
+        <SystemHealthCard />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

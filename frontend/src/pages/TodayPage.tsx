@@ -1,16 +1,19 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { api, type ImpactCard } from '../lib/api'
-import { Button, ListSkeleton, PageHeader, StateBox } from '../components/ui'
+import { Button, ListSkeleton, PageHeader, StateBox, useToast } from '../components/ui'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { useSources } from '../hooks/useSources'
 import { useImportPack } from '../hooks/useImportPack'
+import { errorText } from '../lib/errors'
 
 export default function TodayPage() {
   const { t, i18n } = useTranslation()
+  const qc = useQueryClient()
+  const { push: pushToast } = useToast()
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const sources = useSources()
   const defaultPack = i18n.language.startsWith('zh') ? 'ai-cn' : 'ai-core'
@@ -24,14 +27,38 @@ export default function TodayPage() {
     ['sources'],
   ])
 
+  // Impact is what actually fills Today/Actions, but nothing used to trigger it: the onboarding
+  // said "update once, then read Today" and Today stayed empty forever.
+  const impactJob = useMutation({
+    mutationFn: api.impactJob,
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['intelligence-home'] }),
+        qc.invalidateQueries({ queryKey: ['actions'] }),
+        qc.invalidateQueries({ queryKey: ['changes-watching'] }),
+        qc.invalidateQueries({ queryKey: ['watching'] }),
+      ])
+      pushToast('success', t('today.impactDone'))
+    },
+    onError: (err) => pushToast('error', errorText(err, t)),
+  })
+
   const importPack = useImportPack({ successMessage: 'home.gettingStarted.imported' })
 
   const data = home.data
   const sourceCount = sources.data?.length ?? 0
+  const hasSources = sourceCount > 0
   const todayChanges = (data?.todayChanges ?? data?.whyCare ?? []).slice(0, 10)
   const ready = todayChanges.length > 0
 
   const highCount = todayChanges.filter((c) => c.tier === 'HIGH').length
+
+  const runFetch = () => {
+    fetchJob.mutate(undefined, {
+      // Chain impact so one click really does produce decisions on Today.
+      onSuccess: () => impactJob.mutate(),
+    })
+  }
 
   return (
     <div>
@@ -39,7 +66,7 @@ export default function TodayPage() {
         title={t('today.title')}
         subtitle={t('today.subtitle')}
         actions={
-          <Button onClick={() => fetchJob.mutate()} loading={isPending}>
+          <Button onClick={runFetch} loading={isPending}>
             {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
           </Button>
         }
@@ -55,35 +82,54 @@ export default function TodayPage() {
 
       {home.isLoading ? <ListSkeleton rows={4} /> : null}
       {home.isError ? (
-        <StateBox>{t('common.loadFailed', { message: (home.error as Error).message })}</StateBox>
+        <StateBox>{t('common.loadFailed', { message: errorText(home.error, t) })}</StateBox>
       ) : null}
 
       {/* Getting started */}
       {!home.isLoading && !home.isError && !ready ? (
         <div className="mb-8 rounded-xl border border-dashed border-border bg-surface p-6">
-          <h3 className="text-lg font-medium text-ink">{t('home.gettingStarted.title')}</h3>
-          <p className="mt-2 max-w-xl text-sm text-muted">{t('home.gettingStarted.subtitle')}</p>
-          {sourceCount === 0 ? (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <select
-                className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                value={packId}
-                onChange={(e) => setPackId(e.target.value)}
-              >
-                <option value="ai-core">{t('home.pack.ai-core')}</option>
-                <option value="ai-cn">{t('home.pack.ai-cn')}</option>
-                <option value="ai-signals">{t('home.pack.ai-signals')}</option>
-              </select>
-              <Button loading={importPack.isPending} onClick={() => importPack.mutate(packId)}>
-                {t('home.gettingStarted.import')}
-              </Button>
-            </div>
-          ) : null}
-          <div className="mt-4">
-            <Button onClick={() => fetchJob.mutate()} loading={isPending}>
-              {t('home.gettingStarted.step2')}
+          <h3 className="text-lg font-medium text-ink">
+            {hasSources ? t('home.gettingStarted.hasSourcesTitle') : t('home.gettingStarted.title')}
+          </h3>
+          <p className="mt-2 max-w-xl text-sm text-muted">
+            {hasSources ? t('home.gettingStarted.hasSourcesSubtitle') : t('home.gettingStarted.subtitle')}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {!hasSources ? (
+              <>
+                <select
+                  className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                  value={packId}
+                  onChange={(e) => setPackId(e.target.value)}
+                >
+                  <option value="ai-core">{t('home.pack.ai-core')}</option>
+                  <option value="ai-cn">{t('home.pack.ai-cn')}</option>
+                  <option value="ai-signals">{t('home.pack.ai-signals')}</option>
+                </select>
+                <Button loading={importPack.isPending} onClick={() => importPack.mutate(packId)}>
+                  {t('home.gettingStarted.import')}
+                </Button>
+              </>
+            ) : null}
+            <Button onClick={runFetch} loading={isPending}>
+              {hasSources ? t('common.fetchNow') : t('home.gettingStarted.step2')}
             </Button>
+            <Button
+              variant="ghost"
+              onClick={() => impactJob.mutate()}
+              loading={impactJob.isPending}
+              disabled={!hasSources}
+            >
+              {impactJob.isPending ? t('today.impactRunning') : t('today.recomputeImpact')}
+            </Button>
+            <Link
+              to="/settings/context"
+              className="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm text-accent hover:border-accent/50"
+            >
+              {t('home.gettingStarted.stepContext')}
+            </Link>
           </div>
+          <p className="mt-3 text-xs text-muted">{t('home.gettingStarted.updateHint')}</p>
         </div>
       ) : null}
 

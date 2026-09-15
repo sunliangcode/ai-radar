@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { PageHeader, StateBox } from '../components/ui'
+import { errorText } from '../lib/errors'
 
 export default function BriefDetailPage() {
   const { t } = useTranslation()
@@ -15,7 +16,7 @@ export default function BriefDetailPage() {
   })
 
   if (q.isLoading) return <StateBox>{t('briefs.loading')}</StateBox>
-  if (q.isError) return <StateBox>{t('common.loadFailed', { message: (q.error as Error).message })}</StateBox>
+  if (q.isError) return <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox>
   if (!q.data) return <StateBox>{t('common.notFound')}</StateBox>
 
   return (

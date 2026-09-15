@@ -10,7 +10,7 @@ Optional LAN guard: set `LOCAL_TOKEN` and send header `X-Local-Token`.
 
 | Method | Path |
 | --- | --- |
-| GET | `/api/health` |
+| GET | `/api/health` (includes `translate.status`: up/down/disabled) |
 | POST | `/api/jobs/fetch`, `/api/jobs/push` |
 | CRUD | `/api/sources` |
 | GET/PATCH | `/api/items` (`saved` / `unread` / `sourceType` filters; PATCH `read` / `saved`) |
@@ -40,7 +40,7 @@ Domain model and object mapping: [ai-radar-2.0-domain.md](ai-radar-2.0-domain.md
 
 | Method | Path |
 | --- | --- |
-| GET | `/api/health` |
+| GET | `/api/health`（含 `translate.status`：up/down/disabled） |
 | POST | `/api/jobs/fetch`, `/api/jobs/push` |
 | CRUD | `/api/sources` |
 | GET/PATCH | `/api/items`（`saved` / `unread` / `sourceType` 过滤；`PATCH` 可设 `read` / `saved`） |

@@ -43,7 +43,7 @@ Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.en
 
 Empty databases are seeded from packs `ai-core` + `ai-cn` via `PackImportService` (filesystem `packs/` or classpath). Prefer editing pack JSON rather than hard-coding sources.
 
-**Zhihu** is additionally ensured on every boot (`SourceSeeder.ensureZhihu`): creates 「知乎推荐」 if missing and pins `cliPath` to `/Users/sunliang/workspace/own/zhihu-cli-go/zhihu`. Runtime fetch may still honor `ZHIHU_CLI_PATH`.
+**Zhihu** is ensured on every boot (`SourceSeeder.ensureZhihu`): creates 「知乎推荐」 if missing. New sources are **enabled only when the CLI binary is present** (`ZHIHU_CLI_PATH` or `ZhihuConnector.DEFAULT_CLI`). A working custom `cliPath` is never overwritten; a missing path is repaired only when a preferred binary is ready. Runtime fetch also honors `ZHIHU_CLI_PATH`.
 
 The UI loads field schemas from `GET /api/connectors`.
 

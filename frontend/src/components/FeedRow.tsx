@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Item } from '../lib/api'
 import { ScoreBar, ScoreSourceBadge } from './ui'
+import { errorText } from '../lib/errors'
 
 function timeAgo(iso?: string, locale?: string): string {
   if (!iso) return ''
@@ -168,7 +169,7 @@ export function FeedRow({
             </div>
           ) : detail.isError ? (
             <p className="text-xs text-ember">
-              {t('feed.detailError')} {(detail.error as Error).message}
+              {t('feed.detailError')} {errorText(detail.error, t)}
             </p>
           ) : detail.data?.kind === 'zhihu' ? (
             <>

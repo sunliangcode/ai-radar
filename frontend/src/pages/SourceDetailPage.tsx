@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { ItemRow, PageHeader, StateBox } from '../components/ui'
+import { errorText } from '../lib/errors'
 
 function formatConfigValue(value: unknown): string {
   if (value == null) return '—'
@@ -22,7 +23,7 @@ export default function SourceDetailPage() {
   })
 
   if (q.isLoading) return <StateBox>{t('common.loading')}</StateBox>
-  if (q.isError) return <StateBox>{t('common.loadFailed', { message: (q.error as Error).message })}</StateBox>
+  if (q.isError) return <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox>
   if (!q.data) return <StateBox>{t('sources.notFound')}</StateBox>
 
   const s = q.data

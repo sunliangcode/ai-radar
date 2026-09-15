@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type ChangeCard, type Item, type WatchingGroup } from '../lib/api'
-import { Button, EmptyState, ListSkeleton, PageHeader, ScoreBar, useToast } from '../components/ui'
+import { Button, EmptyState, ListSkeleton, PageHeader, ScoreBar, StateBox, useToast } from '../components/ui'
 import { useMarkItemRead } from '../hooks/useMarkItemRead'
 import { dateLocale } from '../i18n'
+import { errorText } from '../lib/errors'
 
 const TIMELINE_PREVIEW = 3
 
@@ -41,7 +42,7 @@ export default function WatchingPage() {
       }
     },
     onError: (err) => {
-      pushToast('error', t('common.loadFailed', { message: (err as Error).message }))
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
     },
   })
 
@@ -110,9 +111,18 @@ export default function WatchingPage() {
       <section className="mb-8">
         <h2 className="mb-3 text-base font-semibold text-ink">{t('watching.trackedChanges')}</h2>
         {changes.isLoading ? <ListSkeleton rows={3} /> : null}
-        {!changes.isLoading && tracked.length === 0 ? (
+        {changes.isError ? (
+          <StateBox>
+            <p className="mb-3">{t('common.loadFailed', { message: errorText(changes.error, t) })}</p>
+            <Button variant="ghost" onClick={() => void changes.refetch()}>
+              {t('common.retry')}
+            </Button>
+          </StateBox>
+        ) : null}
+        {!changes.isLoading && !changes.isError && tracked.length === 0 ? (
           <EmptyState title={t('watching.noTracked')} description={t('watching.noTrackedHint')} />
-        ) : (
+        ) : null}
+        {!changes.isError && tracked.length > 0 ? (
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
             {tracked.map((c: ChangeCard) => (
               <li key={c.id} className="row-py px-4">
@@ -145,7 +155,7 @@ export default function WatchingPage() {
               </li>
             ))}
           </ul>
-        )}
+        ) : null}
       </section>
 
       <section>
@@ -156,7 +166,15 @@ export default function WatchingPage() {
           </span>
         </div>
         {saved.isLoading ? <ListSkeleton rows={3} /> : null}
-        {!saved.isLoading && savedItems.length === 0 ? (
+        {saved.isError ? (
+          <StateBox>
+            <p className="mb-3">{t('common.loadFailed', { message: errorText(saved.error, t) })}</p>
+            <Button variant="ghost" onClick={() => void saved.refetch()}>
+              {t('common.retry')}
+            </Button>
+          </StateBox>
+        ) : null}
+        {!saved.isLoading && !saved.isError && savedItems.length === 0 ? (
           <EmptyState
             title={t('watching.noSaved')}
             description={t('watching.noSavedHint')}
@@ -166,7 +184,8 @@ export default function WatchingPage() {
               </Link>
             }
           />
-        ) : (
+        ) : null}
+        {!saved.isError && savedItems.length > 0 ? (
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
             {savedItems.map((item: Item) => (
               <li key={item.id} className="row-py px-4">
@@ -219,7 +238,7 @@ export default function WatchingPage() {
               </li>
             ))}
           </ul>
-        )}
+        ) : null}
       </section>
     </div>
   )
