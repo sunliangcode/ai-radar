@@ -10,7 +10,7 @@ English | [中文](README.zh.md)
 ### Your personal AI intelligence system.
 
 ```
-Your Context → Signals → Score & Summarize → Impact → Actions
+Your Context → Signals → Score & Summarize → Today Deck → Decide
 ```
 
 Know what changed. Know why it matters. Know what to do.
@@ -25,16 +25,16 @@ Know what changed. Know why it matters. Know what to do.
 
 ### Why AI Radar?
 
-Most AI news is noise. AI Radar filters that noise against your context and surfaces only changes worth your attention — then tells you what to do about them.
+Most AI news is noise. AI Radar filters that noise against your context and surfaces only changes worth your attention — then helps you decide what to do.
 
 - ✓ **Personal Context** — Profile, projects, and stack so relevance is about *you*
 - ✓ **Primary language** — Summaries in zh/en via LLM; English titles localized with **Argos Translate** (offline sidecar)
-- ✓ **Live Feed** — One-sentence AI summary per item; items appear as soon as they are analyzed
+- ✓ **Today Radar Deck** — Up to three major changes a day; **Watch**, **Dismiss**, or **Decide** one card at a time
+- ✓ **Explore** — Full signal browse with one-sentence AI summaries (legacy Feed lives here)
 - ✓ **Like / dislike keywords** — Save or mark Not interested to teach preference phrases
-- ✓ **Change Detection** — Important external shifts, not an endless raw feed
-- ✓ **Impact Analysis** — Why a change matters for your work, in plain language
-- ✓ **Recommended Actions** — Checklist-style next steps; saving can trigger an action suggestion
-- ✓ **AI Monitor** — Queue progress plus streaming I/O for local Ollama
+- ✓ **Changes & Decisions** — Why a shift matters in plain language, plus decisions to revisit
+- ✓ **Radar Chat** — Multi-turn chat with your model; seed from a change via `?changeId=`
+- ✓ **AI Monitor** — Queue progress and streaming I/O under **Settings → System**
 
 ---
 
@@ -44,15 +44,15 @@ Most AI news is noise. AI Radar filters that noise against your context and surf
 
 - **What changed** — What truly mattered in the AI world today?
 - **Why care** — Why does this matter for *your* projects and stack?
-- **What to do** — What should you do next?
+- **What to do** — Watch, dismiss, or decide — then revisit when needed.
 
 **Demo story**
 
-1. Open Settings / Context and describe your role, projects, and tech stack; set your **primary language** (Chinese or English).
-2. Run a fetch — items appear in the Feed **as each one is scored and summarized** (no need to wait for the whole job).
-3. Read the one-line AI summary; mark **Not interested** or **Save** so Radar learns like/dislike keywords.
-4. Open a change for **Impact**, or check **Actions** for next steps (saving an item can also trigger an action suggestion).
-5. Watch the **AI Monitor** for queue progress and live Ollama token streaming.
+1. Open **Who I am** (Settings / Context) and describe your role, projects, and tech stack; set your **primary language** (Chinese or English).
+2. Import a source pack if needed, then **Update once** — fetch scores and summarizes signals, then recomputes impact.
+3. Clear the **Today** Radar Deck one card at a time (**Watch** / **Dismiss** / **Decide**).
+4. Browse the full stream in **Explore**; open a change for evidence, or jump into **Radar Chat** from a change.
+5. Check **Settings → System** for queue progress and live Ollama token streaming.
 
 ---
 
