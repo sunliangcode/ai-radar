@@ -3,13 +3,15 @@ import type { Item } from '../../lib/api'
 import { isZhihuSource } from '../../components/magazine/magCover'
 
 /**
- * Feed keyboard: j/k move; Enter open original (drawer for Zhihu); o open drawer; s save; m read; / search.
+ * Feed keyboard: j/k (n/p in focus) move; Enter open original (drawer for Zhihu);
+ * o open drawer; s save; m read; / search.
  * When the drawer is open, j/k still advances selection (drawer content follows).
  */
 export function useFeedKeyboard({
   items,
   selectedId,
   drawerOpen,
+  focusMode,
   onSelect,
   onOpenDrawer,
   onCloseDrawer,
@@ -21,6 +23,7 @@ export function useFeedKeyboard({
   items: Item[]
   selectedId: number | null
   drawerOpen: boolean
+  focusMode?: boolean
   onSelect: (id: number) => void
   onOpenDrawer: (id: number) => void
   onCloseDrawer: () => void
@@ -42,14 +45,21 @@ export function useFeedKeyboard({
       }
 
       const idx = items.findIndex((i) => i.id === selectedId)
-      if (e.key === 'j' || e.key === 'ArrowDown') {
-        e.preventDefault()
+      const goNext = () => {
         const next = items[Math.min(items.length - 1, Math.max(0, idx) + 1)]
         if (next) onSelect(next.id)
-      } else if (e.key === 'k' || e.key === 'ArrowUp') {
-        e.preventDefault()
+      }
+      const goPrev = () => {
         const prev = items[Math.max(0, (idx < 0 ? 0 : idx) - 1)]
         if (prev) onSelect(prev.id)
+      }
+
+      if (e.key === 'j' || e.key === 'ArrowDown' || (focusMode && e.key === 'n')) {
+        e.preventDefault()
+        goNext()
+      } else if (e.key === 'k' || e.key === 'ArrowUp' || (focusMode && e.key === 'p')) {
+        e.preventDefault()
+        goPrev()
       } else if (e.key === 'Enter') {
         const cur = items[idx] ?? (selectedId == null ? items[0] : undefined)
         if (cur) {
@@ -80,6 +90,7 @@ export function useFeedKeyboard({
     items,
     selectedId,
     drawerOpen,
+    focusMode,
     onSelect,
     onOpenDrawer,
     onCloseDrawer,

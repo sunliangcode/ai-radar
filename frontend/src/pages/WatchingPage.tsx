@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { PageHeader, useToast } from '../components/ui'
 import { useMarkItemRead } from '../hooks/useMarkItemRead'
+import { useDisplaySources } from '../hooks/useDisplaySources'
+import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
 import { TimelineSection, TIMELINE_PREVIEW } from './watching/TimelineSection'
@@ -17,12 +19,16 @@ export default function WatchingPage() {
   const { push: pushToast } = useToast()
   const locale = dateLocale(i18n.language)
   const markItemRead = useMarkItemRead()
+  const { sourceIdsQuery, displaySourceIds } = useDisplaySources()
   const [showAllTimeline, setShowAllTimeline] = useState(false)
 
   const changes = useQuery({ queryKey: ['changes-watching'], queryFn: () => api.changes(40) })
   const saved = useQuery({
-    queryKey: ['watching-saved'],
-    queryFn: () => api.items('?saved=true&sort=score&limit=50'),
+    queryKey: ['watching-saved', sourceIdsQuery],
+    queryFn: () =>
+      api.items(
+        `?saved=true&sort=score&limit=50${sourceIdsQuery ? `&${sourceIdsQuery}` : ''}`,
+      ),
   })
   const timeline = useQuery({ queryKey: ['watching-timeline'], queryFn: api.watchingTimeline })
 
@@ -50,11 +56,13 @@ export default function WatchingPage() {
     },
   })
 
-  const tracked = (changes.data ?? []).filter(
-    (c) => c.tier === 'HIGH' || c.tier === 'MEDIUM' || c.status === 'WATCHING',
-  )
+  const tracked = (changes.data ?? [])
+    .filter((c) => changeMatchesDisplay(c, displaySourceIds))
+    .filter((c) => c.tier === 'HIGH' || c.tier === 'MEDIUM' || c.status === 'WATCHING')
   const savedItems = saved.data?.items ?? []
-  const groups = timeline.data?.groups ?? []
+  const groups = (timeline.data?.groups ?? []).filter((g) =>
+    changeMatchesDisplay(g, displaySourceIds),
+  )
   const visibleGroups = showAllTimeline ? groups : groups.slice(0, TIMELINE_PREVIEW)
 
   return (

@@ -4,12 +4,14 @@ import {
   ArrowRight,
   Compass,
   GitBranch,
+  MessageSquare,
   Newspaper,
   Search,
   Settings,
   Star,
   User,
 } from 'lucide-react'
+import { useEngagement } from '../../hooks/useEngagement'
 import { LanguageSwitcher, ThemeDensityControls } from './PrefsControls'
 
 const NAV_ICONS = {
@@ -18,6 +20,7 @@ const NAV_ICONS = {
   '/watching': Star,
   '/decisions': ArrowRight,
   '/explore': Compass,
+  '/chat': MessageSquare,
   '/settings/context': User,
   '/settings': Settings,
 } as const
@@ -34,6 +37,7 @@ export function Sidebar({
   onOpenPalette: () => void
 }) {
   const { t } = useTranslation()
+  const { streak, todayReadCount } = useEngagement()
   const [searchParams] = useSearchParams()
   const activeSourceType = searchParams.get('sourceType') ?? ''
 
@@ -43,6 +47,7 @@ export function Sidebar({
     { to: '/watching', label: t('nav.watching'), end: false },
     { to: '/decisions', label: t('nav.decisions'), end: false },
     { to: '/explore', label: t('nav.explore'), end: false },
+    { to: '/chat', label: t('nav.chat'), end: false },
     { to: '/settings/context', label: t('nav.contexts'), end: false },
     { to: '/settings', label: t('nav.settings'), end: false },
   ]
@@ -53,6 +58,20 @@ export function Sidebar({
         <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">{t('nav.product')}</p>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">{t('nav.brand')}</h1>
         <p className="mt-1 text-[11px] text-faint">{t('nav.taglineV2')}</p>
+        {(streak > 0 || todayReadCount > 0) ? (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {streak > 0 ? (
+              <span className="rounded-md bg-border/70 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted">
+                {t('fun.streakPill', { count: streak })}
+              </span>
+            ) : null}
+            {todayReadCount > 0 ? (
+              <span className="rounded-md bg-border/70 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted">
+                {t('fun.readPill', { count: todayReadCount })}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <nav className="flex md:flex-col gap-1 overflow-x-auto" aria-label={t('nav.main')}>
         {nav.map((item) => {

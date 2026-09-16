@@ -1,6 +1,7 @@
 package com.airadar.api;
 
 import com.airadar.action.ActionSuggestService;
+import com.airadar.change.EventSourceLookup;
 import com.airadar.domain.NewsItem;
 import com.airadar.event.EventItemRepository;
 import com.airadar.interest.InterestSignalsService;
@@ -27,9 +28,11 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Stream;
 
@@ -87,6 +90,7 @@ public class ItemsController {
             @RequestParam(required = false) Boolean unread,
             @RequestParam(required = false) Boolean saved,
             @RequestParam(required = false) Long sourceId,
+            @RequestParam(required = false) String sourceIds,
             @RequestParam(required = false) String sourceType,
             @RequestParam(defaultValue = "score") String sort,
             @RequestParam(defaultValue = "0") int offset,
@@ -126,12 +130,12 @@ public class ItemsController {
         if (!savedOnly) {
             stream = stream.filter(i -> !i.isDismissed());
         }
-        if (sourceId != null) {
-            String needle = String.valueOf(sourceId);
-            stream = stream.filter(i ->
-                    (i.getPrimarySourceId() != null && i.getPrimarySourceId().contains(needle))
-                            || i.getSourceRefs().stream().anyMatch(r -> r.contains(needle))
-            );
+        Set<Long> parsedSourceIds = parseSourceIdSet(sourceIds);
+        final Set<Long> sourceIdFilter = parsedSourceIds.isEmpty() && sourceId != null
+                ? Set.of(sourceId)
+                : parsedSourceIds;
+        if (!sourceIdFilter.isEmpty()) {
+            stream = stream.filter(i -> matchesAnySourceId(i, sourceIdFilter));
         }
         if (channelFilter) {
             String wanted = sourceType.trim();
@@ -253,6 +257,7 @@ public class ItemsController {
     @GetMapping("/search")
     public Map<String, Object> search(
             @RequestParam("q") String q,
+            @RequestParam(required = false) String sourceIds,
             @RequestParam(defaultValue = "50") int limit
     ) {
         String needle = q == null ? "" : q.trim();
@@ -260,14 +265,17 @@ public class ItemsController {
             return Map.of("items", List.of(), "total", 0);
         }
         int lim = Math.max(1, Math.min(limit, 200));
+        Set<Long> sourceIdFilter = parseSourceIdSet(sourceIds);
         List<Map<String, Object>> results = newsItemRepository
                 .findByTitleContainingIgnoreCaseOrContentSnippetContainingIgnoreCase(needle, needle)
                 .stream()
                 .filter(e -> !e.isDismissed())
-                .sorted(Comparator.comparing(NewsItemEntity::getScore,
+                .map(entityMapper::toDomain)
+                .filter(i -> sourceIdFilter.isEmpty() || matchesAnySourceId(i, sourceIdFilter))
+                .sorted(Comparator.comparing(NewsItem::getScore,
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(lim)
-                .map(e -> toDto(entityMapper.toDomain(e)))
+                .map(this::toDto)
                 .toList();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("items", results);
@@ -301,6 +309,39 @@ public class ItemsController {
         return out;
     }
 
+    private static Set<Long> parseSourceIdSet(String sourceIds) {
+        if (sourceIds == null || sourceIds.isBlank()) {
+            return Set.of();
+        }
+        Set<Long> out = new LinkedHashSet<>();
+        for (String part : sourceIds.split(",")) {
+            Long id = EventSourceLookup.parseSourceId(part.trim());
+            if (id != null) {
+                out.add(id);
+            }
+        }
+        return out;
+    }
+
+    private static boolean matchesAnySourceId(NewsItem item, Set<Long> wanted) {
+        if (wanted.isEmpty()) {
+            return true;
+        }
+        Long primary = EventSourceLookup.parseSourceId(item.getPrimarySourceId());
+        if (primary != null && wanted.contains(primary)) {
+            return true;
+        }
+        if (item.getSourceRefs() != null) {
+            for (String ref : item.getSourceRefs()) {
+                Long id = EventSourceLookup.parseSourceId(ref);
+                if (id != null && wanted.contains(id)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static Long asLong(Object v) {
         if (v instanceof Number n) return n.longValue();
         try {
@@ -327,6 +368,7 @@ public class ItemsController {
         dto.put("publishedAt", ApiTimes.iso(item.getPublishedAt()));
         dto.put("sourceRefs", item.getSourceRefs());
         dto.put("primarySourceType", item.getPrimarySourceType());
+        dto.put("primarySourceId", item.getPrimarySourceId());
         dto.put("read", item.isRead());
         dto.put("saved", item.isSaved());
         dto.put("dismissed", item.isDismissed());

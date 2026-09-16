@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { api, type ActionCard } from '../lib/api'
 import { FeedbackBar } from '../components/feedback/FeedbackBar'
 import { EmptyState, ListSkeleton, PageHeader, StateBox, StatusBadge, useToast } from '../components/ui'
+import { useDisplaySources } from '../hooks/useDisplaySources'
+import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 
 type Filter = 'open' | 'watching' | 'started' | 'useful' | 'ignored' | 'all'
@@ -13,11 +15,12 @@ const STATUS_ORDER: Filter[] = ['open', 'watching', 'started', 'useful', 'ignore
 
 export default function ActionsPage() {
   const { t } = useTranslation()
+  const { displaySourceIds } = useDisplaySources()
   const actions = useQuery({ queryKey: ['actions'], queryFn: api.actions })
   const [filter, setFilter] = useState<Filter>('open')
 
   const grouped = useMemo(() => {
-    const list = actions.data ?? []
+    const list = (actions.data ?? []).filter((a) => changeMatchesDisplay(a, displaySourceIds))
     const byStatus: Record<string, ActionCard[]> = {}
     for (const action of list) {
       const status = action.status ?? 'open'
@@ -25,7 +28,7 @@ export default function ActionsPage() {
       byStatus[status].push(action)
     }
     return byStatus
-  }, [actions.data])
+  }, [actions.data, displaySourceIds])
 
   const visibleStatuses = useMemo(() => {
     if (filter === 'all') {

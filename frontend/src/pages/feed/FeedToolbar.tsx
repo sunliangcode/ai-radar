@@ -1,8 +1,10 @@
 import { Chip } from '../../components/ui'
 import { useTranslation } from 'react-i18next'
+import { LayoutGrid, Focus } from 'lucide-react'
 import { RANGES, type Range } from './feedQuery'
+import type { ExploreView } from '../../lib/engagement'
 
-/** Search + one scrollable chip row (range / unread / source). */
+/** Search + one scrollable chip row (range / unread / source) + view toggle. */
 export function FeedToolbar({
   inputQ,
   onInputChange,
@@ -18,6 +20,8 @@ export function FeedToolbar({
   total,
   unreadCount,
   channelTypes,
+  exploreView,
+  onExploreViewChange,
 }: {
   inputQ: string
   onInputChange: (v: string) => void
@@ -33,6 +37,8 @@ export function FeedToolbar({
   total: number
   unreadCount: number
   channelTypes: string[]
+  exploreView: ExploreView
+  onExploreViewChange: (v: ExploreView) => void
 }) {
   const { t } = useTranslation()
 
@@ -67,6 +73,38 @@ export function FeedToolbar({
           ) : (
             <kbd className="absolute right-3 top-2.5">/</kbd>
           )}
+        </div>
+        <div
+          className="flex shrink-0 overflow-hidden rounded-full border border-border"
+          role="group"
+          aria-label={t('feed.viewToggle')}
+        >
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs transition ${
+              exploreView === 'waterfall'
+                ? 'bg-accent-soft font-medium text-accent'
+                : 'text-muted hover:bg-border hover:text-ink'
+            }`}
+            aria-pressed={exploreView === 'waterfall'}
+            onClick={() => onExploreViewChange('waterfall')}
+          >
+            <LayoutGrid size={12} aria-hidden />
+            {t('feed.viewWaterfall')}
+          </button>
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs transition ${
+              exploreView === 'focus'
+                ? 'bg-accent-soft font-medium text-accent'
+                : 'text-muted hover:bg-border hover:text-ink'
+            }`}
+            aria-pressed={exploreView === 'focus'}
+            onClick={() => onExploreViewChange('focus')}
+          >
+            <Focus size={12} aria-hidden />
+            {t('feed.viewFocus')}
+          </button>
         </div>
         <span className="font-mono text-xs text-muted">
           {searchMode ? t('feed.searchingFor', { q }) : t('feed.count', { count: total })}

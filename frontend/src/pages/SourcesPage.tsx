@@ -12,6 +12,7 @@ import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
 import { SourceCreateForm } from './sources/SourceCreateForm'
 import { SourceList } from './sources/SourceList'
+import { SourceDisplayPicker } from './sources/SourceDisplayPicker'
 
 export default function SourcesPage() {
   const { t, i18n } = useTranslation()
@@ -169,6 +170,8 @@ export default function SourcesPage() {
       ) : null}
 
       {!isEmpty && sources.data ? (
+        <>
+        <SourceDisplayPicker sources={sources.data} />
         <SourceList
           sources={sources.data}
           locale={locale}
@@ -179,6 +182,7 @@ export default function SourcesPage() {
           onToggleEnabled={(id, enabled) => patch.mutate({ id, body: { enabled } })}
           onDelete={(id) => remove.mutate(id)}
         />
+        </>
       ) : null}
     </div>
   )

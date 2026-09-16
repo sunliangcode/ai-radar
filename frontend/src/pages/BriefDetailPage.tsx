@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { BriefEntryCard } from '../components/brief/BriefEntryCard'
 import { PageHeader, ScorePill, StateBox } from '../components/ui'
+import { useDisplaySources } from '../hooks/useDisplaySources'
+import { itemMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { dateLocale } from '../i18n'
 import { parseBriefMarkdown } from '../lib/parseBriefMarkdown'
@@ -29,6 +31,7 @@ export default function BriefDetailPage() {
   const { t, i18n } = useTranslation()
   const locale = dateLocale(i18n.language)
   const { date = '' } = useParams()
+  const { displaySourceIds } = useDisplaySources()
   const q = useQuery({
     queryKey: ['brief', date],
     queryFn: () => api.brief(date),
@@ -40,22 +43,42 @@ export default function BriefDetailPage() {
     [q.data],
   )
 
+  const visibleItems = useMemo(
+    () => (q.data?.items ?? []).filter((item) => itemMatchesDisplay(item, displaySourceIds)),
+    [q.data, displaySourceIds],
+  )
+
+  const allowedUrls = useMemo(() => {
+    if (displaySourceIds === null) return null
+    return new Set(visibleItems.map((i) => i.canonicalUrl).filter(Boolean))
+  }, [displaySourceIds, visibleItems])
+
+  const events = useMemo(() => {
+    if (!parsed) return []
+    if (allowedUrls == null) return parsed.events
+    return parsed.events.filter((e) => !e.url || allowedUrls.has(e.url))
+  }, [parsed, allowedUrls])
+
+  const topItems = useMemo(() => {
+    if (!parsed) return []
+    if (allowedUrls == null) return parsed.topItems
+    return parsed.topItems.filter((e) => !e.url || allowedUrls.has(e.url))
+  }, [parsed, allowedUrls])
+
   const extraItems = useMemo(() => {
-    if (!q.data || !parsed) return []
+    if (!parsed) return []
     const inBrief = new Set(
-      [...parsed.events, ...parsed.topItems]
-        .map((e) => e.url)
-        .filter(Boolean) as string[],
+      [...events, ...topItems].map((e) => e.url).filter(Boolean) as string[],
     )
-    return (q.data.items ?? []).filter((item) => !inBrief.has(item.canonicalUrl))
-  }, [q.data, parsed])
+    return visibleItems.filter((item) => !inBrief.has(item.canonicalUrl))
+  }, [parsed, events, topItems, visibleItems])
 
   if (q.isLoading) return <StateBox>{t('briefs.loading')}</StateBox>
   if (q.isError) return <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox>
   if (!q.data || !parsed) return <StateBox>{t('common.notFound')}</StateBox>
 
   const parts = briefDateParts(q.data.date, locale)
-  const curatedCount = parsed.events.length + parsed.topItems.length
+  const curatedCount = events.length + topItems.length
   const hasCurated = curatedCount > 0
 
   return (
@@ -106,11 +129,11 @@ export default function BriefDetailPage() {
         <StateBox>{parsed.emptyNote ?? t('briefs.emptyDay')}</StateBox>
       ) : null}
 
-      {parsed.events.length > 0 ? (
+      {events.length > 0 ? (
         <section className="mb-8">
           <h2 className="brief-section-label">{t('briefs.sectionEvents')}</h2>
           <ul className="space-y-3">
-            {parsed.events.map((entry) => (
+            {events.map((entry) => (
               <li key={`event-${entry.rank}-${entry.title}`}>
                 <BriefEntryCard entry={entry} locale={locale} variant="event" />
               </li>
@@ -119,11 +142,11 @@ export default function BriefDetailPage() {
         </section>
       ) : null}
 
-      {parsed.topItems.length > 0 ? (
+      {topItems.length > 0 ? (
         <section className="mb-8">
           <h2 className="brief-section-label">{t('briefs.sectionTopItems')}</h2>
           <ul className="space-y-3">
-            {parsed.topItems.map((entry) => (
+            {topItems.map((entry) => (
               <li key={`item-${entry.rank}-${entry.url ?? entry.title}`}>
                 <BriefEntryCard entry={entry} locale={locale} />
               </li>

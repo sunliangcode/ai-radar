@@ -98,7 +98,7 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
                   active
                     ? 'bg-moss text-surface'
                     : done
-                      ? 'bg-moss/15 text-moss-deep'
+                      ? 'fetch-step-done bg-moss/15 text-moss-deep'
                       : 'bg-border/60 text-muted'
                 }`}
               >

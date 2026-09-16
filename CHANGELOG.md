@@ -4,8 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Radar Chat** (`/chat`): multi-turn chat with the configured Ollama/OpenAI model; injects at most 2 related Changes per turn (seed via `?changeId=` from change detail); SSE streaming; session in localStorage
+- `POST /api/chat` (SSE) and `POST /api/chat/sync`; prompt `chat_radar.md`
+
 ### Changed
 
+- **My Context** UX: free-text intro first; save auto-extracts when structured fields are empty; compact “how AI reads you” + collapsed advanced fields; extract prompt includes `current_focus` / `explicit_ignore`
+- Settings → Sources: checkboxes to limit which sources appear across Today, Explore, Changes, Watching, Decisions, Actions, Briefs, and ⌘K search (stored locally; items API accepts `sourceIds`)
+- **Today Radar Deck**: major changes are cleared one card at a time (keyboard w/x/i/d, progress strip); Explore adds Focus browse mode next to the waterfall grid
+- Light engagement (local only): visit streak + today-read pills in the sidebar; Inbox Zero / deck-clear bursts; playful fetch/decision toasts
+- Nav & copy: Chinese labels for 今日 / 变化 / 我的 Context; fetch steps and empty states lean more narrative
 - **V2 product IA**: Today centers on ≤3 major Changes (why / what changed / what to do) with Watch · Dismiss · Decide; Explore replaces Feed in nav; Changes + Decisions pages; Monitor moves to Settings → System
 - Flyway: single baseline `V1__init.sql` (delete local `data/radar.db` after pull to migrate)
 - Daily Intelligence brief template (replaces “AI Radar Brief” header sections)

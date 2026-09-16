@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { FeedbackBar } from '../components/feedback/FeedbackBar'
@@ -13,6 +13,8 @@ import {
   StatusBadge,
   isZhihuSource,
 } from '../components/ui'
+import { useDisplaySources } from '../hooks/useDisplaySources'
+import { changeMatchesDisplay, itemMatchesDisplay } from '../lib/sourceFilter'
 import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
 
@@ -25,6 +27,7 @@ export default function ChangeDetailPage() {
   const { id } = useParams()
   const changeId = Number(id)
   const [readerItemId, setReaderItemId] = useState<number | null>(null)
+  const { displaySourceIds } = useDisplaySources()
   const q = useQuery({
     queryKey: ['change', changeId],
     queryFn: () => api.change(changeId),
@@ -44,12 +47,28 @@ export default function ChangeDetailPage() {
     navigate(fallbackFrom, { replace: !fromState })
   }
 
+  const visibleItems = useMemo(
+    () => (q.data?.items ?? []).filter((item) => itemMatchesDisplay(item, displaySourceIds)),
+    [q.data, displaySourceIds],
+  )
+
   if (q.isLoading) return <StateBox>{t('changes.loading')}</StateBox>
   if (q.isError) return <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox>
   if (!q.data) return <StateBox>{t('common.notFound')}</StateBox>
 
   const c = q.data
-  const readerItem = c.items?.find((i) => i.id === readerItemId)
+  if (!changeMatchesDisplay(c, displaySourceIds)) {
+    return (
+      <StateBox>
+        <p>{t('sources.hiddenByDisplayFilter')}</p>
+        <button type="button" onClick={goBack} className="mt-3 text-sm text-accent hover:underline">
+          {t('common.backToList')}
+        </button>
+      </StateBox>
+    )
+  }
+
+  const readerItem = visibleItems.find((i) => i.id === readerItemId)
 
   return (
     <div>
@@ -72,6 +91,12 @@ export default function ChangeDetailPage() {
       <div className="mb-4 flex flex-wrap gap-2">
         {c.tier ? <StatusBadge status={c.tier} /> : null}
         {c.status ? <StatusBadge status={c.status} /> : null}
+        <Link
+          to={`/chat?changeId=${c.id}`}
+          className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs text-accent hover:bg-accent-soft"
+        >
+          {t('chat.askAbout')}
+        </Link>
         {c.firstDetectedAt ? (
           <span className="text-xs text-muted">
             {t('changes.firstDetected')}: {new Date(c.firstDetectedAt).toLocaleDateString(locale)}
@@ -136,7 +161,10 @@ export default function ChangeDetailPage() {
 
       <h3 className="mb-3 font-serif text-xl">{t('changes.sourcesItems')}</h3>
       <div className="rounded-xl border border-border bg-surface/70 px-4">
-        {c.items?.map((item) => {
+        {visibleItems.length === 0 ? (
+          <p className="py-4 text-sm text-muted">{t('sources.noItemsInDisplayFilter')}</p>
+        ) : null}
+        {visibleItems.map((item) => {
           const zhihu = isZhihuSource(item.primarySourceType)
           return (
             <article key={item.id} className="flex gap-3 border-b border-border/80 py-3 last:border-0">

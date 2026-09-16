@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { useTranslation } from 'react-i18next'
 import { api, type Item } from '../lib/api'
 import { useToast } from '../components/ui'
+import { useEngagement } from './useEngagement'
 import { errorText } from '../lib/errors'
 
 type FeedPageData = { items: Item[]; total: number; offset?: number; limit?: number }
@@ -45,6 +46,7 @@ export function useMarkItemRead() {
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const { t } = useTranslation()
+  const engagement = useEngagement()
 
   return useMutation({
     mutationFn: ({ id, read }: { id: number; read: boolean }) => api.patchItem(id, { read }),
@@ -52,6 +54,7 @@ export function useMarkItemRead() {
       patchFeedItemInCache(qc, vars.id, { read: vars.read })
       void qc.invalidateQueries({ queryKey: ['unread-counts'] })
       if (!vars.read) return
+      engagement.bumpRead(1)
       pushToast('success', t('feed.markedRead'), {
         label: t('common.undo'),
         onClick: () => {

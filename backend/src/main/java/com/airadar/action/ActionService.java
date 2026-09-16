@@ -1,6 +1,7 @@
 package com.airadar.action;
 
 import com.airadar.api.ApiTimes;
+import com.airadar.change.EventSourceLookup;
 import com.airadar.experiment.ExperimentService;
 import com.airadar.memory.MemoryService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -21,17 +22,20 @@ public class ActionService {
     private final ObjectMapper objectMapper;
     private final ExperimentService experimentService;
     private final MemoryService memoryService;
+    private final EventSourceLookup eventSourceLookup;
 
     public ActionService(
             ActionRepository actionRepository,
             ObjectMapper objectMapper,
             @Lazy ExperimentService experimentService,
-            MemoryService memoryService
+            MemoryService memoryService,
+            EventSourceLookup eventSourceLookup
     ) {
         this.actionRepository = actionRepository;
         this.objectMapper = objectMapper;
         this.experimentService = experimentService;
         this.memoryService = memoryService;
+        this.eventSourceLookup = eventSourceLookup;
     }
 
     @Transactional(readOnly = true)
@@ -81,6 +85,7 @@ public class ActionService {
         m.put("impactId", e.getImpactId());
         m.put("eventId", e.getEventId());
         m.put("newsItemId", e.getNewsItemId());
+        m.put("sourceIds", eventSourceLookup.sourceIdsForEvent(e.getEventId()));
         m.put("title", e.getTitle());
         try {
             m.put("steps", objectMapper.readValue(

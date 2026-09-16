@@ -253,7 +253,10 @@ public class ContextService {
         payload.put("technologies", r.technologies() == null ? List.of() : r.technologies());
         payload.put("interests", r.interests() == null ? List.of() : r.interests());
         payload.put("goals", r.goals() == null ? List.of() : r.goals());
+        payload.put("current_focus", r.currentFocus() == null ? List.of() : r.currentFocus());
+        payload.put("explicit_ignore", r.explicitIgnore() == null ? List.of() : r.explicitIgnore());
         payload.put("preferences", r.preferences() == null ? Map.of() : r.preferences());
+        payload.put("schemaVersion", 2);
         return payload;
     }
 

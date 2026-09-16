@@ -4,12 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { api, type Item } from '../../lib/api'
 import { useToast } from '../../components/ui'
 import { patchFeedItemInCache, useMarkItemRead } from '../../hooks/useMarkItemRead'
+import { useEngagement } from '../../hooks/useEngagement'
 import { errorText } from '../../lib/errors'
 
 export function useFeedActions(unreadOnly: boolean) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
+  const engagement = useEngagement()
   const [confirmMarkAllOpen, setConfirmMarkAllOpen] = useState(false)
 
   const patch = useMutation({
@@ -28,6 +30,7 @@ export function useFeedActions(unreadOnly: boolean) {
       if (vars.dismissed) {
         patchFeedItemInCache(qc, vars.id, { dismissed: true, read: true }, { remove: true })
         void qc.invalidateQueries({ queryKey: ['preference-keywords'] })
+        engagement.bumpRead(1)
         pushToast('success', t('feed.notInterestedDone'), {
           label: t('common.undo'),
           onClick: () => {
@@ -46,6 +49,7 @@ export function useFeedActions(unreadOnly: boolean) {
         if (vars.saved != null) patchFields.saved = vars.saved
         const remove = unreadOnly && vars.read === true
         patchFeedItemInCache(qc, vars.id, patchFields, { remove })
+        if (vars.read === true) engagement.bumpRead(1)
         if (vars.saved) {
           void qc.invalidateQueries({ queryKey: ['preference-keywords'] })
           void qc.invalidateQueries({ queryKey: ['actions'] })
@@ -68,7 +72,12 @@ export function useFeedActions(unreadOnly: boolean) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['feed'] })
       void qc.invalidateQueries({ queryKey: ['unread-counts'] })
-      pushToast('success', t('feed.markAllReadDone'))
+      engagement.bumpRead(1)
+      if (engagement.claimInboxZero()) {
+        pushToast('success', t(engagement.inboxZeroToastKey()))
+      } else {
+        pushToast('success', t('feed.markAllReadDone'))
+      }
     },
     onError: (err) => {
       pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))

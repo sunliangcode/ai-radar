@@ -6,6 +6,7 @@ import { api, type Item } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { formatPushResult, type PushResultBody } from '../lib/formatPushResult'
 import { useMarkItemRead } from '../hooks/useMarkItemRead'
+import { useDisplaySources } from '../hooks/useDisplaySources'
 import { useToast } from './ui'
 
 type Command = {
@@ -20,6 +21,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const navigate = useNavigate()
   const qc = useQueryClient()
   const markItemRead = useMarkItemRead()
+  const { sourceIdsQuery } = useDisplaySources()
   const { push: pushToast } = useToast()
   const [q, setQ] = useState('')
   const [idx, setIdx] = useState(0)
@@ -111,8 +113,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   )
 
   const searchQuery = useQuery({
-    queryKey: ['palette-search', q],
-    queryFn: () => api.searchItems(q, 8),
+    queryKey: ['palette-search', q, sourceIdsQuery],
+    queryFn: () => {
+      const ids = sourceIdsQuery ? sourceIdsQuery.replace(/^sourceIds=/, '') : undefined
+      return api.searchItems(q, 8, ids)
+    },
     enabled: open && q.trim().length > 1,
   })
 

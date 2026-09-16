@@ -7,6 +7,8 @@ Return ONLY JSON:
   "technologies": [],
   "interests": [],
   "goals": [],
+  "current_focus": [],
+  "explicit_ignore": [],
   "preferences": {}
 }
 

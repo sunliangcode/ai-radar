@@ -171,6 +171,74 @@ body {
 .mag-card.tier-low {
   border-left: 3px solid var(--color-border);
 }
+.mag-card--focus {
+  border-radius: 18px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-ink) 10%, transparent);
+}
+.mag-card--focus .mag-card-body {
+  padding: 1rem 1.1rem 0.5rem;
+}
+.mag-card--focus h3 {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  line-height: 1.35;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+}
+.mag-card--focus:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--color-ink) 12%, transparent);
+}
+
+.deck-slide-in {
+  animation: deck-in 220ms ease-out;
+}
+.deck-slide-out {
+  animation: deck-out 180ms ease-in forwards;
+}
+@keyframes deck-in {
+  from { transform: translateX(12px); opacity: 0.6; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes deck-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-16px); opacity: 0.35; }
+}
+
+.inbox-zero-particle {
+  position: absolute;
+  top: 55%;
+  left: var(--p-x, 50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-moss) 70%, var(--color-ember));
+  opacity: 0;
+  animation: inbox-zero-burst 900ms ease-out var(--p-delay, 0ms) forwards;
+}
+@keyframes inbox-zero-burst {
+  0% { transform: translate(-50%, 0) scale(0.4); opacity: 0; }
+  25% { opacity: 0.9; }
+  100% {
+    transform: translate(
+      calc(-50% + (var(--p-i, 0) - 4.5) * 14px),
+      calc(-48px - (var(--p-i, 0) % 3) * 10px)
+    ) scale(1);
+    opacity: 0;
+  }
+}
+
+.fetch-step-done::before {
+  content: '✓';
+  display: inline-block;
+  margin-right: 0.3em;
+  animation: fetch-check-pop 280ms ease-out;
+}
+@keyframes fetch-check-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
 .dark .mag-card.cover-zhihu {
   --mag-chip-bg: #1e3a5f;
   --mag-chip-fg: #93c5fd;
@@ -306,11 +374,16 @@ body {
   .mag-grid-dimmed {
     transition: none;
   }
-  .mag-card:hover {
+  .mag-card:hover,
+  .mag-card--focus:hover {
     transform: none;
   }
   .mag-drawer,
-  .mag-drawer-backdrop {
+  .mag-drawer-backdrop,
+  .deck-slide-in,
+  .deck-slide-out,
+  .inbox-zero-particle,
+  .fetch-step-done::before {
     animation: none;
   }
 }

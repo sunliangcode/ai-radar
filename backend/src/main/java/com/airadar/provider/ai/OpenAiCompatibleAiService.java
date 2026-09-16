@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 @Component
 public class OpenAiCompatibleAiService implements AiService {
@@ -399,6 +400,177 @@ public class OpenAiCompatibleAiService implements AiService {
         );
     }
 
+    /**
+     * Multi-turn plain-text chat (Radar Chat). Streams token deltas when talking to local Ollama.
+     * Goes through {@link AiCallGate} like other LLM calls.
+     */
+    public String chatTextStream(List<Map<String, String>> messages, Consumer<String> onDelta) {
+        ensureLlmReady();
+        return aiCallGate.call(() -> chatTextStreamUnlocked(messages, onDelta));
+    }
+
+    private String chatTextStreamUnlocked(List<Map<String, String>> messages, Consumer<String> onDelta) {
+        RadarProperties.OpenAi cfg = properties.getOpenai();
+        String baseUrl = trimTrailingSlash(cfg.getBaseUrl());
+        int contextWindow = Math.max(1024, cfg.getContextWindowTokens());
+        int maxCompletion = Math.max(64, Math.min(cfg.getMaxCompletionTokens(), contextWindow / 2));
+        int promptBudget = Math.max(512, contextWindow - maxCompletion);
+
+        List<Map<String, String>> fitted = fitMessagesToBudget(messages, promptBudget);
+        boolean stream = isLocalOllama(baseUrl);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", cfg.getModel());
+        body.put("temperature", 0.4);
+        body.put("max_tokens", maxCompletion);
+        body.put("messages", fitted);
+        if (stream) {
+            body.put("stream", true);
+            String keepAlive = cfg.getKeepAlive();
+            if (keepAlive != null && !keepAlive.isBlank()) {
+                body.put("keep_alive", keepAlive);
+            }
+            body.put("options", Map.of("num_ctx", contextWindow));
+        } else {
+            body.put("stream", false);
+        }
+
+        String promptPreview = fitted.stream()
+                .map(m -> m.getOrDefault("role", "?") + ": " + truncate(m.getOrDefault("content", ""), 200))
+                .reduce((a, b) -> a + "\n" + b)
+                .orElse("");
+        int estimatedPromptTokens = fitted.stream()
+                .mapToInt(m -> estimateTokens(m.getOrDefault("content", "")))
+                .sum();
+
+        long start = System.currentTimeMillis();
+        String callId = monitor.begin("chat", cfg.getModel(), promptPreview, contextWindow);
+        try {
+            String content;
+            int promptTokens;
+            int completionTokens;
+            Long decodeMs = null;
+            if (isLocalOllama(baseUrl)) {
+                // Qwen3.5+ via OpenAI-compat puts tokens in delta.reasoning and leaves content empty.
+                // Native /api/chat with think=false returns real assistant content.
+                Map<String, Object> ollamaBody = new HashMap<>();
+                ollamaBody.put("model", cfg.getModel());
+                ollamaBody.put("messages", fitted);
+                ollamaBody.put("stream", true);
+                ollamaBody.put("think", false);
+                ollamaBody.put("options", Map.of(
+                        "num_ctx", contextWindow,
+                        "num_predict", maxCompletion,
+                        "temperature", 0.4
+                ));
+                String keepAlive = cfg.getKeepAlive();
+                if (keepAlive != null && !keepAlive.isBlank()) {
+                    ollamaBody.put("keep_alive", keepAlive);
+                }
+                StreamResult streamResult = chatOllamaNativeStream(baseUrl, cfg, ollamaBody, callId, onDelta);
+                content = streamResult.content();
+                decodeMs = streamResult.decodeMs();
+                promptTokens = estimatedPromptTokens;
+                completionTokens = estimateTokens(content);
+            } else if (stream) {
+                StreamResult streamResult = chatJsonStream(baseUrl, cfg, body, callId, onDelta);
+                content = streamResult.content();
+                decodeMs = streamResult.decodeMs();
+                promptTokens = estimatedPromptTokens;
+                completionTokens = estimateTokens(content);
+            } else {
+                var request = restClientBuilder.build()
+                        .post()
+                        .uri(baseUrl + "/chat/completions")
+                        .header("Content-Type", "application/json");
+                if (cfg.hasApiKey()) {
+                    request = request.header("Authorization", "Bearer " + cfg.getApiKey());
+                }
+                String raw = request.body(body).retrieve().body(String.class);
+                JsonNode root = objectMapper.readTree(raw);
+                content = root.path("choices").path(0).path("message").path("content").asText();
+                if (content == null || content.isBlank()) {
+                    content = firstNonBlank(
+                            root.path("choices").path(0).path("message").path("reasoning").asText(""),
+                            root.path("choices").path(0).path("message").path("reasoning_content").asText("")
+                    );
+                }
+                promptTokens = root.path("usage").path("prompt_tokens").asInt(estimatedPromptTokens);
+                completionTokens = root.path("usage").path("completion_tokens").asInt(estimateTokens(content));
+                if (onDelta != null && content != null && !content.isEmpty()) {
+                    onDelta.accept(content);
+                }
+            }
+
+            long latency = System.currentTimeMillis() - start;
+            monitor.complete(callId, AiCallMonitor.AiCallRecord.success(
+                    "chat", cfg.getModel(), promptTokens, completionTokens, contextWindow, latency, false,
+                    promptPreview, content, decodeMs
+            ));
+            health.recordSuccess();
+            return content == null ? "" : content;
+        } catch (Exception e) {
+            String reason = describeFailure(e);
+            long latency = System.currentTimeMillis() - start;
+            monitor.complete(callId, AiCallMonitor.AiCallRecord.failure(
+                    "chat", cfg.getModel(), estimatedPromptTokens, contextWindow, latency, false,
+                    reason, promptPreview
+            ));
+            health.recordFailure("chat", reason);
+            if (e instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new IllegalStateException(reason, e);
+        }
+    }
+
+    /** Keep system + newest turns; drop oldest user/assistant pairs when over budget. */
+    static List<Map<String, String>> fitMessagesToBudget(List<Map<String, String>> messages, int promptBudget) {
+        if (messages == null || messages.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, String>> copy = new ArrayList<>(messages);
+        while (estimateMessagesTokens(copy) > promptBudget && copy.size() > 2) {
+            // Drop the oldest non-system message
+            int dropAt = 0;
+            for (int i = 0; i < copy.size(); i++) {
+                if (!"system".equals(copy.get(i).get("role"))) {
+                    dropAt = i;
+                    break;
+                }
+            }
+            if ("system".equals(copy.get(dropAt).get("role")) && copy.size() <= 1) {
+                break;
+            }
+            copy.remove(dropAt);
+        }
+        // If still oversized, truncate the longest content
+        if (estimateMessagesTokens(copy) > promptBudget) {
+            for (int i = 0; i < copy.size(); i++) {
+                Map<String, String> m = copy.get(i);
+                String content = m.getOrDefault("content", "");
+                int available = Math.max(256, promptBudget / Math.max(1, copy.size()));
+                if (estimateTokens(content) > available) {
+                    int chars = Math.max(64, available * (content.codePoints().anyMatch(cp ->
+                            Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN) ? 1 : 4));
+                    String trimmed = content.length() <= chars
+                            ? content
+                            : content.substring(0, chars) + "\n...[truncated]";
+                    copy.set(i, Map.of("role", m.getOrDefault("role", "user"), "content", trimmed));
+                }
+            }
+        }
+        return copy;
+    }
+
+    private static int estimateMessagesTokens(List<Map<String, String>> messages) {
+        int sum = 0;
+        for (Map<String, String> m : messages) {
+            sum += 4 + estimateTokens(m.getOrDefault("content", ""));
+        }
+        return sum;
+    }
+
     @SuppressWarnings("unchecked")
     private ContextExtractResult parseContext(JsonNode response) {
         Map<String, Object> profile = objectMapper.convertValue(
@@ -414,10 +586,13 @@ public class OpenAiCompatibleAiService implements AiService {
         List<String> technologies = readStringList(response.path("technologies"));
         List<String> interests = readStringList(response.path("interests"));
         List<String> goals = readStringList(response.path("goals"));
+        List<String> currentFocus = readStringList(response.path("current_focus"));
+        List<String> explicitIgnore = readStringList(response.path("explicit_ignore"));
         Map<String, Object> preferences = objectMapper.convertValue(
                 response.path("preferences").isMissingNode() ? objectMapper.createObjectNode() : response.path("preferences"),
                 Map.class);
-        return new ContextExtractResult(profile, projects, technologies, interests, goals, preferences);
+        return new ContextExtractResult(
+                profile, projects, technologies, interests, goals, currentFocus, explicitIgnore, preferences);
     }
 
     private ImpactAnalysisResult parseImpact(JsonNode response) {
@@ -546,7 +721,25 @@ public class OpenAiCompatibleAiService implements AiService {
                 int completionTokens;
                 Long decodeMs = null;
                 if (stream) {
-                    StreamResult streamResult = chatJsonStream(baseUrl, cfg, body, callId);
+                    // Prefer native Ollama API: OpenAI-compat + thinking models often stream empty content.
+                    Map<String, Object> ollamaBody = new HashMap<>();
+                    ollamaBody.put("model", cfg.getModel());
+                    ollamaBody.put("messages", List.of(
+                            Map.of("role", "system", "content", SYSTEM_PROMPT),
+                            Map.of("role", "user", "content", finalPrompt)
+                    ));
+                    ollamaBody.put("stream", true);
+                    ollamaBody.put("think", false);
+                    ollamaBody.put("options", Map.of(
+                            "num_ctx", contextWindow,
+                            "num_predict", maxCompletion,
+                            "temperature", 0.2
+                    ));
+                    String keepAlive = cfg.getKeepAlive();
+                    if (keepAlive != null && !keepAlive.isBlank()) {
+                        ollamaBody.put("keep_alive", keepAlive);
+                    }
+                    StreamResult streamResult = chatOllamaNativeStream(baseUrl, cfg, ollamaBody, callId, null);
                     content = streamResult.content();
                     decodeMs = streamResult.decodeMs();
                     promptTokens = estimatedPromptTokens;
@@ -660,9 +853,24 @@ public class OpenAiCompatibleAiService implements AiService {
 
     private StreamResult chatJsonStream(String baseUrl, RadarProperties.OpenAi cfg, Map<String, Object> body, String callId)
             throws IOException, InterruptedException {
+        return chatJsonStream(baseUrl, cfg, body, callId, null);
+    }
+
+    /**
+     * Native Ollama {@code /api/chat} NDJSON stream. Uses {@code think:false} so Qwen3.5-class models
+     * emit assistant {@code content} instead of burning the budget on {@code reasoning}.
+     */
+    private StreamResult chatOllamaNativeStream(
+            String openAiBaseUrl,
+            RadarProperties.OpenAi cfg,
+            Map<String, Object> body,
+            String callId,
+            Consumer<String> onDelta
+    ) throws IOException, InterruptedException {
+        String root = ollamaNativeRoot(openAiBaseUrl);
         String jsonBody = objectMapper.writeValueAsString(body);
         HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/chat/completions"))
+                .uri(URI.create(root + "/api/chat"))
                 .timeout(Duration.ofMillis(Math.max(60_000, properties.getFetchTimeoutMs())))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
@@ -684,18 +892,15 @@ public class OpenAiCompatibleAiService implements AiService {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.isBlank() || !line.startsWith("data:")) {
+                if (line.isBlank()) {
                     continue;
                 }
-                String data = line.substring(5).trim();
-                if ("[DONE]".equals(data)) {
-                    break;
-                }
                 try {
-                    JsonNode chunk = objectMapper.readTree(data);
-                    String delta = chunk.path("choices").path(0).path("delta").path("content").asText("");
+                    JsonNode chunk = objectMapper.readTree(line);
+                    String delta = chunk.path("message").path("content").asText("");
                     if (delta.isEmpty()) {
-                        delta = chunk.path("choices").path(0).path("message").path("content").asText("");
+                        // Some builds still emit thinking under message.thinking even with think=false
+                        delta = "";
                     }
                     if (!delta.isEmpty()) {
                         long now = System.currentTimeMillis();
@@ -705,9 +910,15 @@ public class OpenAiCompatibleAiService implements AiService {
                         lastTokenAt = now;
                         content.append(delta);
                         monitor.appendDelta(callId, delta);
+                        if (onDelta != null) {
+                            onDelta.accept(delta);
+                        }
+                    }
+                    if (chunk.path("done").asBoolean(false)) {
+                        break;
                     }
                 } catch (Exception parseErr) {
-                    log.debug("sse_chunk_skip error={}", parseErr.getMessage());
+                    log.debug("ollama_ndjson_skip error={}", parseErr.getMessage());
                 }
             }
         }
@@ -721,6 +932,120 @@ public class OpenAiCompatibleAiService implements AiService {
             decodeMs = Math.max(1L, firstTokenAt - requestStart);
         }
         return new StreamResult(content.toString(), decodeMs);
+    }
+
+    private StreamResult chatJsonStream(
+            String baseUrl,
+            RadarProperties.OpenAi cfg,
+            Map<String, Object> body,
+            String callId,
+            Consumer<String> onDelta
+    ) throws IOException, InterruptedException {
+        String jsonBody = objectMapper.writeValueAsString(body);
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/chat/completions"))
+                .timeout(Duration.ofMillis(Math.max(60_000, properties.getFetchTimeoutMs())))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
+        if (cfg.hasApiKey()) {
+            builder.header("Authorization", "Bearer " + cfg.getApiKey());
+        }
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+        long requestStart = System.currentTimeMillis();
+        HttpResponse<InputStream> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+        if (response.statusCode() >= 400) {
+            String err = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
+            throw new IllegalStateException("HTTP " + response.statusCode() + ": " + truncate(err, 300));
+        }
+        StringBuilder content = new StringBuilder();
+        StringBuilder reasoning = new StringBuilder();
+        Long firstTokenAt = null;
+        Long lastTokenAt = null;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isBlank() || !line.startsWith("data:")) {
+                    continue;
+                }
+                String data = line.substring(5).trim();
+                if ("[DONE]".equals(data)) {
+                    break;
+                }
+                try {
+                    JsonNode chunk = objectMapper.readTree(data);
+                    JsonNode deltaNode = chunk.path("choices").path(0).path("delta");
+                    String delta = deltaNode.path("content").asText("");
+                    if (delta.isEmpty()) {
+                        delta = chunk.path("choices").path(0).path("message").path("content").asText("");
+                    }
+                    String reasonDelta = firstNonBlank(
+                            deltaNode.path("reasoning").asText(""),
+                            deltaNode.path("reasoning_content").asText(""),
+                            deltaNode.path("thinking").asText("")
+                    );
+                    if (!reasonDelta.isEmpty()) {
+                        reasoning.append(reasonDelta);
+                    }
+                    if (!delta.isEmpty()) {
+                        long now = System.currentTimeMillis();
+                        if (firstTokenAt == null) {
+                            firstTokenAt = now;
+                        }
+                        lastTokenAt = now;
+                        content.append(delta);
+                        monitor.appendDelta(callId, delta);
+                        if (onDelta != null) {
+                            onDelta.accept(delta);
+                        }
+                    }
+                } catch (Exception parseErr) {
+                    log.debug("sse_chunk_skip error={}", parseErr.getMessage());
+                }
+            }
+        }
+        if (content.isEmpty() && !reasoning.isEmpty()) {
+            // Last resort for OpenAI-compat thinking models (prefer native path for chat/local).
+            log.warn("openai_stream_content_empty using_reasoning_fallback chars={}", reasoning.length());
+            String fallback = reasoning.toString();
+            monitor.appendDelta(callId, fallback);
+            if (onDelta != null) {
+                onDelta.accept(fallback);
+            }
+            return new StreamResult(fallback, null);
+        }
+        if (content.isEmpty()) {
+            throw new IllegalStateException("Empty streamed response from model");
+        }
+        Long decodeMs = null;
+        if (firstTokenAt != null && lastTokenAt != null && lastTokenAt > firstTokenAt) {
+            decodeMs = lastTokenAt - firstTokenAt;
+        } else if (firstTokenAt != null) {
+            decodeMs = Math.max(1L, firstTokenAt - requestStart);
+        }
+        return new StreamResult(content.toString(), decodeMs);
+    }
+
+    /** Strip trailing {@code /v1} from an OpenAI-compatible base URL to reach Ollama's native root. */
+    static String ollamaNativeRoot(String openAiBaseUrl) {
+        String u = trimTrailingSlash(openAiBaseUrl);
+        if (u.toLowerCase(Locale.ROOT).endsWith("/v1")) {
+            return u.substring(0, u.length() - 3);
+        }
+        return u;
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                return v;
+            }
+        }
+        return "";
     }
 
     /** True for local Ollama-style OpenAI-compatible endpoints (streaming enabled). */

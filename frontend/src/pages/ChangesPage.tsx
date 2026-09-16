@@ -3,20 +3,24 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { ListSkeleton, PageHeader, StateBox, StatusBadge } from '../components/ui'
+import { useDisplaySources } from '../hooks/useDisplaySources'
+import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 
 export default function ChangesPage() {
   const { t } = useTranslation()
+  const { displaySourceIds } = useDisplaySources()
   const q = useQuery({ queryKey: ['changes-list'], queryFn: () => api.changes(50) })
+  const rows = (q.data ?? []).filter((c) => changeMatchesDisplay(c, displaySourceIds))
 
   return (
     <div>
       <PageHeader title={t('changes.listTitle')} subtitle={t('changes.listSubtitle')} />
       {q.isLoading ? <ListSkeleton rows={6} /> : null}
       {q.isError ? <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox> : null}
-      {q.data?.length ? (
+      {rows.length ? (
         <ul className="space-y-3">
-          {q.data.map((c) => (
+          {rows.map((c) => (
             <li key={c.id}>
               <Link
                 to={`/changes/${c.id}`}
@@ -35,7 +39,7 @@ export default function ChangesPage() {
           ))}
         </ul>
       ) : null}
-      {!q.isLoading && !q.isError && !q.data?.length ? <StateBox>{t('changes.empty')}</StateBox> : null}
+      {!q.isLoading && !q.isError && !rows.length ? <StateBox>{t('changes.empty')}</StateBox> : null}
     </div>
   )
 }

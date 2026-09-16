@@ -31,6 +31,7 @@ public class ChangeService {
     private final EntityMapper entityMapper;
     private final ImpactRepository impactRepository;
     private final ImpactService impactService;
+    private final EventSourceLookup eventSourceLookup;
 
     public ChangeService(
             EventRepository eventRepository,
@@ -39,7 +40,8 @@ public class ChangeService {
             NewsItemRepository newsItemRepository,
             EntityMapper entityMapper,
             ImpactRepository impactRepository,
-            ImpactService impactService
+            ImpactService impactService,
+            EventSourceLookup eventSourceLookup
     ) {
         this.eventRepository = eventRepository;
         this.eventItemRepository = eventItemRepository;
@@ -48,6 +50,7 @@ public class ChangeService {
         this.entityMapper = entityMapper;
         this.impactRepository = impactRepository;
         this.impactService = impactService;
+        this.eventSourceLookup = eventSourceLookup;
     }
 
     @Transactional(readOnly = true)
@@ -96,6 +99,7 @@ public class ChangeService {
                 m.put("summary", item.getSummary());
                 m.put("canonicalUrl", item.getCanonicalUrl());
                 m.put("primarySourceType", item.getPrimarySourceType());
+                m.put("primarySourceId", item.getPrimarySourceId());
                 m.put("role", link.getRole());
                 m.put("publishedAt", ApiTimes.iso(item.getPublishedAt()));
                 items.add(m);
@@ -124,6 +128,7 @@ public class ChangeService {
         m.put("sourceCount", sources);
         m.put("itemCount", sources);
         m.put("score", event.getScore());
+        m.put("sourceIds", eventSourceLookup.sourceIdsForEvent(event.getId()));
 
         impactRepository.findByEventId(event.getId()).ifPresent(impact -> {
             Map<String, Object> impactDto = impactService.toDto(impact);

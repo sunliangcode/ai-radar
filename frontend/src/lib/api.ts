@@ -74,6 +74,7 @@ export type Item = {
   publishedAt?: string
   sourceRefs?: string[]
   primarySourceType?: string
+  primarySourceId?: string
   read?: boolean
   saved?: boolean
   dismissed?: boolean
@@ -132,6 +133,7 @@ export type ActionCard = {
   eventId?: number
   impactId?: number
   newsItemId?: number
+  sourceIds?: number[]
 }
 
 export type PreferenceKeyword = {
@@ -178,6 +180,23 @@ export type OutcomeSummary = {
   roi?: number | null
 }
 
+export type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string }
+
+export type ChatCitedChange = {
+  id: number
+  title?: string
+  summary?: string
+  why?: string
+  tier?: string
+  recommendation?: string
+}
+
+export type ChatTurnResult = {
+  reply: string
+  newlyCited: ChatCitedChange[]
+  citedChangeIds: number[]
+}
+
 export type UserContext = {
   id?: number
   payload: {
@@ -212,6 +231,8 @@ export type ChangeCard = {
   lastUpdatedAt?: string
   sourceCount?: number
   itemCount?: number
+  /** News source ids linked to this change (for UI filtering). */
+  sourceIds?: number[]
   score?: number
   relevance?: number
   impact?: number
@@ -249,6 +270,7 @@ export type DecisionRecord = {
   changeSummary?: string
   updatesSinceDecision?: number
   createdAt?: string
+  sourceIds?: number[]
 }
 
 export type ProactiveAlert = {
@@ -294,6 +316,7 @@ export type WatchingGroup = {
   title: string
   status?: string
   entryCount: number
+  sourceIds?: number[]
   entries: WatchingEntry[]
 }
 
@@ -542,9 +565,11 @@ export const api = {
       questionId?: number
       comments?: Array<{ author: string; content: string }>
     }>(`/api/items/${id}/detail`),
-  searchItems: async (q: string, limit = 50) => {
+  searchItems: async (q: string, limit = 50, sourceIds?: string) => {
+    const params = new URLSearchParams({ q, limit: String(limit) })
+    if (sourceIds) params.set('sourceIds', sourceIds)
     const data = await request<{ items: Item[]; total: number }>(
-      `/api/items/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+      `/api/items/search?${params}`,
     )
     return data
   },
@@ -641,6 +666,106 @@ export const api = {
       '/api/contexts/import/markdown',
       { method: 'POST', body: JSON.stringify({ markdown }) },
     ),
+  chatStream: async (
+    body: { messages: ChatMessage[]; citedChangeIds?: number[]; seedChangeId?: number },
+    opts?: { signal?: AbortSignal; onDelta?: (delta: string) => void },
+  ): Promise<ChatTurnResult> => {
+    const headers = new Headers({
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    })
+    const token = localStorage.getItem('localToken')
+    if (token) headers.set('X-Local-Token', token)
+
+    let res: Response
+    try {
+      res = await fetch(`${BASE}/api/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: opts?.signal,
+      })
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      throw new ApiError(0, 'network', detail)
+    }
+    if (!res.ok) {
+      let message = res.statusText
+      try {
+        const j = await res.json()
+        message = j.message ?? message
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(res.status, 'error', message)
+    }
+    if (!res.body) {
+      throw new ApiError(0, 'error', 'empty chat stream')
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let result: ChatTurnResult = { reply: '', newlyCited: [], citedChangeIds: body.citedChangeIds ?? [] }
+    let eventName = 'message'
+
+    const handleBlock = (block: string) => {
+      const lines = block.split('\n')
+      let data = ''
+      let name = eventName
+      for (const line of lines) {
+        if (line.startsWith('event:')) name = line.slice(6).trim()
+        else if (line.startsWith('data:')) data += (data ? '\n' : '') + line.slice(5).trimStart()
+      }
+      if (!data) return
+      if (name === 'delta') {
+        // Spring may JSON-encode strings
+        let delta = data
+        try {
+          const parsed = JSON.parse(data)
+          if (typeof parsed === 'string') delta = parsed
+        } catch {
+          /* raw */
+        }
+        opts?.onDelta?.(delta)
+        result = { ...result, reply: result.reply + delta }
+      } else if (name === 'done') {
+        try {
+          const parsed = JSON.parse(data) as ChatTurnResult
+          result = {
+            reply: parsed.reply ?? result.reply,
+            newlyCited: parsed.newlyCited ?? [],
+            citedChangeIds: parsed.citedChangeIds ?? result.citedChangeIds,
+          }
+        } catch {
+          /* ignore */
+        }
+      } else if (name === 'error') {
+        let message = data
+        try {
+          const parsed = JSON.parse(data) as { message?: string }
+          message = parsed.message ?? data
+        } catch {
+          /* ignore */
+        }
+        throw new ApiError(500, 'error', message)
+      }
+      eventName = 'message'
+    }
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() ?? ''
+      for (const part of parts) {
+        if (part.trim()) handleBlock(part)
+      }
+    }
+    if (buffer.trim()) handleBlock(buffer)
+    return result
+  },
   actions: () => request<ActionCard[]>('/api/actions'),
   patchAction: (id: number, body: { status: string }) =>
     request<ActionCard>(`/api/actions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

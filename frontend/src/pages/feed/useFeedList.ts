@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, type Item } from '../../lib/api'
 import { useSources } from '../../hooks/useSources'
-import { useConnectors } from '../../hooks/useConnectors'
+import { useDisplaySources } from '../../hooks/useDisplaySources'
+import { itemMatchesDisplay } from '../../lib/sourceFilter'
 import { PAGE, sinceIso, type Range } from './feedQuery'
 
 export function useFeedList(progressRunning?: boolean) {
@@ -17,15 +18,17 @@ export function useFeedList(progressRunning?: boolean) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const sources = useSources()
-  const connectors = useConnectors()
+  const { sourceIdsQuery, displaySourceIds, isDisplayed } = useDisplaySources()
+  const displayBlocksAll = displaySourceIds !== null && displaySourceIds.length === 0
   const hasSources = (sources.data?.length ?? 0) > 0
 
   const channelTypes = useMemo(() => {
     const set = new Set<string>()
-    for (const s of sources.data ?? []) if (s.type) set.add(s.type)
-    for (const c of connectors.data ?? []) if (c.id) set.add(c.id)
+    for (const s of sources.data ?? []) {
+      if (s.type && s.enabled && isDisplayed(s.id)) set.add(s.type)
+    }
     return Array.from(set).sort()
-  }, [sources.data, connectors.data])
+  }, [sources.data, isDisplayed])
 
   const searchMode = q.trim().length > 1
   const since = sinceIso(range)
@@ -42,33 +45,51 @@ export function useFeedList(progressRunning?: boolean) {
   }, [inputQ])
 
   const feedQuery = useQuery({
-    queryKey: ['feed', range, sourceType, unreadOnly, page],
+    queryKey: ['feed', range, sourceType, unreadOnly, page, sourceIdsQuery],
     queryFn: () => {
       const parts = [`sort=score`, `limit=${PAGE}`, `offset=${offset}`]
       if (since) parts.push(`since=${encodeURIComponent(since)}`)
       if (unreadOnly) parts.push('unread=true')
       if (sourceType) parts.push(`sourceType=${encodeURIComponent(sourceType)}`)
+      if (sourceIdsQuery) parts.push(sourceIdsQuery)
       return api.items(`?${parts.join('&')}`)
     },
+    enabled: !displayBlocksAll,
     refetchInterval: () => (progressRunning ? 1500 : false),
   })
 
   const searchQuery = useQuery({
-    queryKey: ['feed-search', q],
-    queryFn: () => api.searchItems(q, 60),
-    enabled: searchMode,
+    queryKey: ['feed-search', q, sourceIdsQuery],
+    queryFn: () => {
+      const ids = sourceIdsQuery ? sourceIdsQuery.replace(/^sourceIds=/, '') : undefined
+      return api.searchItems(q, 60, ids)
+    },
+    enabled: searchMode && !displayBlocksAll,
   })
 
-  const items: Item[] = useMemo(
-    () => (searchMode ? (searchQuery.data?.items ?? []) : (feedQuery.data?.items ?? [])),
-    [searchMode, searchQuery.data, feedQuery.data],
-  )
-  const total = searchMode ? (searchQuery.data?.items.length ?? 0) : (feedQuery.data?.total ?? 0)
+  const items: Item[] = useMemo(() => {
+    if (displayBlocksAll) return []
+    const raw = searchMode ? (searchQuery.data?.items ?? []) : (feedQuery.data?.items ?? [])
+    if (displaySourceIds === null) return raw
+    return raw.filter((item) => itemMatchesDisplay(item, displaySourceIds))
+  }, [displayBlocksAll, displaySourceIds, searchMode, searchQuery.data, feedQuery.data])
+  const total = displayBlocksAll
+    ? 0
+    : searchMode
+      ? items.length
+      : (feedQuery.data?.total ?? 0)
 
   useEffect(() => {
     setPage(1)
     setSelectedId(null)
-  }, [range, sourceType, unreadOnly, q])
+  }, [range, sourceType, unreadOnly, q, sourceIdsQuery])
+
+  useEffect(() => {
+    if (!sourceType) return
+    if (!channelTypes.includes(sourceType)) {
+      setSearchParams({}, { replace: true })
+    }
+  }, [sourceType, channelTypes, setSearchParams])
 
   useEffect(() => {
     if (items.length && selectedId == null) setSelectedId(items[0].id)

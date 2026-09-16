@@ -371,7 +371,8 @@ public class HeuristicAiService implements AiService {
         Map<String, Object> profile = new java.util.LinkedHashMap<>();
         profile.put("role", "Practitioner");
         profile.put("summary", text == null ? "" : truncate(text.trim(), 240));
-        return new ContextExtractResult(profile, List.of(), interests, interests, List.of("stay-current"), Map.of());
+        return new ContextExtractResult(
+                profile, List.of(), interests, interests, List.of("stay-current"), List.of(), List.of(), Map.of());
     }
 
     @Override

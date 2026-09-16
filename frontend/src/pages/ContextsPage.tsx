@@ -16,6 +16,15 @@ function textToList(value: string) {
     .filter(Boolean)
 }
 
+function isSparsePayload(payload: UserContext['payload'] | null) {
+  if (!payload) return true
+  const role = payload.profile?.role?.trim()
+  const tech = payload.technologies?.length ?? 0
+  const focus = payload.current_focus?.length ?? 0
+  const interests = payload.interests?.length ?? 0
+  return !role && tech === 0 && focus === 0 && interests === 0
+}
+
 export default function ContextsPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
@@ -25,6 +34,7 @@ export default function ContextsPage() {
   const [rawText, setRawText] = useState('')
   const [githubUrl, setGithubUrl] = useState('')
   const [baseline, setBaseline] = useState<string | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const hydratedRef = useRef(false)
   const currentKey = useMemo(
     () => JSON.stringify({ payload, rawText }),
@@ -41,10 +51,22 @@ export default function ContextsPage() {
   }, [ctx.data])
 
   const save = useMutation({
-    mutationFn: () => api.saveContext({ payload, rawText, source: 'manual' }),
+    mutationFn: async () => {
+      let nextPayload = payload
+      let source = 'manual'
+      if (rawText.trim() && isSparsePayload(payload)) {
+        const draft = await api.extractContext(rawText)
+        nextPayload = draft.payload
+        source = 'extract'
+        setPayload(draft.payload)
+      }
+      return api.saveContext({ payload: nextPayload, rawText, source })
+    },
     onSuccess: (data) => {
       qc.setQueryData(['contexts'], data)
-      setBaseline(JSON.stringify({ payload, rawText }))
+      setPayload(data.payload)
+      setRawText(data.rawText ?? rawText)
+      setBaseline(JSON.stringify({ payload: data.payload, rawText: data.rawText ?? rawText }))
       pushToast('success', t('contexts.saved'))
     },
     onError: (e) => pushToast('error', errorText(e, t)),
@@ -64,6 +86,7 @@ export default function ContextsPage() {
     onSuccess: (draft) => {
       setPayload(draft.payload)
       if (draft.rawText) setRawText(draft.rawText)
+      setAdvancedOpen(true)
       pushToast('success', t('contexts.imported'))
     },
     onError: (e) => pushToast('error', errorText(e, t)),
@@ -88,10 +111,10 @@ export default function ContextsPage() {
 
       <div className="space-y-6">
         <section>
-          <h3 className="mb-3 font-serif text-lg text-ink">{t('contexts.whoSection')}</h3>
           <div className="space-y-4 rounded-xl border border-border bg-surface/70 p-4">
             <div>
-              <h4 className="mb-2 text-sm font-medium text-ink">{t('contexts.extractTitle')}</h4>
+              <h3 className="mb-1 font-serif text-lg text-ink">{t('contexts.introTitle')}</h3>
+              <p className="mb-3 text-sm text-muted">{t('contexts.introHint')}</p>
               <textarea
                 className="min-h-28 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
                 value={rawText}
@@ -103,126 +126,145 @@ export default function ContextsPage() {
                   {t('contexts.extract')}
                 </Button>
               </div>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <input
-                  className="min-w-64 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                  value={githubUrl}
-                  onChange={(e) => setGithubUrl(e.target.value)}
-                  placeholder="https://github.com/owner/repo"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  loading={importGithub.isPending}
-                  onClick={() => importGithub.mutate()}
-                >
-                  {t('contexts.importGithub')}
-                </Button>
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <h4 className="mb-1 text-sm font-medium text-ink">{t('contexts.understoodTitle')}</h4>
+              <p className="mb-3 text-xs text-muted">{t('contexts.understoodHint')}</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="mb-1 block text-muted">{t('contexts.role')}</span>
+                  <input
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                    value={payload.profile?.role ?? ''}
+                    onChange={(e) =>
+                      setPayload({
+                        ...payload,
+                        profile: { ...payload.profile, role: e.target.value },
+                      })
+                    }
+                  />
+                </label>
+                <label className="block text-sm md:col-span-2">
+                  <span className="mb-1 block text-muted">{t('contexts.technologies')}</span>
+                  <input
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                    value={listToText(payload.technologies)}
+                    onChange={(e) => setPayload({ ...payload, technologies: textToList(e.target.value) })}
+                  />
+                </label>
+                <label className="block text-sm md:col-span-2">
+                  <span className="mb-1 block text-muted">{t('contexts.currentFocus')}</span>
+                  <input
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                    value={listToText(payload.current_focus)}
+                    onChange={(e) =>
+                      setPayload({ ...payload, current_focus: textToList(e.target.value), schemaVersion: 2 })
+                    }
+                  />
+                </label>
+                <label className="block text-sm md:col-span-2">
+                  <span className="mb-1 block text-muted">{t('contexts.explicitIgnore')}</span>
+                  <input
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                    value={listToText(payload.explicit_ignore)}
+                    onChange={(e) =>
+                      setPayload({ ...payload, explicit_ignore: textToList(e.target.value), schemaVersion: 2 })
+                    }
+                  />
+                </label>
               </div>
             </div>
 
-            <div className="grid gap-4 border-t border-border pt-4 md:grid-cols-2">
-              <label className="block text-sm">
-                <span className="mb-1 block text-muted">{t('contexts.role')}</span>
-                <input
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
-                  value={payload.profile?.role ?? ''}
-                  onChange={(e) =>
-                    setPayload({
-                      ...payload,
-                      profile: { ...payload.profile, role: e.target.value },
-                    })
-                  }
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="mb-1 block text-muted">{t('contexts.summary')}</span>
-                <input
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
-                  value={payload.profile?.summary ?? ''}
-                  onChange={(e) =>
-                    setPayload({
-                      ...payload,
-                      profile: { ...payload.profile, summary: e.target.value },
-                    })
-                  }
-                />
-              </label>
-              <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-muted">{t('contexts.technologies')}</span>
-                <input
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
-                  value={listToText(payload.technologies)}
-                  onChange={(e) => setPayload({ ...payload, technologies: textToList(e.target.value) })}
-                />
-              </label>
-              <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-muted">{t('contexts.interests')}</span>
-                <input
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
-                  value={listToText(payload.interests)}
-                  onChange={(e) => setPayload({ ...payload, interests: textToList(e.target.value) })}
-                />
-              </label>
-              <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-muted">{t('contexts.goals')}</span>
-                <input
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
-                  value={listToText(payload.goals)}
-                  onChange={(e) => setPayload({ ...payload, goals: textToList(e.target.value) })}
-                />
-              </label>
-              <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-muted">{t('contexts.currentFocus')}</span>
-                <input
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
-                  value={listToText(payload.current_focus)}
-                  onChange={(e) =>
-                    setPayload({ ...payload, current_focus: textToList(e.target.value), schemaVersion: 2 })
-                  }
-                />
-              </label>
-              <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-muted">{t('contexts.explicitIgnore')}</span>
-                <input
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
-                  value={listToText(payload.explicit_ignore)}
-                  onChange={(e) =>
-                    setPayload({ ...payload, explicit_ignore: textToList(e.target.value), schemaVersion: 2 })
-                  }
-                />
-              </label>
-              <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block text-muted">{t('contexts.projects')}</span>
-                <textarea
-                  className="min-h-24 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                  value={(payload.projects ?? [])
-                    .map((p) => `${p.name ?? ''}${p.stack?.length ? ` [${p.stack.join(', ')}]` : ''}`)
-                    .join('\n')}
-                  onChange={(e) =>
-                    setPayload({
-                      ...payload,
-                      projects: e.target.value
-                        .split('\n')
-                        .map((line) => line.trim())
-                        .filter(Boolean)
-                        .map((line) => {
-                          const m = line.match(/^(.*?)(?:\s*\[(.*)\])?$/)
-                          return {
-                            name: (m?.[1] ?? line).trim(),
-                            stack: m?.[2] ? textToList(m[2]) : [],
-                            type: 'project',
-                          }
-                        }),
-                    })
-                  }
-                />
-              </label>
+            <div className="border-t border-border pt-3">
+              <button
+                type="button"
+                className="text-sm text-accent hover:underline"
+                onClick={() => setAdvancedOpen((o) => !o)}
+                aria-expanded={advancedOpen}
+              >
+                {advancedOpen ? t('contexts.hideMore') : t('contexts.showMore')}
+              </button>
+              {advancedOpen ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <label className="block text-sm md:col-span-2">
+                    <span className="mb-1 block text-muted">{t('contexts.summary')}</span>
+                    <input
+                      className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                      value={payload.profile?.summary ?? ''}
+                      onChange={(e) =>
+                        setPayload({
+                          ...payload,
+                          profile: { ...payload.profile, summary: e.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="block text-sm md:col-span-2">
+                    <span className="mb-1 block text-muted">{t('contexts.interests')}</span>
+                    <input
+                      className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                      value={listToText(payload.interests)}
+                      onChange={(e) => setPayload({ ...payload, interests: textToList(e.target.value) })}
+                    />
+                  </label>
+                  <label className="block text-sm md:col-span-2">
+                    <span className="mb-1 block text-muted">{t('contexts.goals')}</span>
+                    <input
+                      className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                      value={listToText(payload.goals)}
+                      onChange={(e) => setPayload({ ...payload, goals: textToList(e.target.value) })}
+                    />
+                  </label>
+                  <label className="block text-sm md:col-span-2">
+                    <span className="mb-1 block text-muted">{t('contexts.projects')}</span>
+                    <textarea
+                      className="min-h-24 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      value={(payload.projects ?? [])
+                        .map((p) => `${p.name ?? ''}${p.stack?.length ? ` [${p.stack.join(', ')}]` : ''}`)
+                        .join('\n')}
+                      onChange={(e) =>
+                        setPayload({
+                          ...payload,
+                          projects: e.target.value
+                            .split('\n')
+                            .map((line) => line.trim())
+                            .filter(Boolean)
+                            .map((line) => {
+                              const m = line.match(/^(.*?)(?:\s*\[(.*)\])?$/)
+                              return {
+                                name: (m?.[1] ?? line).trim(),
+                                stack: m?.[2] ? textToList(m[2]) : [],
+                                type: 'project',
+                              }
+                            }),
+                        })
+                      }
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                    <input
+                      className="min-w-64 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      value={githubUrl}
+                      onChange={(e) => setGithubUrl(e.target.value)}
+                      placeholder="https://github.com/owner/repo"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      loading={importGithub.isPending}
+                      onClick={() => importGithub.mutate()}
+                    >
+                      {t('contexts.importGithub')}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <FormSaveBar
               dirty={isDirty}
-              saving={save.isPending}
+              saving={save.isPending || extract.isPending}
               onSave={() => save.mutate()}
               onDiscard={discard}
             />

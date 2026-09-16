@@ -5,13 +5,17 @@ import { PrefsProvider, StateBox, ToastProvider } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Sidebar } from './components/layout/Sidebar'
 import { CommandPalette } from './components/CommandPalette'
+import { EngagementProvider } from './hooks/useEngagement'
+import { DisplaySourcesProvider } from './hooks/useDisplaySources'
 import { useSources } from './hooks/useSources'
+import { useDisplaySources } from './hooks/useDisplaySources'
 import { useUnreadCounts } from './hooks/useUnreadCounts'
 
 // Route-level code splitting: each page is a separate chunk so the shell and
 // Today page load without pulling in every other route's code.
 const BriefDetailPage = lazy(() => import('./pages/BriefDetailPage'))
 const ChangeDetailPage = lazy(() => import('./pages/ChangeDetailPage'))
+const ChatPage = lazy(() => import('./pages/ChatPage'))
 const ContextsPage = lazy(() => import('./pages/ContextsPage'))
 const FeedPage = lazy(() => import('./pages/FeedPage'))
 const ChangesPage = lazy(() => import('./pages/ChangesPage'))
@@ -59,19 +63,29 @@ function Shell() {
 
   const unread = useUnreadCounts()
   const sources = useSources()
+  const { isDisplayed } = useDisplaySources()
+
+  const visibleSources = useMemo(
+    () => (sources.data ?? []).filter((s) => s.enabled && isDisplayed(s.id)),
+    [sources.data, isDisplayed],
+  )
 
   const totalUnread = useMemo(() => {
     const m = unread.data ?? {}
-    return Object.values(m).reduce((a, b) => a + b, 0)
-  }, [unread.data])
+    const visibleTypes = new Set(visibleSources.map((s) => s.type))
+    return Object.entries(m).reduce(
+      (sum, [type, count]) => sum + (visibleTypes.has(type) ? count : 0),
+      0,
+    )
+  }, [unread.data, visibleSources])
 
   const sourceTypes = useMemo(() => {
     const seen = new Map<string, number>()
-    for (const s of sources.data ?? []) {
-      if (s.type && s.enabled) seen.set(s.type, (seen.get(s.type) ?? 0) + 1)
+    for (const s of visibleSources) {
+      if (s.type) seen.set(s.type, (seen.get(s.type) ?? 0) + 1)
     }
     return Array.from(seen.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [sources.data])
+  }, [visibleSources])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -108,6 +122,7 @@ function Shell() {
                 <Route path="/changes" element={<ChangesPage />} />
                 <Route path="/decisions" element={<DecisionsPage />} />
                 <Route path="/watching" element={<WatchingPage />} />
+                <Route path="/chat" element={<ChatPage />} />
                 <Route path="/actions" element={<Navigate to="/decisions" replace />} />
                 <Route path="/briefs" element={<BriefsPage />} />
                 <Route path="/settings" element={<SettingsHubPage />} />
@@ -152,7 +167,11 @@ export default function App() {
   return (
     <PrefsProvider>
       <ToastProvider>
-        <Shell />
+        <DisplaySourcesProvider>
+          <EngagementProvider>
+            <Shell />
+          </EngagementProvider>
+        </DisplaySourcesProvider>
       </ToastProvider>
     </PrefsProvider>
   )

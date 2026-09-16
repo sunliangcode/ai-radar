@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useState } from 'react'
 import { api, type ImpactCard } from '../lib/api'
 import {
   Button,
@@ -11,20 +11,27 @@ import {
   StateBox,
   useToast,
 } from '../components/ui'
-import { ChangeCard } from '../components/change/ChangeCard'
 import { DecisionForm, type DecisionKind } from '../components/change/DecisionForm'
+import { RadarDeck } from '../components/today/RadarDeck'
 import { PackPicker } from '../components/PackPicker'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
+import { useEngagement } from '../hooks/useEngagement'
 import { useSources } from '../hooks/useSources'
+import { useDisplaySources } from '../hooks/useDisplaySources'
+import { useChangeSourceMap } from '../hooks/useChangeSourceMap'
+import { impactEventMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 
 export default function TodayPage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
+  const engagement = useEngagement()
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const sources = useSources()
+  const { displaySourceIds } = useDisplaySources()
+  const changeSourceMap = useChangeSourceMap()
   const [decideCard, setDecideCard] = useState<ImpactCard | null>(null)
   const [decideKind, setDecideKind] = useState<DecisionKind>('watch')
 
@@ -41,7 +48,7 @@ export default function TodayPage() {
     mutationFn: api.impactJob,
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-      pushToast('success', t('today.impactDone'))
+      pushToast('success', t(engagement.fetchDoneToastKey()))
     },
     onError: (err) => pushToast('error', errorText(err, t)),
   })
@@ -86,7 +93,7 @@ export default function TodayPage() {
       setDecideCard(null)
       await qc.invalidateQueries({ queryKey: ['intelligence-home'] })
       await qc.invalidateQueries({ queryKey: ['decisions'] })
-      pushToast('success', t('decisions.saved'))
+      pushToast('success', t(engagement.decisionToastKey()))
     },
     onError: (err) => pushToast('error', errorText(err, t)),
   })
@@ -94,11 +101,18 @@ export default function TodayPage() {
   const data = home.data
   const sourceCount = sources.data?.length ?? 0
   const hasSources = sourceCount > 0
-  const major = (data?.majorChanges ?? data?.todayChanges ?? []).slice(0, 3)
-  const minor = (data?.minorSignals ?? []).slice(0, 5)
-  const revisit = (data?.decisionsToRevisit ?? []).slice(0, 1)
-  const alerts = data?.proactiveAlerts ?? []
-  const majorCount = data?.stats?.majorCount ?? major.length
+  const filterCard = (card: ImpactCard) =>
+    impactEventMatchesDisplay(card.eventId, changeSourceMap, displaySourceIds)
+
+  const major = (data?.majorChanges ?? data?.todayChanges ?? []).filter(filterCard).slice(0, 3)
+  const minor = (data?.minorSignals ?? []).filter(filterCard).slice(0, 5)
+  const revisit = (data?.decisionsToRevisit ?? [])
+    .filter((d) => impactEventMatchesDisplay(d.changeId, changeSourceMap, displaySourceIds))
+    .slice(0, 1)
+  const alerts = (data?.proactiveAlerts ?? []).filter((a) =>
+    impactEventMatchesDisplay(a.changeId, changeSourceMap, displaySourceIds),
+  )
+  const majorCount = major.length
   const ready = major.length > 0 || minor.length > 0
 
   const openDecide = (card: ImpactCard, kind: DecisionKind = 'watch') => {
@@ -111,6 +125,12 @@ export default function TodayPage() {
       onSuccess: () => impactJob.mutate(),
     })
   }
+
+  const onDeckCleared = useCallback(() => {
+    if (engagement.claimDeckCleared()) {
+      pushToast('success', t(engagement.deckClearToastKey()))
+    }
+  }, [engagement, pushToast, t])
 
   const busy = dismissMut.isPending || watchMut.isPending || decisionMut.isPending
 
@@ -193,28 +213,21 @@ export default function TodayPage() {
 
       {ready ? (
         <>
-          <section className="mb-8 space-y-4">
-            <h2 className="font-mono text-xs uppercase tracking-widest text-muted">{t('today.majorChanges')}</h2>
-            {major.map((card) => {
-              const cid = card.eventId
-              if (!cid) return null
-              return (
-                <ChangeCard
-                  key={card.id ?? cid}
-                  card={card}
-                  busy={busy}
-                  onDismiss={() => dismissMut.mutate(cid)}
-                  onWatch={() => watchMut.mutate(cid)}
-                  onDecide={() => openDecide(card, 'watch')}
-                  onInvestigate={() => openDecide(card, 'investigate')}
-                />
-              )
-            })}
-          </section>
+          <RadarDeck
+            cards={major}
+            busy={busy}
+            onWatch={(c) => c.eventId && watchMut.mutate(c.eventId)}
+            onDismiss={(c) => c.eventId && dismissMut.mutate(c.eventId)}
+            onDecide={(c) => openDecide(c, 'watch')}
+            onInvestigate={(c) => openDecide(c, 'investigate')}
+            onCleared={onDeckCleared}
+          />
 
           {minor.length > 0 ? (
             <details className="mb-6 rounded-lg border border-border bg-surface/50 px-4 py-3">
-              <summary className="cursor-pointer text-sm font-medium text-muted">{t('today.minorSignals')}</summary>
+              <summary className="cursor-pointer text-sm font-medium text-muted">
+                {t('today.minorSignals')}
+              </summary>
               <ul className="mt-3 space-y-2">
                 {minor.map((card) => (
                   <li key={card.id} className="text-sm">

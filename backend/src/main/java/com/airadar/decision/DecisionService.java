@@ -1,6 +1,7 @@
 package com.airadar.decision;
 
 import com.airadar.api.ApiTimes;
+import com.airadar.change.EventSourceLookup;
 import com.airadar.event.EventRepository;
 import com.airadar.event.TimelineEntryRepository;
 import com.airadar.memory.MemoryService;
@@ -26,17 +27,20 @@ public class DecisionService {
     private final EventRepository eventRepository;
     private final TimelineEntryRepository timelineEntryRepository;
     private final MemoryService memoryService;
+    private final EventSourceLookup eventSourceLookup;
 
     public DecisionService(
             DecisionRepository decisionRepository,
             EventRepository eventRepository,
             TimelineEntryRepository timelineEntryRepository,
-            MemoryService memoryService
+            MemoryService memoryService,
+            EventSourceLookup eventSourceLookup
     ) {
         this.decisionRepository = decisionRepository;
         this.eventRepository = eventRepository;
         this.timelineEntryRepository = timelineEntryRepository;
         this.memoryService = memoryService;
+        this.eventSourceLookup = eventSourceLookup;
     }
 
     @Transactional
@@ -117,6 +121,7 @@ public class DecisionService {
             m.put("changeTitle", e.getTitle());
             m.put("changeSummary", e.getSummary());
         });
+        m.put("sourceIds", eventSourceLookup.sourceIdsForEvent(d.getChangeId()));
         if (updatesSince != null) {
             m.put("updatesSinceDecision", updatesSince);
         }

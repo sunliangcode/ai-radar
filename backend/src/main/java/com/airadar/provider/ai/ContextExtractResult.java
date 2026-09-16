@@ -9,9 +9,12 @@ public record ContextExtractResult(
         List<String> technologies,
         List<String> interests,
         List<String> goals,
+        List<String> currentFocus,
+        List<String> explicitIgnore,
         Map<String, Object> preferences
 ) {
     public static ContextExtractResult empty() {
-        return new ContextExtractResult(Map.of(), List.of(), List.of(), List.of(), List.of(), Map.of());
+        return new ContextExtractResult(
+                Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), Map.of());
     }
 }

@@ -99,6 +99,9 @@ public class BriefsController {
                     m.put("score", i.getScore());
                     m.put("summary", i.getSummary());
                     m.put("canonicalUrl", i.getCanonicalUrl());
+                    m.put("primarySourceType", i.getPrimarySourceType());
+                    m.put("primarySourceId", i.getPrimarySourceId());
+                    m.put("sourceRefs", i.getSourceRefs());
                     return m;
                 })
                 .toList();

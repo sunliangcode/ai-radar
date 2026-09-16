@@ -1,5 +1,6 @@
 package com.airadar.api;
 
+import com.airadar.change.EventSourceLookup;
 import com.airadar.event.EventEntity;
 import com.airadar.event.EventRepository;
 import com.airadar.event.TimelineEntryEntity;
@@ -27,15 +28,18 @@ public class WatchingController {
     private final MemoryRepository memoryRepository;
     private final EventRepository eventRepository;
     private final TimelineEntryRepository timelineRepository;
+    private final EventSourceLookup eventSourceLookup;
 
     public WatchingController(
             MemoryRepository memoryRepository,
             EventRepository eventRepository,
-            TimelineEntryRepository timelineRepository
+            TimelineEntryRepository timelineRepository,
+            EventSourceLookup eventSourceLookup
     ) {
         this.memoryRepository = memoryRepository;
         this.eventRepository = eventRepository;
         this.timelineRepository = timelineRepository;
+        this.eventSourceLookup = eventSourceLookup;
     }
 
     @GetMapping("/timeline")
@@ -72,6 +76,7 @@ public class WatchingController {
         out.put("title", event.getTitle());
         out.put("status", event.getStatus());
         out.put("entryCount", entries.size());
+        out.put("sourceIds", eventSourceLookup.sourceIdsForEvent(event.getId()));
         out.put("entries", recent);
         return out;
     }
