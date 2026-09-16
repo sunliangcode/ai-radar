@@ -3,6 +3,7 @@ package com.airadar.feedback;
 import com.airadar.action.ActionEntity;
 import com.airadar.action.ActionRepository;
 import com.airadar.action.ActionService;
+import com.airadar.context.ContextService;
 import com.airadar.event.EventEntity;
 import com.airadar.event.EventRepository;
 import com.airadar.memory.MemoryService;
@@ -30,12 +31,14 @@ class FeedbackServiceTest {
     @Mock ActionService actionService;
     @Mock ActionRepository actionRepository;
     @Mock EventRepository eventRepository;
+    @Mock ContextService contextService;
 
     FeedbackService feedbackService;
 
     @BeforeEach
     void setUp() {
-        feedbackService = new FeedbackService(memoryService, actionService, actionRepository, eventRepository);
+        feedbackService = new FeedbackService(
+                memoryService, actionService, actionRepository, eventRepository, contextService);
     }
 
     @Test

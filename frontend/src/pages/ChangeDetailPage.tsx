@@ -1,9 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { FeedbackBar } from '../components/feedback/FeedbackBar'
-import { PageHeader, ScorePill, StateBox, StatusBadge } from '../components/ui'
+import {
+  ImmersiveDrawer,
+  ItemDetailBody,
+  PageHeader,
+  ScorePill,
+  StateBox,
+  StatusBadge,
+  isZhihuSource,
+} from '../components/ui'
 import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
 
@@ -15,6 +24,7 @@ export default function ChangeDetailPage() {
   const location = useLocation()
   const { id } = useParams()
   const changeId = Number(id)
+  const [readerItemId, setReaderItemId] = useState<number | null>(null)
   const q = useQuery({
     queryKey: ['change', changeId],
     queryFn: () => api.change(changeId),
@@ -39,6 +49,8 @@ export default function ChangeDetailPage() {
   if (!q.data) return <StateBox>{t('common.notFound')}</StateBox>
 
   const c = q.data
+  const readerItem = c.items?.find((i) => i.id === readerItemId)
+
   return (
     <div>
       <PageHeader
@@ -60,6 +72,16 @@ export default function ChangeDetailPage() {
       <div className="mb-4 flex flex-wrap gap-2">
         {c.tier ? <StatusBadge status={c.tier} /> : null}
         {c.status ? <StatusBadge status={c.status} /> : null}
+        {c.firstDetectedAt ? (
+          <span className="text-xs text-muted">
+            {t('changes.firstDetected')}: {new Date(c.firstDetectedAt).toLocaleDateString(locale)}
+          </span>
+        ) : null}
+        {c.lastUpdatedAt ? (
+          <span className="text-xs text-muted">
+            {t('changes.lastUpdated')}: {new Date(c.lastUpdatedAt).toLocaleDateString(locale)}
+          </span>
+        ) : null}
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
@@ -114,18 +136,48 @@ export default function ChangeDetailPage() {
 
       <h3 className="mb-3 font-serif text-xl">{t('changes.sourcesItems')}</h3>
       <div className="rounded-xl border border-border bg-surface/70 px-4">
-        {c.items?.map((item) => (
-          <article key={item.id} className="flex gap-3 border-b border-border/80 py-3 last:border-0">
-            <ScorePill score={item.score} />
-            <div>
-              <a href={item.canonicalUrl} target="_blank" rel="noreferrer" className="font-medium hover:text-moss">
-                {item.title}
-              </a>
-              {item.summary ? <p className="mt-1 text-sm text-muted">{item.summary}</p> : null}
-            </div>
-          </article>
-        ))}
+        {c.items?.map((item) => {
+          const zhihu = isZhihuSource(item.primarySourceType)
+          return (
+            <article key={item.id} className="flex gap-3 border-b border-border/80 py-3 last:border-0">
+              <ScorePill score={item.score} />
+              <div className="min-w-0 flex-1">
+                {zhihu ? (
+                  <button
+                    type="button"
+                    onClick={() => setReaderItemId(item.id)}
+                    className="text-left font-medium text-accent hover:underline"
+                  >
+                    {item.title}
+                  </button>
+                ) : (
+                  <a href={item.canonicalUrl} target="_blank" rel="noreferrer" className="font-medium hover:text-moss">
+                    {item.title}
+                  </a>
+                )}
+                {item.summary ? <p className="mt-1 text-sm text-muted">{item.summary}</p> : null}
+                {zhihu ? (
+                  <button
+                    type="button"
+                    onClick={() => setReaderItemId(item.id)}
+                    className="mt-1 text-xs text-accent hover:underline"
+                  >
+                    {t('feed.readInRadar')}
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          )
+        })}
       </div>
+
+      <ImmersiveDrawer
+        open={readerItemId != null}
+        onClose={() => setReaderItemId(null)}
+        title={readerItem?.title}
+      >
+        {readerItemId ? <ItemDetailBody itemId={readerItemId} lead={readerItem?.summary} /> : null}
+      </ImmersiveDrawer>
     </div>
   )
 }

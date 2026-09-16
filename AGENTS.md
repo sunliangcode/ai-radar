@@ -81,7 +81,7 @@ User-visible changes → update `CHANGELOG.md` (PR template checkbox).
 
 ## Architecture notes
 
-- **SQLite + Flyway**: schema is Flyway-only (`ddl-auto: none`). New columns → new `backend/src/main/resources/db/migration/V*.sql`. WAL + `busy_timeout=30000`; Hikari pool size 4.
+- **SQLite + Flyway**: schema is Flyway-only (`ddl-auto: none`). Pre-release baseline is a **single** `backend/src/main/resources/db/migration/V1__init.sql`; after first production release, add `V2__…` incrementally. Local schema drift → delete `./data/radar.db` (or `backend/data/radar.db`) and restart. WAL + `busy_timeout=30000`; Hikari pool size 4.
 - **DB path is relative** (`./data/radar.db` from the process CWD). Running Maven from `backend/` writes `backend/data/`; `install.sh` uses root `data/`. Do not assume one path.
 - **Env loading**: Spring `optional:file:.env[.properties]` from **backend working directory**. Copy `backend/.env.example` → `backend/.env`. Never commit `.env`.
 - **Default LLM is local Ollama** (`OPENAI_BASE_URL=http://localhost:11434/v1`, no API key for localhost). Cloud still needs `OPENAI_API_KEY`. LLM failure falls back to heuristics — unit tests do not need a live model.

@@ -51,11 +51,19 @@ public class ChangeService {
     }
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listRecent(int limit) {
+    public List<Map<String, Object>> listRecent(int limit, String tier) {
+        String tierFilter = tier == null || tier.isBlank() ? null : tier.trim().toUpperCase();
         return eventRepository.findTop50ByOrderByScoreDesc().stream()
                 .sorted((a, b) -> b.getLastUpdatedAt().compareTo(a.getLastUpdatedAt()))
-                .limit(Math.max(1, Math.min(limit, 100)))
                 .map(this::fromEvent)
+                .filter(m -> {
+                    if (tierFilter == null) {
+                        return true;
+                    }
+                    Object t = m.get("tier");
+                    return t != null && tierFilter.equalsIgnoreCase(t.toString());
+                })
+                .limit(Math.max(1, Math.min(limit, 100)))
                 .toList();
     }
 
@@ -87,6 +95,7 @@ public class ChangeService {
                 m.put("score", item.getScore());
                 m.put("summary", item.getSummary());
                 m.put("canonicalUrl", item.getCanonicalUrl());
+                m.put("primarySourceType", item.getPrimarySourceType());
                 m.put("role", link.getRole());
                 m.put("publishedAt", ApiTimes.iso(item.getPublishedAt()));
                 items.add(m);

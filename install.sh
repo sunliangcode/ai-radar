@@ -236,6 +236,19 @@ else
     echo "--- last 20 log lines ---"
     tail -n 20 data/ai-radar.log || true
     echo "-------------------------"
+    if grep -q "Migration checksum mismatch" data/ai-radar.log 2>/dev/null; then
+      cat <<'FLYWAY'
+
+Flyway baseline changed (common after git pull). Pre-release there is no in-place upgrade:
+  1. ./stop.sh
+  2. Optional: ./scripts/backup.sh   (uses data/radar.db if present)
+  3. rm -f backend/data/radar.db backend/data/radar.db-wal backend/data/radar.db-shm
+     rm -f data/radar.db data/radar.db-wal data/radar.db-shm
+  4. ./install.sh
+
+See docs/installation.md — "Schema (Flyway)".
+FLYWAY
+    fi
   fi
   echo "  Re-check later: ./scripts/status.sh"
 fi

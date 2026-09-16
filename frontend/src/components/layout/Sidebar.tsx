@@ -1,15 +1,24 @@
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Activity, ArrowRight, FileText, List, Newspaper, Search, Settings, Star } from 'lucide-react'
+import {
+  ArrowRight,
+  Compass,
+  GitBranch,
+  Newspaper,
+  Search,
+  Settings,
+  Star,
+  User,
+} from 'lucide-react'
 import { LanguageSwitcher, ThemeDensityControls } from './PrefsControls'
 
 const NAV_ICONS = {
-  '/monitor': Activity,
   '/': Newspaper,
-  '/feed': List,
+  '/changes': GitBranch,
   '/watching': Star,
-  '/actions': ArrowRight,
-  '/briefs': FileText,
+  '/decisions': ArrowRight,
+  '/explore': Compass,
+  '/settings/context': User,
   '/settings': Settings,
 } as const
 
@@ -25,14 +34,16 @@ export function Sidebar({
   onOpenPalette: () => void
 }) {
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
+  const activeSourceType = searchParams.get('sourceType') ?? ''
 
   const nav = [
-    { to: '/monitor', label: t('nav.monitor'), end: false },
     { to: '/', label: t('nav.today'), end: true },
-    { to: '/feed', label: t('nav.feed'), end: false },
+    { to: '/changes', label: t('nav.changes'), end: false },
     { to: '/watching', label: t('nav.watching'), end: false },
-    { to: '/actions', label: t('nav.actions'), end: false },
-    { to: '/briefs', label: t('nav.briefs'), end: false },
+    { to: '/decisions', label: t('nav.decisions'), end: false },
+    { to: '/explore', label: t('nav.explore'), end: false },
+    { to: '/settings/context', label: t('nav.contexts'), end: false },
     { to: '/settings', label: t('nav.settings'), end: false },
   ]
 
@@ -41,6 +52,7 @@ export function Sidebar({
       <div className="md:mb-4 md:border-b md:border-border md:pb-4">
         <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">{t('nav.product')}</p>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">{t('nav.brand')}</h1>
+        <p className="mt-1 text-[11px] text-faint">{t('nav.taglineV2')}</p>
       </div>
       <nav className="flex md:flex-col gap-1 overflow-x-auto" aria-label={t('nav.main')}>
         {nav.map((item) => {
@@ -58,7 +70,7 @@ export function Sidebar({
             >
               {Icon ? <Icon size={14} className="shrink-0 opacity-70" aria-hidden /> : null}
               <span className="flex-1 whitespace-nowrap">{item.label}</span>
-              {item.to === '/feed' && totalUnread > 0 ? (
+              {item.to === '/explore' && totalUnread > 0 ? (
                 <span className="rounded-full bg-moss/15 px-1.5 py-px font-mono text-[10px] text-moss">
                   {totalUnread}
                 </span>
@@ -84,13 +96,21 @@ export function Sidebar({
           <div className="flex flex-col gap-0.5">
             {sourceTypes.slice(0, 10).map(([type]) => {
               const count = unreadByType[type] ?? 0
+              const active = activeSourceType === type
               return (
                 <Link
                   key={type}
-                  to={`/feed?sourceType=${encodeURIComponent(type)}`}
-                  className={`flex items-center gap-2 rounded px-2.5 py-1 text-xs hover:bg-border ${count > 0 ? 'font-medium text-ink' : 'text-faint'}`}
+                  to={`/explore?sourceType=${encodeURIComponent(type)}`}
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex items-center gap-2 rounded px-2.5 py-1 text-xs transition ${
+                    active
+                      ? 'bg-accent-soft font-medium text-accent'
+                      : count > 0
+                        ? 'font-medium text-ink hover:bg-border'
+                        : 'text-faint hover:bg-border'
+                  }`}
                 >
-                  <span className="flex-1 truncate">{t(`sourceType.${type}`, { defaultValue: type })}</span>
+                  <span className="flex-1 truncate">{type}</span>
                   {count > 0 ? (
                     <span className="font-mono text-[10px] text-moss">{count}</span>
                   ) : null}
@@ -100,7 +120,8 @@ export function Sidebar({
           </div>
         </div>
       ) : null}
-      <div className="ml-auto md:ml-0 md:mt-auto flex items-center gap-3">
+
+      <div className="mt-auto hidden pt-6 md:flex md:flex-col md:gap-2">
         <LanguageSwitcher />
         <ThemeDensityControls />
       </div>

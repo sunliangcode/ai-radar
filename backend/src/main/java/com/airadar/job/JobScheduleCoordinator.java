@@ -39,6 +39,7 @@ public class JobScheduleCoordinator {
     private ScheduledFuture<?> fetchFuture;
     private ScheduledFuture<?> pushFuture;
     private ScheduledFuture<?> clusterFuture;
+    private ScheduledFuture<?> revisitFuture;
     private Instant lastFetchDone;
     private Instant lastPushDone;
     private Instant lastClusterDone;
@@ -80,13 +81,16 @@ public class JobScheduleCoordinator {
             cancel(fetchFuture);
             cancel(pushFuture);
             cancel(clusterFuture);
+            cancel(revisitFuture);
             fetchFuture = null;
             pushFuture = null;
             clusterFuture = null;
+            revisitFuture = null;
             pushCronError = null;
             armFetch();
             armPush();
             armCluster();
+            armRevisit();
         }
     }
 
@@ -123,6 +127,11 @@ public class JobScheduleCoordinator {
                 }
             }
         }, when);
+    }
+
+    private void armRevisit() {
+        long dayMs = Duration.ofDays(1).toMillis();
+        revisitFuture = taskScheduler.scheduleAtFixedRate(radarJobs::scheduledRevisitCheck, Duration.ofMillis(dayMs));
     }
 
     private void armCluster() {

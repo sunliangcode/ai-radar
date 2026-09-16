@@ -15,6 +15,8 @@ public interface NewsItemRepository extends JpaRepository<NewsItemEntity, Long> 
 
     List<NewsItemEntity> findByCanonicalUrlIn(Collection<String> urls);
 
+    List<NewsItemEntity> findByTitleIn(Collection<String> titles);
+
     List<NewsItemEntity> findByCreatedAtGreaterThanEqualOrderByScoreDesc(Instant since);
 
     List<NewsItemEntity> findByPrimarySourceTypeAndCreatedAtGreaterThanEqualOrderByScoreDesc(

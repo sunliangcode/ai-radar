@@ -10,11 +10,12 @@ import { useUnreadCounts } from './hooks/useUnreadCounts'
 
 // Route-level code splitting: each page is a separate chunk so the shell and
 // Today page load without pulling in every other route's code.
-const ActionsPage = lazy(() => import('./pages/ActionsPage'))
 const BriefDetailPage = lazy(() => import('./pages/BriefDetailPage'))
 const ChangeDetailPage = lazy(() => import('./pages/ChangeDetailPage'))
 const ContextsPage = lazy(() => import('./pages/ContextsPage'))
 const FeedPage = lazy(() => import('./pages/FeedPage'))
+const ChangesPage = lazy(() => import('./pages/ChangesPage'))
+const DecisionsPage = lazy(() => import('./pages/DecisionsPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const SettingsHubPage = lazy(() => import('./pages/SettingsHubPage'))
 const SourceDetailPage = lazy(() => import('./pages/SourceDetailPage'))
@@ -100,27 +101,30 @@ function Shell() {
           <ErrorBoundary>
             <Suspense fallback={<PageFallback />}>
               <Routes>
-                <Route path="/monitor" element={<AiMonitorPage />} />
+                <Route path="/monitor" element={<Navigate to="/settings/system" replace />} />
                 <Route path="/" element={<TodayPage />} />
-                <Route path="/feed" element={<FeedPage />} />
+                <Route path="/explore" element={<FeedPage />} />
+                <Route path="/feed" element={<Navigate to="/explore" replace />} />
+                <Route path="/changes" element={<ChangesPage />} />
+                <Route path="/decisions" element={<DecisionsPage />} />
                 <Route path="/watching" element={<WatchingPage />} />
+                <Route path="/actions" element={<Navigate to="/decisions" replace />} />
+                <Route path="/briefs" element={<BriefsPage />} />
                 <Route path="/settings" element={<SettingsHubPage />} />
+                <Route path="/settings/system" element={<AiMonitorPage />} />
                 <Route path="/settings/context" element={<ContextsPage />} />
                 <Route path="/settings/sources" element={<SourcesPage />} />
                 <Route path="/settings/sources/:id" element={<SourceDetailPage />} />
                 <Route path="/settings/preferences" element={<SettingsPage />} />
                 <Route path="/settings/llm" element={<Navigate to="/settings/preferences" replace />} />
                 <Route path="/changes/:id" element={<ChangeDetailPage />} />
-                <Route path="/actions" element={<ActionsPage />} />
                 <Route path="/briefs/:date" element={<BriefDetailPage />} />
-                <Route path="/briefs" element={<BriefsPage />} />
                 {/* Legacy redirects */}
-                <Route path="/changes" element={<Navigate to="/feed" replace />} />
-                <Route path="/items" element={<Navigate to="/feed" replace />} />
+                <Route path="/items" element={<Navigate to="/explore" replace />} />
                 <Route path="/contexts" element={<Navigate to="/settings/context" replace />} />
                 <Route path="/sources" element={<Navigate to="/settings/sources" replace />} />
                 <Route path="/sources/:id" element={<SourceIdRedirect />} />
-                <Route path="/events" element={<Navigate to="/feed" replace />} />
+                <Route path="/events" element={<Navigate to="/explore" replace />} />
                 <Route path="/events/:id" element={<EventRedirect />} />
                 {/* Unknown URLs used to render a blank main area with no explanation. */}
                 <Route path="*" element={<NotFoundPage />} />

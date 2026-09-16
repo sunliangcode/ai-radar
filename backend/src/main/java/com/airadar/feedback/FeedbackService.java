@@ -3,6 +3,7 @@ package com.airadar.feedback;
 import com.airadar.action.ActionEntity;
 import com.airadar.action.ActionRepository;
 import com.airadar.action.ActionService;
+import com.airadar.context.ContextService;
 import com.airadar.event.EventEntity;
 import com.airadar.event.EventRepository;
 import com.airadar.memory.MemoryService;
@@ -23,17 +24,20 @@ public class FeedbackService {
     private final ActionService actionService;
     private final ActionRepository actionRepository;
     private final EventRepository eventRepository;
+    private final ContextService contextService;
 
     public FeedbackService(
             MemoryService memoryService,
             ActionService actionService,
             ActionRepository actionRepository,
-            EventRepository eventRepository
+            EventRepository eventRepository,
+            ContextService contextService
     ) {
         this.memoryService = memoryService;
         this.actionService = actionService;
         this.actionRepository = actionRepository;
         this.eventRepository = eventRepository;
+        this.contextService = contextService;
     }
 
     @Transactional
@@ -78,6 +82,11 @@ public class FeedbackService {
                 .orElseThrow(() -> new NoSuchElementException("change not found: " + eventId));
         String memoryKind = memoryKind(kind);
         memoryService.remember(memoryKind, "change", eventId, event.getTitle(), payload(kind));
+        if ("irrelevant".equals(kind) || "ignore".equals(kind)) {
+            contextService.noteTopicFeedback(event.getTitle(), false);
+        } else if ("useful".equals(kind)) {
+            contextService.noteTopicFeedback(event.getTitle(), true);
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("targetType", "change");

@@ -50,11 +50,12 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const navCommands: Command[] = useMemo(
     () => [
-      { id: 'monitor', label: t('nav.monitor'), hint: '/monitor', run: () => navigate('/monitor') },
+      { id: 'monitor', label: t('nav.monitor'), hint: '/settings/system', run: () => navigate('/settings/system') },
       { id: 'today', label: t('nav.today'), hint: '/', run: () => navigate('/') },
-      { id: 'feed', label: t('nav.feed'), hint: '/feed', run: () => navigate('/feed') },
+      { id: 'explore', label: t('nav.explore'), hint: '/explore', run: () => navigate('/explore') },
+      { id: 'changes', label: t('nav.changes'), hint: '/changes', run: () => navigate('/changes') },
+      { id: 'decisions', label: t('nav.decisions'), hint: '/decisions', run: () => navigate('/decisions') },
       { id: 'watching', label: t('nav.watching'), hint: '/watching', run: () => navigate('/watching') },
-      { id: 'actions', label: t('nav.actions'), hint: '/actions', run: () => navigate('/actions') },
       { id: 'briefs', label: t('nav.briefs'), hint: '/briefs', run: () => navigate('/briefs') },
       { id: 'settings', label: t('nav.settings'), hint: '/settings', run: () => navigate('/settings') },
       {
@@ -99,7 +100,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               void qc.invalidateQueries({ queryKey: ['feed'] })
               void qc.invalidateQueries({ queryKey: ['unread-counts'] })
               void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-              navigate('/feed')
+              navigate('/explore')
               pushToast('success', t('feed.markAllReadDone'))
             })
             .catch((err) => pushToast('error', t('common.loadFailed', { message: errorText(err, t) })))

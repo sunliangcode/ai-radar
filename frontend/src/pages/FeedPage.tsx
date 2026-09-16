@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { errorText } from '../lib/errors'
+import { cleanFeedLead } from '../lib/cleanFeedLead'
 import {
   Button,
   buttonVariants,
@@ -16,6 +17,7 @@ import {
   PageHeader,
   SourceBadge,
   StateBox,
+  isZhihuSource,
 } from '../components/ui'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { timeAgo } from '../components/magazine/timeAgo'
@@ -51,6 +53,7 @@ export default function FeedPage() {
 
   const list = useFeedList(!!progress?.running)
   const actions = useFeedActions(list.unreadOnly)
+  const filteredSource = Boolean(list.sourceType)
 
   const focusSearch = useCallback(() => {
     document.getElementById('feed-search-input')?.focus()
@@ -93,6 +96,13 @@ export default function FeedPage() {
       onSuccess: () => list.resetList(),
     })
   }
+
+  const selectedLead = selectedItem
+    ? cleanFeedLead(
+        selectedItem.summary || selectedItem.scoreReason,
+        selectedItem.titleDisplay || selectedItem.title,
+      )
+    : undefined
 
   return (
     <div>
@@ -215,14 +225,16 @@ export default function FeedPage() {
 
       {list.items.length > 0 ? (
         <div ref={listRef}>
-          <MagGrid dimmed={drawerOpen}>
+          <MagGrid dimmed={drawerOpen} variant={filteredSource ? 'list' : 'waterfall'}>
             {list.items.map((item) => {
-              const lead = item.summary || item.scoreReason || undefined
+              const displayTitle = item.titleDisplay || item.title
+              const zhihu = isZhihuSource(item.primarySourceType)
+              const lead = cleanFeedLead(item.summary || item.scoreReason, displayTitle)
               return (
                 <MagCard
                   key={item.id}
                   dataId={item.id}
-                  title={item.titleDisplay || item.title}
+                  title={displayTitle}
                   titleSecondary={
                     item.titleDisplay && item.titleDisplay !== item.title ? item.title : undefined
                   }
@@ -230,13 +242,18 @@ export default function FeedPage() {
                   score={item.score}
                   tier={scoreTier(item.score)}
                   sourceType={item.primarySourceType}
+                  hideSourceChip={filteredSource}
                   tags={item.tags}
                   unread={!item.read}
                   selected={item.id === list.selectedId}
                   dimmed={drawerOpen && item.id !== list.selectedId}
-                  href={item.canonicalUrl}
+                  href={zhihu ? undefined : item.canonicalUrl}
                   onSelect={() => list.setSelectedId(item.id)}
-                  onOpen={() => actions.markReadOnOpen(item)}
+                  onOpen={
+                    zhihu
+                      ? () => openDrawer(item.id)
+                      : () => actions.markReadOnOpen(item)
+                  }
                   meta={
                     <>
                       <span className="tabular-nums">
@@ -257,31 +274,58 @@ export default function FeedPage() {
                     </>
                   }
                   actions={
-                    <>
-                      <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
-                        {item.saved ? t('feed.unsave') : t('feed.save')}
-                      </MagAction>
-                      <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
-                        {t('feed.notInterested')}
-                      </MagAction>
-                    </>
+                    zhihu ? (
+                      <>
+                        <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
+                          {item.saved ? t('feed.unsave') : t('feed.save')}
+                        </MagAction>
+                        <MagAction
+                          onClick={() => openDrawer(item.id)}
+                          tone="accent"
+                        >
+                          {t('feed.expand')}
+                        </MagAction>
+                      </>
+                    ) : (
+                      <>
+                        <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
+                          {item.saved ? t('feed.unsave') : t('feed.save')}
+                        </MagAction>
+                        <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
+                          {t('feed.notInterested')}
+                        </MagAction>
+                      </>
+                    )
                   }
                   secondaryActions={
-                    <>
-                      <MagAction
-                        onClick={() => {
-                          list.setSelectedId(item.id)
-                          openDrawer(item.id)
-                        }}
-                      >
-                        {t('feed.expand')}
-                      </MagAction>
-                      {!item.read ? (
-                        <MagAction onClick={() => actions.markItemSelectedRead(item)}>
-                          {t('feed.read')}
+                    zhihu ? (
+                      <>
+                        <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
+                          {t('feed.notInterested')}
                         </MagAction>
-                      ) : null}
-                    </>
+                        {!item.read ? (
+                          <MagAction onClick={() => actions.markItemSelectedRead(item)}>
+                            {t('feed.read')}
+                          </MagAction>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <MagAction
+                          onClick={() => {
+                            list.setSelectedId(item.id)
+                            openDrawer(item.id)
+                          }}
+                        >
+                          {t('feed.expand')}
+                        </MagAction>
+                        {!item.read ? (
+                          <MagAction onClick={() => actions.markItemSelectedRead(item)}>
+                            {t('feed.read')}
+                          </MagAction>
+                        ) : null}
+                      </>
+                    )
                   }
                 />
               )
@@ -388,7 +432,7 @@ export default function FeedPage() {
           ) : null
         }
       >
-        {selectedItem ? <ItemDetailBody itemId={selectedItem.id} lead={selectedItem.summary} /> : null}
+        {selectedItem ? <ItemDetailBody itemId={selectedItem.id} lead={selectedLead} /> : null}
       </ImmersiveDrawer>
     </div>
   )

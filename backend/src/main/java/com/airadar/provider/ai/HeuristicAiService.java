@@ -400,6 +400,16 @@ public class HeuristicAiService implements AiService {
             }
             why += " Adjusted by Memory (past rejects).";
         }
+        if (contextJson != null && contextJson.toLowerCase(Locale.ROOT).contains("explicit_ignore")) {
+            for (String token : contextJson.toLowerCase(Locale.ROOT).split("[^a-z0-9+#.-]+")) {
+                if (token.length() >= 4 && blob.contains(token)) {
+                    relevance = Math.max(15, relevance - 20);
+                    tier = "IGNORE";
+                    why = "Topic matches explicit_ignore in your Context.";
+                    break;
+                }
+            }
+        }
         return new ImpactAnalysisResult(
                 relevance,
                 impact,

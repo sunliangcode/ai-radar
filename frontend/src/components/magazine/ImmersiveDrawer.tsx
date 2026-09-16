@@ -4,7 +4,7 @@ import { useFocusTrap } from '../layout/useFocusTrap'
 import { cn } from '../../lib/cn'
 
 /**
- * Immersive focus panel: right drawer on lg+, bottom sheet on small screens.
+ * Immersive focus panel: centered modal on all breakpoints.
  * Esc / backdrop closes; focus is trapped while open.
  */
 export function ImmersiveDrawer({
@@ -56,7 +56,7 @@ export function ImmersiveDrawer({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[50]" role="presentation">
+    <div className="fixed inset-0 z-[50] flex items-center justify-center px-4" role="presentation">
       <button
         type="button"
         aria-label={t('magazine.closeDrawer')}
@@ -69,11 +69,7 @@ export function ImmersiveDrawer({
         aria-modal="true"
         aria-labelledby={title ? labelledById : undefined}
         className={cn(
-          'mag-drawer absolute flex flex-col bg-surface shadow-2xl border-border',
-          // Mobile: bottom sheet
-          'inset-x-0 bottom-0 max-h-[85vh] rounded-t-2xl border-t',
-          // Desktop: right panel
-          'md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:h-full md:max-h-none md:w-[min(480px,100%)] md:rounded-none md:border-t-0 md:border-l',
+          'mag-drawer relative flex w-full max-w-2xl max-h-[85vh] flex-col rounded-2xl border border-border bg-surface shadow-2xl',
         )}
       >
         <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3 md:px-5">

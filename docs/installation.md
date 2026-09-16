@@ -30,6 +30,8 @@ Backup the SQLite database (WAL-safe; keeps the last 14 copies under `data/backu
 
 Optional retention: Settings → Advanced → **Keep items for N days** (default `0` = forever). Items older than N days that are not saved and not linked to an event are deleted after each scheduled fetch (and via `POST /api/jobs/cleanup`).
 
+**Schema (Flyway):** the repo ships a single baseline migration `V1__init.sql`. After pulling a release that changes schema, stop the backend and remove `data/radar.db` (and `-wal`/`-shm` if present), or restore from backup — there is no multi-step upgrade path before first production cut.
+
 ---
 
 ## Configure

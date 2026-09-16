@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClient;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -228,10 +229,16 @@ public class ContextService {
             });
         }
         Map<String, Object> payload = new LinkedHashMap<>();
-        for (String key : List.of("profile", "projects", "technologies", "interests", "goals", "preferences")) {
+        for (String key : List.of(
+                "profile", "projects", "technologies", "interests", "goals", "preferences",
+                "current_focus", "explicit_ignore", "watching_topics", "weights", "schemaVersion"
+        )) {
             if (body.containsKey(key)) {
                 payload.put(key, body.get(key));
             }
+        }
+        if (!payload.containsKey("schemaVersion")) {
+            payload.put("schemaVersion", 2);
         }
         if (payload.isEmpty()) {
             throw new IllegalArgumentException("payload is required");
@@ -264,6 +271,33 @@ public class ContextService {
         dto.put("createdAt", ApiTimes.iso(row.getCreatedAt()));
         dto.put("updatedAt", ApiTimes.iso(row.getUpdatedAt()));
         return dto;
+    }
+
+    @Transactional
+    public void noteTopicFeedback(String title, boolean relevant) {
+        UserContextEntity row = repository.findById(1L).orElse(null);
+        if (row == null || title == null || title.isBlank()) {
+            return;
+        }
+        try {
+            Map<String, Object> payload = objectMapper.readValue(
+                    row.getPayloadJson(),
+                    new TypeReference<Map<String, Object>>() {}
+            );
+            @SuppressWarnings("unchecked")
+            Map<String, Number> weights = payload.get("weights") instanceof Map<?, ?> m
+                    ? new LinkedHashMap<>((Map<String, Number>) m)
+                    : new LinkedHashMap<>();
+            String key = title.trim().split("\\s+")[0].toLowerCase(Locale.ROOT);
+            double delta = relevant ? -0.5 : 1.0;
+            weights.put(key, weights.getOrDefault(key, 0).doubleValue() + delta);
+            payload.put("weights", weights);
+            payload.put("schemaVersion", 2);
+            row.setPayloadJson(objectMapper.writeValueAsString(payload));
+            repository.save(row);
+        } catch (Exception e) {
+            // best-effort personalization
+        }
     }
 
     private static String asString(Object v) {

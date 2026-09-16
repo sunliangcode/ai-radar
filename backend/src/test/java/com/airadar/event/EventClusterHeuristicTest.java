@@ -62,6 +62,39 @@ class EventClusterHeuristicTest {
     }
 
     @Test
+    void claudeCodeSeriesShouldPreferSameEvent() {
+        RadarProperties props = new RadarProperties();
+        NewsItemRepository repo = mock(NewsItemRepository.class);
+        when(repo.findBySavedTrue()).thenReturn(List.of());
+        PreferenceKeywordRepository prefRepo = mock(PreferenceKeywordRepository.class);
+        when(prefRepo.findByKindOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyString())).thenReturn(List.of());
+        SettingsService settings = mock(SettingsService.class);
+        when(settings.effectiveSourceWeights()).thenReturn(Map.of());
+        HeuristicAiService ai = new HeuristicAiService(props, new InterestSignalsService(props, repo, prefRepo), settings);
+
+        NewsItem a = item("Claude Code releases agent workflow preview", Instant.parse("2026-09-12T10:00:00Z"));
+        NewsItem b = item("Claude Code agent workflow expands to MCP tools", Instant.parse("2026-09-14T10:00:00Z"));
+        NewsItem c = item("Developers react to Claude Code agent workflow update", Instant.parse("2026-09-16T10:00:00Z"));
+
+        var first = ai.assignEvent(a, List.of());
+        assertTrue(first.createNew());
+
+        var candidates = List.of(new com.airadar.provider.ai.EventCandidate(
+                1L, first.title(), a.getTitle(), 85));
+        var second = ai.assignEvent(b, candidates);
+        var third = ai.assignEvent(c, candidates);
+
+        int assigns = 0;
+        if (!second.createNew()) {
+            assigns++;
+        }
+        if (!third.createNew()) {
+            assigns++;
+        }
+        assertTrue(assigns >= 1, "Claude Code related items should link to one change when possible");
+    }
+
+    @Test
     void entityLexiconFindsOverlap() {
         var a = EntityLexicon.extract("OpenAI GPT and Claude comparison");
         var b = EntityLexicon.extract("Anthropic Claude update");

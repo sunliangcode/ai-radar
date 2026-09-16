@@ -173,6 +173,26 @@ export default function ContextsPage() {
                 />
               </label>
               <label className="block text-sm md:col-span-2">
+                <span className="mb-1 block text-muted">{t('contexts.currentFocus')}</span>
+                <input
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                  value={listToText(payload.current_focus)}
+                  onChange={(e) =>
+                    setPayload({ ...payload, current_focus: textToList(e.target.value), schemaVersion: 2 })
+                  }
+                />
+              </label>
+              <label className="block text-sm md:col-span-2">
+                <span className="mb-1 block text-muted">{t('contexts.explicitIgnore')}</span>
+                <input
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                  value={listToText(payload.explicit_ignore)}
+                  onChange={(e) =>
+                    setPayload({ ...payload, explicit_ignore: textToList(e.target.value), schemaVersion: 2 })
+                  }
+                />
+              </label>
+              <label className="block text-sm md:col-span-2">
                 <span className="mb-1 block text-muted">{t('contexts.projects')}</span>
                 <textarea
                   className="min-h-24 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"

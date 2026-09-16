@@ -37,6 +37,11 @@ export default function SettingsHubPage() {
       title: t('settingsHub.sources'),
       desc: t('settingsHub.sourcesDesc'),
     },
+    {
+      to: '/settings/system',
+      title: t('settingsHub.system'),
+      desc: t('settingsHub.systemDesc'),
+    },
   ]
 
   const bannerCls = aiReady
@@ -93,8 +98,12 @@ export default function SettingsHubPage() {
       </section>
 
       <p className="mt-6 text-sm text-muted">
-        <Link to="/actions" className="text-moss underline underline-offset-2">
-          {t('settingsHub.openActions')}
+        <Link to="/decisions" className="text-moss underline underline-offset-2">
+          {t('settingsHub.openDecisions')}
+        </Link>
+        {' · '}
+        <Link to="/briefs" className="text-moss underline underline-offset-2">
+          {t('nav.briefs')}
         </Link>
       </p>
     </div>

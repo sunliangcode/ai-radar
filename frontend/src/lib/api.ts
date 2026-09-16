@@ -99,6 +99,7 @@ export type RadarEvent = {
 export type ImpactCard = {
   id: number
   eventId: number
+  changeId?: number
   title: string
   relevance?: number
   impact?: number
@@ -113,8 +114,12 @@ export type ImpactCard = {
   updatedAt?: string
   watchNext?: string
   summary?: string
+  changeSummary?: string
   score?: number
   status?: string
+  recentTimeline?: TimelineSnippet[]
+  firstDetectedAt?: string
+  lastUpdatedAt?: string
 }
 
 export type ActionCard = {
@@ -181,7 +186,12 @@ export type UserContext = {
     technologies?: string[]
     interests?: string[]
     goals?: string[]
+    current_focus?: string[]
+    explicit_ignore?: string[]
+    watching_topics?: string[]
     preferences?: Record<string, unknown>
+    weights?: Record<string, number>
+    schemaVersion?: number
   }
   rawText?: string
   source?: string
@@ -221,7 +231,41 @@ export type ChangeCard = {
 
 export type FeedbackKind = 'useful' | 'irrelevant' | 'watch' | 'ignore' | 'tried'
 
+export type TimelineSnippet = {
+  at?: string
+  label: string
+  note?: string
+  newsItemId?: number
+}
+
+export type DecisionRecord = {
+  id: number
+  changeId: number
+  kind: string
+  reason?: string
+  revisitAt?: string
+  status?: string
+  changeTitle?: string
+  changeSummary?: string
+  updatesSinceDecision?: number
+  createdAt?: string
+}
+
+export type ProactiveAlert = {
+  changeId?: number
+  timelineId?: number
+  at?: string
+  label?: string
+  note?: string
+  title?: string
+}
+
 export type IntelligenceHome = {
+  majorChanges?: ImpactCard[]
+  minorSignals?: ImpactCard[]
+  decisionsToRevisit?: DecisionRecord[]
+  proactiveAlerts?: ProactiveAlert[]
+  stats?: { majorCount?: number; minorCount?: number; decisionsDue?: number }
   todayChanges?: ImpactCard[]
   whatChanged: { eventId: number; eventTitle?: string; at: string; label: string; note?: string }[]
   whyCare?: ImpactCard[]
@@ -555,8 +599,29 @@ export const api = {
   cleanupJob: () => request<Record<string, unknown>>('/api/jobs/cleanup', { method: 'POST' }),
   events: (q: string = '') => request<RadarEvent[]>(`/api/events${q}`),
   event: (id: number) => request<RadarEvent>(`/api/events/${id}`),
-  changes: (limit: number = 40) => request<ChangeCard[]>(`/api/changes?limit=${limit}`),
+  changes: (limit: number = 40, tier?: string) => {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (tier) params.set('tier', tier)
+    return request<ChangeCard[]>(`/api/changes?${params}`)
+  },
   change: (id: number) => request<ChangeCard>(`/api/changes/${id}`),
+  dismissChange: (id: number) =>
+    request<{ changeId: number; dismissed: boolean }>(`/api/changes/${id}/dismiss`, { method: 'POST' }),
+  postChangeDecision: (
+    id: number,
+    body: { kind: string; reason?: string; revisitAt?: string },
+  ) =>
+    request<DecisionRecord>(`/api/changes/${id}/decisions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  putWatch: (changeId: number, rules: Record<string, boolean>) =>
+    request<Record<string, unknown>>(`/api/watch/${changeId}`, {
+      method: 'PUT',
+      body: JSON.stringify(rules),
+    }),
+  decisions: (revisit?: 'due') =>
+    request<DecisionRecord[]>(`/api/decisions${revisit ? '?revisit=due' : ''}`),
   intelligenceHome: () => request<IntelligenceHome>('/api/intelligence/home'),
   getContext: () => request<UserContext>('/api/contexts'),
   saveContext: (body: unknown) =>

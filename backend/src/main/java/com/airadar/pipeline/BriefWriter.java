@@ -27,11 +27,17 @@ public final class BriefWriter {
         Files.createDirectories(briefsDir);
         Path file = briefsDir.resolve(date + ".md");
         StringBuilder sb = new StringBuilder();
-        sb.append("# AI Radar Brief — ").append(date).append("\n\n");
+        sb.append("# Daily Intelligence — ").append(date).append("\n\n");
         sb.append("Generated at ").append(java.time.Instant.now()).append(" (UTC)\n\n");
 
+        int eventCount = events == null ? 0 : events.size();
+        int itemCount = topItems == null ? 0 : topItems.size();
+        sb.append("## Today's Intelligence\n\n");
+        sb.append("- **You should know:** ").append(eventCount).append(" change(s)\n");
+        sb.append("- **Signals in digest:** ").append(itemCount).append("\n\n");
+
         if (events != null && !events.isEmpty()) {
-            sb.append("## Events\n\n");
+            sb.append("## Changes you should know\n\n");
             int rank = 1;
             for (BriefPayload.BriefEvent event : events) {
                 sb.append("### ").append(rank++).append(". ").append(nullSafe(event.title())).append("\n\n");
@@ -61,7 +67,7 @@ public final class BriefWriter {
                 sb.append("_No items passed the score filter today._\n");
             }
         } else {
-            sb.append("## Top Items\n\n");
+            sb.append("## Explore (signals)\n\n");
             int rank = 1;
             for (NewsItem item : topItems) {
                 sb.append("### ").append(rank++).append(". ").append(nullSafe(item.getTitle())).append("\n\n");

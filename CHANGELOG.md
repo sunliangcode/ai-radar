@@ -6,12 +6,34 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **V2 product IA**: Today centers on ≤3 major Changes (why / what changed / what to do) with Watch · Dismiss · Decide; Explore replaces Feed in nav; Changes + Decisions pages; Monitor moves to Settings → System
+- Flyway: single baseline `V1__init.sql` (delete local `data/radar.db` after pull to migrate)
+- Daily Intelligence brief template (replaces “AI Radar Brief” header sections)
+- Context schema v2 fields: `current_focus`, `explicit_ignore`; feedback nudges topic weights
+
+### Fixed
+
+- Flyway baseline `V1__init.sql`: migration sections run in dependency order (V1→V16); `install.sh` prints reset steps on checksum mismatch
+
+### Added
+
+- `decisions` + `watch_subscriptions` tables; APIs `POST /api/changes/{id}/decisions`, `POST …/dismiss`, `PUT /api/watch/{id}`, `GET /api/decisions?revisit=due`
+- Intelligence home: `majorChanges`, `minorSignals`, `decisionsToRevisit`, `proactiveAlerts`
+- Change detail: in-app Zhihu reading from evidence list (shared `ItemDetailBody` drawer)
+- Scheduled daily decision revisit check (surfaces on Today)
+
+### Changed (prior)
+
+- Briefs UI: calendar-style archive cards (latest featured), structured detail cards (events + top picks), and header actions for update / send
+- Feed Zhihu UX: localized source filter chips; sidebar highlights active `sourceType`; strip `【SOURCE】` title-echo from card leads; Zhihu card click / Enter opens the immersive drawer (original stays in drawer CTA); single-source filter uses a denser 1–2 column list and hides redundant source chips; Zhihu cards promote Expand over Not interested; score tiers get left-edge cues
 - Feed cards: compact source chip + title-first layout (dropped empty cover band); click opens original URL; drawer shows a clear **Open original** CTA
 - Feed browse UI: 2–3 column waterfall grid, slim chip filters, collapsible shortcuts; Save / Not interested stay primary
 - Magazine MagCard / MagGrid shared by Today and Watching inherit the same cover + waterfall rhythm
 
 ### Added
 
+- Exact-title fetch dedup: after URL merge, drop new items whose `title` already exists in-batch or in DB (`POST` fetch path via `UrlDedupStage`)
+- `POST /api/jobs/cleanup-duplicate-titles` — merge duplicate `news_items` rows that share an exact title (keep best row; rewire event/timeline/actions links)
 - Feishu scan-to-bind (Device Authorization Grant): Settings shows a QR code, stores app credentials + open_id, one-click unbind; push prefers IM API with legacy webhook fallback
 - `POST/GET/DELETE /api/delivery/feishu/bind*` bind session APIs
 - Magazine-style Feed / Today / Watching: dual-column MagCards + immersive detail drawer (browse rhythm + single-item focus)

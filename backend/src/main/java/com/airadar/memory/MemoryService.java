@@ -37,6 +37,14 @@ public class MemoryService {
     }
 
     @Transactional(readOnly = true)
+    public java.util.Set<Long> dismissedChangeIdsSince(java.time.Instant since) {
+        return repository.findByKindAndRefTypeAndCreatedAtGreaterThanEqual("dismissed", "change", since).stream()
+                .map(MemoryEntity::getRefId)
+                .filter(id -> id != null)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> listRecent() {
         return repository.findTop20ByOrderByCreatedAtDesc().stream().map(m -> {
             Map<String, Object> dto = new LinkedHashMap<>();

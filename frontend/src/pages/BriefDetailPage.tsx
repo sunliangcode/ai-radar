@@ -1,13 +1,33 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import ReactMarkdown from 'react-markdown'
+import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { PageHeader, StateBox } from '../components/ui'
+import { BriefEntryCard } from '../components/brief/BriefEntryCard'
+import { PageHeader, ScorePill, StateBox } from '../components/ui'
 import { errorText } from '../lib/errors'
+import { dateLocale } from '../i18n'
+import { parseBriefMarkdown } from '../lib/parseBriefMarkdown'
+import { cn } from '../lib/cn'
+
+function briefDateParts(date: string, locale: string) {
+  const d = new Date(`${date}T00:00:00`)
+  return {
+    day: String(d.getDate()),
+    month: d.toLocaleDateString(locale, { month: 'short' }),
+    titleDate: d.toLocaleDateString(locale, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
+    weekday: d.toLocaleDateString(locale, { weekday: 'long' }),
+  }
+}
 
 export default function BriefDetailPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = dateLocale(i18n.language)
   const { date = '' } = useParams()
   const q = useQuery({
     queryKey: ['brief', date],
@@ -15,23 +35,137 @@ export default function BriefDetailPage() {
     enabled: Boolean(date),
   })
 
+  const parsed = useMemo(
+    () => (q.data ? parseBriefMarkdown(q.data.markdown) : null),
+    [q.data],
+  )
+
+  const extraItems = useMemo(() => {
+    if (!q.data || !parsed) return []
+    const inBrief = new Set(
+      [...parsed.events, ...parsed.topItems]
+        .map((e) => e.url)
+        .filter(Boolean) as string[],
+    )
+    return (q.data.items ?? []).filter((item) => !inBrief.has(item.canonicalUrl))
+  }, [q.data, parsed])
+
   if (q.isLoading) return <StateBox>{t('briefs.loading')}</StateBox>
   if (q.isError) return <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox>
-  if (!q.data) return <StateBox>{t('common.notFound')}</StateBox>
+  if (!q.data || !parsed) return <StateBox>{t('common.notFound')}</StateBox>
+
+  const parts = briefDateParts(q.data.date, locale)
+  const curatedCount = parsed.events.length + parsed.topItems.length
+  const hasCurated = curatedCount > 0
 
   return (
-    <div>
+    <div className="mx-auto max-w-3xl">
       <PageHeader
-        title={t('briefs.detailTitle', { date: q.data.date })}
+        title={t('briefs.detailTitle', { date: parts.titleDate })}
+        subtitle={parts.weekday}
         actions={
-          <Link to="/" className="text-sm text-moss underline underline-offset-2">
-            {t('common.backToList')}
+          <Link
+            to="/briefs"
+            className="inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-ink"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            {t('briefs.backToArchive')}
           </Link>
         }
       />
-      <article className="prose-brief rounded-xl border border-border bg-surface/80 p-5 md:p-8">
-        <ReactMarkdown>{q.data.markdown}</ReactMarkdown>
-      </article>
+
+      <header
+        className={cn(
+          'brief-detail-hero mb-6 flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 md:p-5',
+          'brief-card--featured',
+        )}
+      >
+        <div className="flex min-w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-bg px-3 py-2 text-center">
+          <span className="text-3xl font-semibold leading-none tabular-nums text-ink">{parts.day}</span>
+          <span className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+            {parts.month}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-moss">
+            {t('nav.briefs')}
+          </p>
+          <p className="mt-1 text-sm text-muted">{parts.weekday}</p>
+          <p className="mt-2 text-sm text-ink">
+            {hasCurated
+              ? t('briefs.curatedCount', { count: curatedCount })
+              : t('briefs.emptyDay')}
+            {extraItems.length > 0
+              ? ` · ${t('briefs.moreFromDay', { count: extraItems.length })}`
+              : null}
+          </p>
+        </div>
+      </header>
+
+      {!hasCurated && extraItems.length === 0 ? (
+        <StateBox>{parsed.emptyNote ?? t('briefs.emptyDay')}</StateBox>
+      ) : null}
+
+      {parsed.events.length > 0 ? (
+        <section className="mb-8">
+          <h2 className="brief-section-label">{t('briefs.sectionEvents')}</h2>
+          <ul className="space-y-3">
+            {parsed.events.map((entry) => (
+              <li key={`event-${entry.rank}-${entry.title}`}>
+                <BriefEntryCard entry={entry} locale={locale} variant="event" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {parsed.topItems.length > 0 ? (
+        <section className="mb-8">
+          <h2 className="brief-section-label">{t('briefs.sectionTopItems')}</h2>
+          <ul className="space-y-3">
+            {parsed.topItems.map((entry) => (
+              <li key={`item-${entry.rank}-${entry.url ?? entry.title}`}>
+                <BriefEntryCard entry={entry} locale={locale} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {extraItems.length > 0 ? (
+        <section>
+          <h2 className="brief-section-label">
+            {t('briefs.moreFromDayTitle')}
+            <span className="ml-2 font-normal normal-case tracking-normal text-muted">
+              · {t('common.itemsCount', { count: extraItems.length })}
+            </span>
+          </h2>
+          <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+            {extraItems.slice(0, 20).map((item) => (
+              <li key={item.id}>
+                <a
+                  href={item.canonicalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-start gap-3 px-4 py-3 transition hover:bg-bg/80"
+                >
+                  <ScorePill score={item.score} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium leading-snug text-ink">
+                      {item.titleDisplay || item.title}
+                    </p>
+                    {item.summary ? (
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">
+                        {item.summary}
+                      </p>
+                    ) : null}
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   )
 }

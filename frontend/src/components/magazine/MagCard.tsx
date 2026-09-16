@@ -1,4 +1,5 @@
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/cn'
 import { ScorePill } from '../score/ScorePill'
 import { coverShortLabel, coverSourceClass } from './magCover'
@@ -24,6 +25,7 @@ export function MagCard({
   dimmed,
   sourceType,
   coverLabel,
+  hideSourceChip,
   tags,
   meta,
   actions,
@@ -46,8 +48,10 @@ export function MagCard({
   dimmed?: boolean
   /** Connector type — drives source chip hue. */
   sourceType?: string
-  /** Override source chip text (defaults from sourceType). */
+  /** Override source chip text (defaults from i18n / sourceType). */
   coverLabel?: string
+  /** Hide chip when the page is already filtered to one source. */
+  hideSourceChip?: boolean
   tags?: string[]
   meta?: ReactNode
   /** Primary footer actions (always visible): save / dismiss. */
@@ -66,6 +70,8 @@ export function MagCard({
   onOpen?: () => void
   className?: string
 }) {
+  const { t } = useTranslation()
+
   const activate = (e?: MouseEvent | KeyboardEvent) => {
     e?.stopPropagation()
     onSelect?.()
@@ -75,8 +81,13 @@ export function MagCard({
     onOpen?.()
   }
 
-  const label = coverLabel ?? coverShortLabel(sourceType)
+  const label =
+    coverLabel ??
+    (sourceType
+      ? t(`sourceType.${sourceType}`, { defaultValue: coverShortLabel(sourceType) })
+      : coverShortLabel(undefined))
   const shownTags = (tags ?? []).filter(Boolean).slice(0, 2)
+  const showChip = !hideSourceChip && Boolean(label)
 
   return (
     <article
@@ -104,9 +115,13 @@ export function MagCard({
     >
       <div className="mag-card-body">
         <div className="mag-card-top">
-          <span className="mag-source-chip" aria-hidden={!label}>
-            {label}
-          </span>
+          {showChip ? (
+            <span className="mag-source-chip" aria-hidden={!label}>
+              {label}
+            </span>
+          ) : (
+            <span />
+          )}
           <div className="mag-card-top-right">
             {unread ? <span className="mag-unread-dot" /> : null}
             {score != null ? <ScorePill score={score} /> : null}

@@ -8,9 +8,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class UrlDedupStage {
@@ -46,19 +48,74 @@ public class UrlDedupStage {
             }
         }
 
-        List<NewsItem> result = new ArrayList<>();
+        List<NewsItem> urlDeduped = new ArrayList<>();
         for (NewsItem item : batch.values()) {
             NewsItemEntity entity = dbByUrl.get(item.getCanonicalUrl());
             if (entity != null) {
                 NewsItem existing = entityMapper.toDomain(entity);
                 merge(existing, item);
                 // Keep prior score/summary/titleDisplay; still return for potential re-score of NEW only.
-                result.add(existing);
+                urlDeduped.add(existing);
             } else {
-                result.add(item);
+                urlDeduped.add(item);
             }
         }
+        return discardDuplicateTitles(urlDeduped);
+    }
+
+    /**
+     * Exact-title discard after URL merge. Persisted URL hits (with id) always
+     * pass through. New rows with a title already present in-batch or in DB are dropped.
+     */
+    private List<NewsItem> discardDuplicateTitles(List<NewsItem> items) {
+        List<NewsItem> result = new ArrayList<>();
+        Set<String> seenTitles = new HashSet<>();
+        List<String> candidateTitles = new ArrayList<>();
+
+        for (NewsItem item : items) {
+            if (item.getId() != null) {
+                result.add(item);
+                if (isDedupableTitle(item)) {
+                    seenTitles.add(item.getTitle());
+                }
+            } else if (isDedupableTitle(item)) {
+                candidateTitles.add(item.getTitle());
+            }
+        }
+
+        Set<String> dbTitles = new HashSet<>();
+        if (!candidateTitles.isEmpty()) {
+            for (NewsItemEntity entity : newsItemRepository.findByTitleIn(candidateTitles)) {
+                dbTitles.add(entity.getTitle());
+            }
+        }
+
+        for (NewsItem item : items) {
+            if (item.getId() != null) {
+                continue;
+            }
+            if (!isDedupableTitle(item)) {
+                result.add(item);
+                continue;
+            }
+            String title = item.getTitle();
+            if (seenTitles.contains(title) || dbTitles.contains(title)) {
+                continue;
+            }
+            seenTitles.add(title);
+            result.add(item);
+        }
         return result;
+    }
+
+    /** Skip blank titles and URL-fallback titles from {@code NormalizeStage.cleanTitle}. */
+    static boolean isDedupableTitle(NewsItem item) {
+        String title = item.getTitle();
+        if (title == null || title.isBlank()) {
+            return false;
+        }
+        String url = item.getCanonicalUrl();
+        return url == null || !title.equals(url);
     }
 
     private static void merge(NewsItem target, NewsItem other) {

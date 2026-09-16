@@ -1,5 +1,6 @@
 package com.airadar.job;
 
+import com.airadar.decision.DecisionService;
 import com.airadar.delivery.DeliveryService;
 import com.airadar.event.EventClusterService;
 import com.airadar.impact.ImpactService;
@@ -35,6 +36,7 @@ public class RadarJobs {
     private final ImpactService impactService;
     private final FetchProgress fetchProgress;
     private final RetentionService retentionService;
+    private final DecisionService decisionService;
     private final AtomicBoolean clusterRunning = new AtomicBoolean(false);
     private final AtomicBoolean impactRunning = new AtomicBoolean(false);
 
@@ -46,7 +48,8 @@ public class RadarJobs {
             EventClusterService eventClusterService,
             ImpactService impactService,
             FetchProgress fetchProgress,
-            RetentionService retentionService
+            RetentionService retentionService,
+            DecisionService decisionService
     ) {
         this.orchestrator = orchestrator;
         this.deliveryService = deliveryService;
@@ -56,6 +59,15 @@ public class RadarJobs {
         this.impactService = impactService;
         this.fetchProgress = fetchProgress;
         this.retentionService = retentionService;
+        this.decisionService = decisionService;
+    }
+
+    /** Daily check for decisions past revisit date (surfaces on Today via intelligence-home). */
+    public void scheduledRevisitCheck() {
+        var due = decisionService.listDueRevisit();
+        if (!due.isEmpty()) {
+            log.info("decision_revisit_due count={}", due.size());
+        }
     }
 
     public void scheduledFetch() {

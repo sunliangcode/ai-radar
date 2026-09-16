@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import type { Item } from '../../lib/api'
+import { isZhihuSource } from '../../components/magazine/magCover'
 
 /**
- * Feed keyboard: j/k move; Enter open original; o open drawer; s save; m read; / search.
+ * Feed keyboard: j/k move; Enter open original (drawer for Zhihu); o open drawer; s save; m read; / search.
  * When the drawer is open, j/k still advances selection (drawer content follows).
  */
 export function useFeedKeyboard({
@@ -53,7 +54,8 @@ export function useFeedKeyboard({
         const cur = items[idx] ?? (selectedId == null ? items[0] : undefined)
         if (cur) {
           e.preventDefault()
-          onOpenExternal(cur)
+          if (isZhihuSource(cur.primarySourceType)) onOpenDrawer(cur.id)
+          else onOpenExternal(cur)
         }
       } else if (e.key === 'o') {
         const cur = items[idx] ?? (selectedId == null ? items[0] : undefined)

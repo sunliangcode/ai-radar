@@ -14,13 +14,13 @@ export function coverSourceClass(sourceType?: string): string {
   return 'cover-default'
 }
 
-/** Short label for the cover band (2–6 chars). */
+/** Compact ASCII fallback when i18n has no `sourceType.*` key. */
 export function coverShortLabel(sourceType?: string, fallback = 'AI'): string {
   const raw = (sourceType ?? '').trim()
   if (!raw) return fallback
   const key = raw.toUpperCase().replace(/-/g, '_')
   const known: Record<string, string> = {
-    ZHIHU: '知乎',
+    ZHIHU: 'Zhihu',
     GITHUB: 'GH',
     HACKER_NEWS: 'HN',
     REDDIT: 'RD',
@@ -34,10 +34,15 @@ export function coverShortLabel(sourceType?: string, fallback = 'AI'): string {
     GDELT: 'GD',
     EMAIL: 'Mail',
     OSS_INSIGHT: 'OSS',
+    GITHUB_TRENDING: 'GHT',
   }
   if (known[key]) return known[key]
   const compact = raw.replace(/[_-]/g, ' ')
   const words = compact.split(/\s+/).filter(Boolean)
   if (words.length >= 2) return words.map((w) => w[0]!.toUpperCase()).join('').slice(0, 4)
   return raw.slice(0, 4).toUpperCase()
+}
+
+export function isZhihuSource(sourceType?: string | null): boolean {
+  return (sourceType ?? '').toUpperCase().includes('ZHIHU')
 }

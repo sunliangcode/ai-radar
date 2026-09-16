@@ -116,9 +116,9 @@ export function FeedToolbar({
             active={sourceType === c}
             disabled={searchMode}
             onClick={() => onSourceTypeChange(c)}
-            className="shrink-0 font-mono"
+            className="shrink-0"
           >
-            {c}
+            {t(`sourceType.${c}`, { defaultValue: c })}
           </Chip>
         ))}
       </div>

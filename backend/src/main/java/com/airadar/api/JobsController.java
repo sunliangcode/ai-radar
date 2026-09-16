@@ -2,6 +2,7 @@ package com.airadar.api;
 
 import com.airadar.job.JobScheduleCoordinator;
 import com.airadar.job.RadarJobs;
+import com.airadar.maintenance.DuplicateTitleCleanupService;
 import com.airadar.maintenance.RetentionService;
 import com.airadar.pipeline.PipelineResult;
 import org.springframework.http.ResponseEntity;
@@ -21,15 +22,18 @@ public class JobsController {
     private final RadarJobs radarJobs;
     private final JobScheduleCoordinator scheduleCoordinator;
     private final RetentionService retentionService;
+    private final DuplicateTitleCleanupService duplicateTitleCleanupService;
 
     public JobsController(
             RadarJobs radarJobs,
             JobScheduleCoordinator scheduleCoordinator,
-            RetentionService retentionService
+            RetentionService retentionService,
+            DuplicateTitleCleanupService duplicateTitleCleanupService
     ) {
         this.radarJobs = radarJobs;
         this.scheduleCoordinator = scheduleCoordinator;
         this.retentionService = retentionService;
+        this.duplicateTitleCleanupService = duplicateTitleCleanupService;
     }
 
     @GetMapping("/schedule")
@@ -75,5 +79,10 @@ public class JobsController {
     @PostMapping("/cleanup")
     public ResponseEntity<Map<String, Object>> cleanup() {
         return ResponseEntity.ok(retentionService.run());
+    }
+
+    @PostMapping("/cleanup-duplicate-titles")
+    public ResponseEntity<Map<String, Object>> cleanupDuplicateTitles() {
+        return ResponseEntity.ok(duplicateTitleCleanupService.run());
     }
 }
