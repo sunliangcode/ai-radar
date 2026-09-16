@@ -9,24 +9,8 @@ import { SystemHealthCard } from './settings/SystemHealthCard'
 export default function SettingsHubPage() {
   const { t } = useTranslation()
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings })
-  const health = useQuery({
-    queryKey: ['health'],
-    queryFn: api.health,
-    refetchInterval: 30_000,
-    retry: 1,
-  })
-  // "AI is on" must reflect real call outcomes, not just a config string check: a local Ollama URL
-  // counts as configured even when nothing is listening.
-  const llmMode = health.data?.llm?.mode
-  const aiReady = llmMode === 'ai'
-  const aiDegraded = llmMode === 'degraded'
 
   const cards = [
-    {
-      to: '/settings/preferences',
-      title: t('settingsHub.preferences'),
-      desc: t('settingsHub.preferencesDesc'),
-    },
     {
       to: '/settings/context',
       title: t('settingsHub.context'),
@@ -38,22 +22,11 @@ export default function SettingsHubPage() {
       desc: t('settingsHub.sourcesDesc'),
     },
     {
-      to: '/settings/system',
-      title: t('settingsHub.system'),
-      desc: t('settingsHub.systemDesc'),
+      to: '/settings/preferences',
+      title: t('settingsHub.preferences'),
+      desc: t('settingsHub.preferencesDesc'),
     },
   ]
-
-  const bannerCls = aiReady
-    ? 'border-moss/40 bg-moss/5'
-    : aiDegraded
-      ? 'border-ember/40 bg-ember/5'
-      : 'border-border bg-surface'
-  const bannerText = aiReady
-    ? t('settingsHub.aiOn')
-    : aiDegraded
-      ? t('settingsHub.aiDegraded')
-      : t('settingsHub.aiOff')
 
   return (
     <div>
@@ -66,9 +39,6 @@ export default function SettingsHubPage() {
           </StateBox>
         </div>
       ) : null}
-
-      {/* AI status banner */}
-      <div className={`mb-6 rounded-lg border px-4 py-3 text-sm ${bannerCls}`}>{bannerText}</div>
 
       <div className="mb-6">
         <SystemHealthCard />
@@ -89,23 +59,6 @@ export default function SettingsHubPage() {
           </Link>
         ))}
       </div>
-
-      <section className="mt-8">
-        <h3 className="mb-2 text-base font-semibold text-ink">{t('settingsHub.howItWorks')}</h3>
-        <div className="rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed text-muted">
-          {t('settingsHub.howItWorksBody')}
-        </div>
-      </section>
-
-      <p className="mt-6 text-sm text-muted">
-        <Link to="/decisions" className="text-moss underline underline-offset-2">
-          {t('settingsHub.openDecisions')}
-        </Link>
-        {' · '}
-        <Link to="/briefs" className="text-moss underline underline-offset-2">
-          {t('nav.briefs')}
-        </Link>
-      </p>
     </div>
   )
 }

@@ -1,11 +1,13 @@
 package com.airadar.context;
 
 import com.airadar.api.ApiTimes;
+import com.airadar.preference.PreferenceKeywordService;
 import com.airadar.provider.ai.AiService;
 import com.airadar.provider.ai.ContextExtractResult;
 import com.airadar.settings.SettingsService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
@@ -27,6 +29,7 @@ public class ContextService {
     private final ContextRepository repository;
     private final AiService aiService;
     private final SettingsService settingsService;
+    private final PreferenceKeywordService preferenceKeywordService;
     private final ObjectMapper objectMapper;
     private final RestClient.Builder restClientBuilder;
 
@@ -34,12 +37,14 @@ public class ContextService {
             ContextRepository repository,
             AiService aiService,
             SettingsService settingsService,
+            @Lazy PreferenceKeywordService preferenceKeywordService,
             ObjectMapper objectMapper,
             RestClient.Builder restClientBuilder
     ) {
         this.repository = repository;
         this.aiService = aiService;
         this.settingsService = settingsService;
+        this.preferenceKeywordService = preferenceKeywordService;
         this.objectMapper = objectMapper;
         this.restClientBuilder = restClientBuilder;
     }
@@ -77,6 +82,7 @@ public class ContextService {
         }
         repository.save(row);
         syncInterestProfile(payload);
+        syncExplicitIgnore(payload);
         return toDto(row);
     }
 
@@ -200,27 +206,62 @@ public class ContextService {
 
     private void syncInterestProfile(Map<String, Object> payload) {
         List<String> parts = new ArrayList<>();
-        Object interests = payload.get("interests");
-        if (interests instanceof List<?> list) {
-            for (Object o : list) {
-                if (o != null && !o.toString().isBlank()) {
-                    parts.add(o.toString());
-                }
-            }
-        }
-        Object tech = payload.get("technologies");
-        if (tech instanceof List<?> list) {
-            for (Object o : list) {
-                if (o != null && !o.toString().isBlank() && !parts.contains(o.toString())) {
-                    parts.add(o.toString());
-                }
-            }
-        }
+        appendUnique(parts, profileRole(payload));
+        appendList(parts, payload.get("current_focus"));
+        appendList(parts, payload.get("interests"));
+        appendList(parts, payload.get("technologies"));
         if (parts.isEmpty()) {
             return;
         }
         String summary = String.join("、", parts.subList(0, Math.min(parts.size(), 12)));
         settingsService.update(Map.of("interestProfile", summary));
+    }
+
+    private void syncExplicitIgnore(Map<String, Object> payload) {
+        List<String> ignore = new ArrayList<>();
+        Object raw = payload.get("explicit_ignore");
+        if (raw instanceof List<?> list) {
+            for (Object o : list) {
+                if (o != null && !o.toString().isBlank()) {
+                    ignore.add(o.toString().trim());
+                }
+            }
+        }
+        preferenceKeywordService.replaceContextDislikes(ignore);
+    }
+
+    private static String profileRole(Map<String, Object> payload) {
+        Object profile = payload.get("profile");
+        if (profile instanceof Map<?, ?> map) {
+            Object role = map.get("role");
+            if (role != null && !role.toString().isBlank()) {
+                return role.toString().trim();
+            }
+        }
+        return null;
+    }
+
+    private static void appendList(List<String> parts, Object value) {
+        if (!(value instanceof List<?> list)) {
+            return;
+        }
+        for (Object o : list) {
+            if (o != null && !o.toString().isBlank()) {
+                appendUnique(parts, o.toString().trim());
+            }
+        }
+    }
+
+    private static void appendUnique(List<String> parts, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        for (String existing : parts) {
+            if (existing.equalsIgnoreCase(value)) {
+                return;
+            }
+        }
+        parts.add(value);
     }
 
     private Map<String, Object> extractPayload(Map<String, Object> body) {

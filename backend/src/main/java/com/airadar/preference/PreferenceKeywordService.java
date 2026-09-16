@@ -29,6 +29,7 @@ public class PreferenceKeywordService {
     public static final String SOURCE_MANUAL = "manual";
     public static final String SOURCE_AI_SAVE = "ai_save";
     public static final String SOURCE_AI_DISMISS = "ai_dismiss";
+    public static final String SOURCE_CONTEXT = "context";
 
     private final PreferenceKeywordRepository repository;
     private final NewsItemRepository newsItemRepository;
@@ -91,6 +92,36 @@ public class PreferenceKeywordService {
             throw new NoSuchElementException("keyword not found: " + id);
         }
         repository.deleteById(id);
+        interestSignals.invalidate();
+    }
+
+    /**
+     * Replace dislike keywords sourced from Context {@code explicit_ignore}.
+     * Leaves manual / AI-dismiss dislikes untouched.
+     */
+    @Transactional
+    public void replaceContextDislikes(List<String> texts) {
+        List<PreferenceKeywordEntity> existing =
+                repository.findByKindAndSource(KIND_DISLIKE, SOURCE_CONTEXT);
+        if (!existing.isEmpty()) {
+            repository.deleteAll(existing);
+        }
+        if (texts != null) {
+            for (String raw : texts) {
+                String t = normalizeText(raw);
+                if (t.isBlank()) {
+                    continue;
+                }
+                if (repository.existsByKindAndTextIgnoreCase(KIND_DISLIKE, t)) {
+                    continue;
+                }
+                PreferenceKeywordEntity entity = new PreferenceKeywordEntity();
+                entity.setKind(KIND_DISLIKE);
+                entity.setText(t);
+                entity.setSource(SOURCE_CONTEXT);
+                repository.save(entity);
+            }
+        }
         interestSignals.invalidate();
     }
 

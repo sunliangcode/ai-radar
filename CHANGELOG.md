@@ -4,10 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings 极简收敛**：Hub 收成「我是谁 / 情报源 / 通知」三入口 + 可折叠状态条；偏好页只留摘要语言与推送渠道（去掉兴趣描述、关键词编辑、时区与「仅有内容才推」勾选）；兴趣与忽略只在 Context 编辑，保存时同步到评分用的 `interestProfile` 与 dislike 关键词
+
 ### Added
 
 - **Radar Chat** (`/chat`): multi-turn chat with the configured Ollama/OpenAI model; injects at most 2 related Changes per turn (seed via `?changeId=` from change detail); SSE streaming; session in localStorage
 - `POST /api/chat` (SSE) and `POST /api/chat/sync`; prompt `chat_radar.md`
+
+### Fixed
+
+- Local Ollama (Qwen3.5 thinking models): chat/pipeline calls use native `/api/chat` with `think:false` so streamed `content` is not empty (OpenAI-compat was filling only `reasoning`)
 
 ### Changed
 

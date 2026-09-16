@@ -77,13 +77,13 @@ class OpenAiCompatibleAiServiceSerialTest {
                 } finally {
                     inFlight.decrementAndGet();
                 }
-                // localhost → streaming path
-                String sse = "data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"keyword\\\":\\\"k\\\"}\"}}]}\n\n"
-                        + "data: [DONE]\n\n";
+                // localhost → native Ollama /api/chat NDJSON path
+                String ndjson = "{\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"keyword\\\":\\\"k\\\"}\"},\"done\":false}\n"
+                        + "{\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true}\n";
                 return new MockResponse()
                         .setResponseCode(200)
-                        .addHeader("Content-Type", "text/event-stream")
-                        .setBody(sse);
+                        .addHeader("Content-Type", "application/x-ndjson")
+                        .setBody(ndjson);
             }
         });
 
@@ -109,7 +109,11 @@ class OpenAiCompatibleAiServiceSerialTest {
             assertEquals(1, maxInFlight.get(), "LLM HTTP must be single-flight");
 
             RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS);
-            String reqBody = first != null ? first.getBody().readUtf8() : "";
+            assertTrue(first != null && first.getPath() != null && first.getPath().contains("/api/chat"),
+                    "local Ollama should call native /api/chat");
+            String reqBody = first.getBody().readUtf8();
+            assertTrue(reqBody.contains("\"think\":false") || reqBody.contains("\"think\": false"),
+                    "native chat should disable thinking");
             assertTrue(reqBody.contains("\"keep_alive\":\"5m\""),
                     "local Ollama stream requests should pin keep_alive");
             assertTrue(reqBody.contains("\"num_ctx\":4096") || reqBody.contains("\"num_ctx\": 4096"),

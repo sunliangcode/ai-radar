@@ -24,4 +24,12 @@ class FitMessagesToBudgetTest {
         assertEquals("system", fitted.getFirst().get("role"));
         assertEquals("latest question", fitted.getLast().get("content"));
     }
+
+    @Test
+    void ollamaNativeRootStripsV1() {
+        assertEquals("http://localhost:11434",
+                OpenAiCompatibleAiService.ollamaNativeRoot("http://localhost:11434/v1"));
+        assertEquals("http://localhost:11434",
+                OpenAiCompatibleAiService.ollamaNativeRoot("http://localhost:11434/v1/"));
+    }
 }

@@ -10,5 +10,7 @@ public interface PreferenceKeywordRepository extends JpaRepository<PreferenceKey
 
     List<PreferenceKeywordEntity> findAllByOrderByCreatedAtDesc();
 
+    List<PreferenceKeywordEntity> findByKindAndSource(String kind, String source);
+
     boolean existsByKindAndTextIgnoreCase(String kind, String text);
 }

@@ -192,39 +192,26 @@ export function NotifySection({
           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t('settings.pushTime')} hint={t('settings.pushTimeHint')}>
-            <Select
-              value={hour === 'custom' ? 'custom' : String(hour)}
-              onChange={(e) => {
-                const v = e.target.value
-                if (v === 'custom') return
-                const preset = PUSH_PRESETS.find((p) => String(p.hour) === v)
-                if (preset) patch({ pushCron: preset.cron })
-              }}
-            >
-              {PUSH_PRESETS.map((p) => (
-                <option key={p.hour} value={String(p.hour)}>
-                  {t('settings.pushTimeHour', { hour: p.hour })}
-                </option>
-              ))}
-              {hour === 'custom' ? (
-                <option value="custom">{t('settings.pushTimeCustom')}</option>
-              ) : null}
-            </Select>
-          </Field>
-          <Field label={t('settings.timezone')} hint={t('settings.timezoneHint')}>
-            <Input value={form.timezone ?? 'Asia/Shanghai'} readOnly className="opacity-80" />
-          </Field>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={Boolean(form.pushOnlyWhenItems)}
-              onChange={(e) => patch({ pushOnlyWhenItems: e.target.checked })}
-            />
-            <span>{t('settings.pushOnlyWhenItems')}</span>
-          </label>
-        </div>
+        <Field label={t('settings.pushTime')} hint={t('settings.pushTimeHint')}>
+          <Select
+            value={hour === 'custom' ? 'custom' : String(hour)}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'custom') return
+              const preset = PUSH_PRESETS.find((p) => String(p.hour) === v)
+              if (preset) patch({ pushCron: preset.cron })
+            }}
+          >
+            {PUSH_PRESETS.map((p) => (
+              <option key={p.hour} value={String(p.hour)}>
+                {t('settings.pushTimeHour', { hour: p.hour })}
+              </option>
+            ))}
+            {hour === 'custom' ? (
+              <option value="custom">{t('settings.pushTimeCustom')}</option>
+            ) : null}
+          </Select>
+        </Field>
       </div>
     </Card>
   )

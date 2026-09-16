@@ -5,6 +5,7 @@ import com.airadar.interest.InterestSignalsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,18 +70,20 @@ class OpenAiCompatibleAiServiceRetryTest {
 
     @Test
     void retriesTransientFailureThenSucceeds() throws Exception {
+        // MockWebServer is always localhost → native Ollama /api/chat NDJSON path
         server.enqueue(new MockResponse().setResponseCode(503).setBody("busy"));
-        String sse = "data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"keyword\\\":\\\"agents\\\"}\"}}]}\n\n"
-                + "data: [DONE]\n\n";
+        String ndjson = "{\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"keyword\\\":\\\"agents\\\"}\"},\"done\":false}\n"
+                + "{\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true}\n";
         server.enqueue(new MockResponse()
                 .setResponseCode(200)
-                .addHeader("Content-Type", "text/event-stream")
-                .setBody(sse));
+                .addHeader("Content-Type", "application/x-ndjson")
+                .setBody(ndjson));
 
         String keyword = service.extractPreferenceKeyword("title", "summary", "like");
         assertEquals("agents", keyword);
         assertEquals(2, server.getRequestCount());
         assertTrue(server.takeRequest(1, TimeUnit.SECONDS) != null);
-        assertTrue(server.takeRequest(1, TimeUnit.SECONDS) != null);
+        RecordedRequest second = server.takeRequest(1, TimeUnit.SECONDS);
+        assertTrue(second != null && second.getPath() != null && second.getPath().contains("/api/chat"));
     }
 }

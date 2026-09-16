@@ -1,5 +1,6 @@
 package com.airadar.decision;
 
+import com.airadar.change.EventSourceLookup;
 import com.airadar.event.EventRepository;
 import com.airadar.event.TimelineEntryRepository;
 import com.airadar.memory.MemoryService;
@@ -8,6 +9,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -23,6 +26,7 @@ class DecisionServiceTest {
     @Mock EventRepository eventRepository;
     @Mock TimelineEntryRepository timelineEntryRepository;
     @Mock MemoryService memoryService;
+    @Mock EventSourceLookup eventSourceLookup;
 
     @InjectMocks DecisionService decisionService;
 
@@ -35,7 +39,8 @@ class DecisionServiceTest {
     @Test
     void record_persistsWatchDecision() {
         when(eventRepository.existsById(2L)).thenReturn(true);
-        when(decisionRepository.findByChangeIdOrderByCreatedAtDesc(2L)).thenReturn(java.util.List.of());
+        when(decisionRepository.findByChangeIdOrderByCreatedAtDesc(2L)).thenReturn(List.of());
+        when(eventSourceLookup.sourceIdsForEvent(2L)).thenReturn(List.of());
 
         var result = decisionService.record(2L, "watch", "Java stability", "2026-10-16");
 

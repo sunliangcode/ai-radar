@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Settings } from '../lib/api'
-import { Button, FormSaveBar, PageHeader, StateBox } from '../components/ui'
+import { FormSaveBar, PageHeader, StateBox } from '../components/ui'
 import { useSettings, useSaveSettings } from '../hooks/useSettings'
 import { BasicsSection } from './settings/BasicsSection'
 import { NotifySection } from './settings/NotifySection'
 import { errorText } from '../lib/errors'
 
-/** Customer preferences: interests + notifications only. Ops knobs live in .env. */
+/** Notifications + summary language. Personalization lives in Context. */
 export default function SettingsPage() {
   const { t } = useTranslation()
   const settings = useSettings()
@@ -25,11 +25,9 @@ export default function SettingsPage() {
   function saveSettings() {
     save.mutate(
       {
-        interestProfile: form.interestProfile,
         summaryLanguage: form.summaryLanguage,
         pushCron: form.pushCron,
         timezone: form.timezone,
-        pushOnlyWhenItems: form.pushOnlyWhenItems,
         smtpTo: form.smtpTo,
       },
       {
@@ -67,11 +65,6 @@ export default function SettingsPage() {
           onDiscard={discard}
           onSave={saveSettings}
         />
-        <div className="flex justify-end">
-          <Button type="submit" loading={save.isPending} disabled={!isDirty}>
-            {t('common.save')}
-          </Button>
-        </div>
       </form>
     </div>
   )
