@@ -772,6 +772,8 @@
     "localTokenServer": "Server LOCAL_TOKEN configured:",
     "advanced": "Advanced",
     "advancedHint": "Model, schedule, webhooks, and access token.",
+    "showAdvanced": "Detailed settings",
+    "hideAdvanced": "Hide detailed settings",
     "packSection": "Starter packs",
     "pack": {
       "ai-core": "English AI core",

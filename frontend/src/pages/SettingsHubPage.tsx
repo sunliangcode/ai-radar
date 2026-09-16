@@ -26,6 +26,11 @@ export default function SettingsHubPage() {
       title: t('settingsHub.preferences'),
       desc: t('settingsHub.preferencesDesc'),
     },
+    {
+      to: '/settings/system',
+      title: t('settingsHub.system'),
+      desc: t('settingsHub.systemDesc'),
+    },
   ]
 
   return (
@@ -44,7 +49,7 @@ export default function SettingsHubPage() {
         <SystemHealthCard />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {cards.map((c) => (
           <Link
             key={c.to}

@@ -39,6 +39,7 @@ export function NotifySection({
   const qc = useQueryClient()
   const { push } = useToast()
   const [bindSessionId, setBindSessionId] = useState<string | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   const pushNow = useMutation({
     mutationFn: api.pushJob,
@@ -212,6 +213,32 @@ export function NotifySection({
             ) : null}
           </Select>
         </Field>
+
+        <div className="border-t border-border pt-3">
+          <button
+            type="button"
+            className="text-sm text-accent hover:underline"
+            onClick={() => setAdvancedOpen((o) => !o)}
+            aria-expanded={advancedOpen}
+          >
+            {advancedOpen ? t('settings.hideAdvanced') : t('settings.showAdvanced')}
+          </button>
+          {advancedOpen ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Field label={t('settings.timezone')} hint={t('settings.timezoneHint')}>
+                <Input value={form.timezone ?? 'Asia/Shanghai'} readOnly className="opacity-80" />
+              </Field>
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.pushOnlyWhenItems)}
+                  onChange={(e) => patch({ pushOnlyWhenItems: e.target.checked })}
+                />
+                <span>{t('settings.pushOnlyWhenItems')}</span>
+              </label>
+            </div>
+          ) : null}
+        </div>
       </div>
     </Card>
   )

@@ -225,6 +225,10 @@ export function SystemHealthCard() {
             <Link to="/settings/preferences" className="text-accent hover:underline">
               {t('settingsHub.preferences')}
             </Link>
+            {' · '}
+            <Link to="/settings/system" className="text-accent hover:underline">
+              {t('nav.monitor')}
+            </Link>
           </p>
         </div>
       ) : null}

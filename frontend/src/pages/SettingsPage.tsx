@@ -28,6 +28,7 @@ export default function SettingsPage() {
         summaryLanguage: form.summaryLanguage,
         pushCron: form.pushCron,
         timezone: form.timezone,
+        pushOnlyWhenItems: form.pushOnlyWhenItems,
         smtpTo: form.smtpTo,
       },
       {

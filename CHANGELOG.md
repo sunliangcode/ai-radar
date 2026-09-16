@@ -6,7 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Settings 极简收敛**：Hub 收成「我是谁 / 情报源 / 通知」三入口 + 可折叠状态条；偏好页只留摘要语言与推送渠道（去掉兴趣描述、关键词编辑、时区与「仅有内容才推」勾选）；兴趣与忽略只在 Context 编辑，保存时同步到评分用的 `interestProfile` 与 dislike 关键词
+- **Settings**：Hub 恢复「系统 / AI 监控」入口（四卡片 + 状态条链到监控）；通知页默认仍简洁，经「详细配置」展开只读时区与「仅有内容才推」；兴趣与忽略仍只在 Context 编辑，保存时同步到评分用的 `interestProfile` 与 dislike 关键词
+- **Settings 极简收敛**（前次）：Hub 收成核心入口 + 可折叠状态条；偏好页去掉兴趣描述与关键词编辑
 
 ### Added
 

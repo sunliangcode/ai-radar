@@ -774,6 +774,8 @@
     "localTokenServer": "服务端 LOCAL_TOKEN 已配置：",
     "advanced": "高级设置",
     "advancedHint": "模型、定时、Webhook 与访问 Token。",
+    "showAdvanced": "详细配置",
+    "hideAdvanced": "收起详细配置",
     "packSection": "推荐源组合",
     "pack": {
       "ai-core": "英文 AI 核心源",
