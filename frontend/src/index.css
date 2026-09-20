@@ -117,6 +117,21 @@ body {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 1px var(--color-accent), 0 12px 28px color-mix(in srgb, var(--color-ink) 9%, transparent);
 }
+.mag-card.is-dimmed {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.mag-grid-dimmed .mag-card.selected {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mag-card:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-accent) 45%, transparent),
+    0 12px 28px color-mix(in srgb, var(--color-ink) 9%, transparent);
+}
 .mag-card--swiping {
   transition: none;
   z-index: 2;
@@ -427,11 +442,14 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .mag-card,
-  .mag-grid-dimmed {
+  .mag-grid-dimmed,
+  .brief-card,
+  .brief-entry {
     transition: none;
   }
   .mag-card:hover,
-  .mag-card--focus:hover {
+  .mag-card--focus:hover,
+  .brief-card:hover {
     transform: none;
   }
   .mag-drawer,
@@ -439,8 +457,19 @@ body {
   .deck-slide-in,
   .deck-slide-out,
   .inbox-zero-particle,
-  .fetch-step-done::before {
+  .fetch-step-done::before,
+  .monitor-cursor {
     animation: none;
+  }
+  .mag-drawer {
+    transform: none;
+  }
+  .monitor-cursor {
+    opacity: 1;
+  }
+  .skeleton {
+    animation: none;
+    opacity: 0.7;
   }
 }
 

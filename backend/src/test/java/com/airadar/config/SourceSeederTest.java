@@ -152,6 +152,24 @@ class SourceSeederTest {
         assertTrue(existing.isEnabled());
     }
 
+    @Test
+    void repairsBroken36krFeedUrl() throws Exception {
+        SourceEntity existing = new SourceEntity();
+        existing.setId(3L);
+        existing.setName("36氪");
+        existing.setType(SourceType.RSS);
+        existing.setConfigJson("{\"feedUrl\":\"https://36kr.com/feed\"}");
+        when(sourceRepository.findFirstByName("36氪")).thenReturn(Optional.of(existing));
+        when(sourceRepository.save(any(SourceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        seeder.repairNamedRssFeedUrl("36氪", "https://36kr.com/feed", "https://www.36kr.com/feed");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(SourceEntity.class);
+        verify(sourceRepository).save(captor.capture());
+        JsonNode config = mapper.readTree(captor.getValue().getConfigJson());
+        assertEquals("https://www.36kr.com/feed", config.path("feedUrl").asText());
+    }
+
     private SourceEntity existingZhihu(String cliPath, boolean enabled) throws Exception {
         SourceEntity entity = new SourceEntity();
         entity.setId(9L);

@@ -112,7 +112,8 @@ cd ../backend && ./mvnw spring-boot:run
 ```bash
 cp backend/.env.example backend/.env   # edit as needed
 docker compose up -d --build
-# starts argos-translate (:8765) + ai-radar (:8080)
+# starts argos-translate (:8765) + daily-hot (:6688) + ai-radar (:8080)
+# DAILY_HOT sources stay disabled until daily-hot is up; then enable in Settings → Sources
 curl -s http://localhost:8080/api/health
 curl -s http://localhost:8765/health
 ```
@@ -253,7 +254,8 @@ cd ../backend && ./mvnw spring-boot:run
 ```bash
 cp backend/.env.example backend/.env
 docker compose up -d --build
-# 启动 argos-translate (:8765) + ai-radar (:8080)
+# 启动 argos-translate (:8765) + daily-hot (:6688) + ai-radar (:8080)
+# DailyHot 热榜源默认关闭；边车就绪后在「情报源」里启用
 curl -s http://localhost:8080/api/health
 curl -s http://localhost:8765/health
 ```

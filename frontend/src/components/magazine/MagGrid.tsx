@@ -22,6 +22,8 @@ export function MagGrid({
         dimmed && 'mag-grid-dimmed',
         className,
       )}
+      role="feed"
+      aria-busy={dimmed || undefined}
       {...props}
     >
       {children}

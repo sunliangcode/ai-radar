@@ -3,16 +3,16 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { ChangeCard } from '../../lib/api'
 import {
-  Button,
   EmptyState,
   ImmersiveDrawer,
   ListSkeleton,
   MagAction,
   MagCard,
   MagGrid,
-  StateBox,
+  QueryErrorState,
 } from '../../components/ui'
 import { errorText } from '../../lib/errors'
+import { cn, focusRingClass } from '../../lib/cn'
 
 function changeScore(c: ChangeCard): number | undefined {
   if (c.priority != null) return Math.min(100, Math.round(c.priority / 1000))
@@ -37,22 +37,58 @@ export function TrackedChangesSection({
   const drawerCard = tracked.find((c) => c.id === drawerId) ?? null
 
   return (
-    <section className="mb-8">
-      <h2 className="mb-3 text-base font-semibold text-ink">{t('watching.trackedChanges')}</h2>
+    <section className="mb-8" aria-labelledby="watching-tracked-heading">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h2 id="watching-tracked-heading" className="text-base font-semibold text-ink">
+          {t('watching.trackedChanges')}
+        </h2>
+        {!loading && !error ? (
+          <span
+            className="font-mono text-xs text-muted"
+            aria-live="polite"
+            aria-label={t('watching.trackedCount', { count: tracked.length })}
+          >
+            {tracked.length}
+          </span>
+        ) : null}
+      </div>
       {loading ? <ListSkeleton rows={3} /> : null}
       {error ? (
-        <StateBox>
-          <p className="mb-3">{t('common.loadFailed', { message: errorText(error, t) })}</p>
-          <Button variant="ghost" onClick={onRetry}>
-            {t('common.retry')}
-          </Button>
-        </StateBox>
+        <QueryErrorState
+          message={t('common.loadFailed', { message: errorText(error, t) })}
+          onRetry={onRetry}
+        />
       ) : null}
       {!loading && !error && tracked.length === 0 ? (
-        <EmptyState title={t('watching.noTracked')} description={t('watching.noTrackedHint')} />
+        <EmptyState
+          title={t('watching.noTracked')}
+          description={t('watching.noTrackedHint')}
+          primary={
+            <Link
+              to="/"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                focusRingClass(),
+              )}
+            >
+              {t('watching.goToday')}
+            </Link>
+          }
+          secondary={
+            <Link
+              to="/radar"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
+                focusRingClass(),
+              )}
+            >
+              {t('nav.radar')}
+            </Link>
+          }
+        />
       ) : null}
       {!error && tracked.length > 0 ? (
-        <MagGrid dimmed={drawerId != null}>
+        <MagGrid dimmed={drawerId != null} aria-label={t('watching.trackedChanges')}>
           {tracked.map((c) => (
             <MagCard
               key={c.id}
@@ -87,7 +123,10 @@ export function TrackedChangesSection({
                 <Link
                   to={`/changes/${c.id}`}
                   state={{ from: '/watching' }}
-                  className="inline-flex items-center rounded-md px-2 py-1 text-xs text-muted transition hover:bg-border hover:text-ink"
+                  className={cn(
+                    'inline-flex min-h-9 items-center rounded-md px-2 py-1 text-xs text-muted transition motion-reduce:transition-none hover:bg-border hover:text-ink',
+                    focusRingClass(),
+                  )}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {t('today.openChange')} →
@@ -117,7 +156,10 @@ export function TrackedChangesSection({
             <Link
               to={`/changes/${drawerCard.id}`}
               state={{ from: '/watching' }}
-              className="inline-flex items-center rounded-md px-2 py-1 text-xs text-moss transition hover:bg-moss/10"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md px-2 py-1 text-xs text-moss transition hover:bg-moss/10',
+                focusRingClass(),
+              )}
             >
               {t('today.openChange')} →
             </Link>

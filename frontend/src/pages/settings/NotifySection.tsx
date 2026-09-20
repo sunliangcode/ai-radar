@@ -5,6 +5,7 @@ import { api, type Settings } from '../../lib/api'
 import { errorText } from '../../lib/errors'
 import { formatPushResult, type PushResultBody } from '../../lib/formatPushResult'
 import { Button, Card, Field, Input, Select, useToast } from '../../components/ui'
+import { cn, textLinkClass } from '../../lib/cn'
 
 const PUSH_PRESETS = [
   { hour: 7, cron: '0 0 7 * * *' },
@@ -108,9 +109,11 @@ export function NotifySection({
   const binding = Boolean(bindSessionId) || startBind.isPending
 
   return (
-    <Card>
+    <Card id="notify" className="scroll-mt-20" aria-labelledby="notify-heading">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="font-serif text-lg">{t('settings.notifySection')}</h3>
+        <h3 id="notify-heading" className="font-serif text-lg">
+          {t('settings.notifySection')}
+        </h3>
         <Button type="button" variant="ghost" loading={pushNow.isPending} onClick={() => pushNow.mutate()}>
           {pushNow.isPending ? t('common.pushing') : t('common.pushNow')}
         </Button>
@@ -150,7 +153,7 @@ export function NotifySection({
               </Button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" aria-busy={binding || undefined}>
               <p className="text-sm text-muted">{t('settings.feishuBindHint')}</p>
               {!binding ? (
                 <Button type="button" loading={startBind.isPending} onClick={() => startBind.mutate()}>
@@ -169,7 +172,7 @@ export function NotifySection({
                   <div className="max-w-xs text-sm text-muted">
                     <p>{t('settings.feishuScanHint')}</p>
                     <a
-                      className="mt-2 inline-block break-all text-moss underline underline-offset-2"
+                      className={`mt-2 inline-flex min-h-9 items-center break-all ${textLinkClass('moss')}`}
                       href={qrUrl}
                       target="_blank"
                       rel="noreferrer"
@@ -187,7 +190,9 @@ export function NotifySection({
                   </div>
                 </div>
               ) : binding ? (
-                <p className="text-sm text-muted">{t('settings.feishuPreparingQr')}</p>
+                <p className="text-sm text-muted" role="status" aria-live="polite">
+                  {t('settings.feishuPreparingQr')}
+                </p>
               ) : null}
             </div>
           )}
@@ -217,20 +222,22 @@ export function NotifySection({
         <div className="border-t border-border pt-3">
           <button
             type="button"
-            className="text-sm text-accent hover:underline"
+            className={cn('inline-flex min-h-9 items-center text-sm', textLinkClass())}
             onClick={() => setAdvancedOpen((o) => !o)}
             aria-expanded={advancedOpen}
+            aria-controls="notify-advanced"
           >
             {advancedOpen ? t('settings.hideAdvanced') : t('settings.showAdvanced')}
           </button>
           {advancedOpen ? (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div id="notify-advanced" className="mt-4 grid gap-3 sm:grid-cols-2">
               <Field label={t('settings.timezone')} hint={t('settings.timezoneHint')}>
                 <Input value={form.timezone ?? 'Asia/Shanghai'} readOnly className="opacity-80" />
               </Field>
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <label className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-sm text-sm sm:col-span-2 focus-within:outline-none focus-within:ring-2 focus-within:ring-accent/40">
                 <input
                   type="checkbox"
+                  className="h-4 w-4 rounded border-border text-accent focus-visible:ring-2 focus-visible:ring-accent/40"
                   checked={Boolean(form.pushOnlyWhenItems)}
                   onChange={(e) => patch({ pushOnlyWhenItems: e.target.checked })}
                 />

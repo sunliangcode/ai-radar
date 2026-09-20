@@ -39,6 +39,7 @@ public interface SourceConnector {
 | `ZHIHU` | Open-source `zhihu` CLI | `cliPath`, paste `cookie` (or `ZHIHU_COOKIE` / `zhihu login`) |
 | `WEIBO` | Open-source [weibo-cli](https://github.com/jackwener/weibo-cli) | `cliPath`, paste `cookie` → `~/.config/weibo-cli/credential.json` |
 | `BILIBILI` | Open-source [bilibili-cli](https://github.com/public-clis/bilibili-cli) | `cliPath`, paste `cookie` → `~/.bilibili-cli/credential.json` |
+| `DAILY_HOT` | Self-hosted [DailyHotApi](https://github.com/imsyy/DailyHotApi) | `route` + optional `baseUrl` (`DAILY_HOT_BASE_URL`, default `http://127.0.0.1:6688`); compose service `daily-hot` |
 | `FIXTURE` | Local JSON | demos / offline |
 
 Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.enabled`), with optional `WEB_FETCH_PARALLELISM` (default 4).
@@ -74,7 +75,7 @@ See `backend/src/main/java/com/airadar/connector/FixtureConnector.java`.
 Importable presets under `packs/sources/`:
 
 - `ai-core.json` — English AI blogs + Google News / GDELT / OSS Insight / Trending
-- `ai-cn.json` — WeChat bridges, 36氪, 即刻, V2EX, CN Google News, Zhihu / Weibo / Bilibili (OSS CLI), IT之家, Solidot, 极客公园, 爱范儿
+- `ai-cn.json` — WeChat bridges, 36氪 (`www.36kr.com/feed`), 即刻, V2EX, CN tech RSS (IT之家 / 虎嗅 / InfoQ / …), Zhihu / Weibo / Bilibili (OSS CLI), DailyHot hot lists (disabled until sidecar)
 - `ai-signals.json` — Product Hunt / Twitter / WEB / EMAIL samples (often disabled until tokens are set)
 
 ```bash

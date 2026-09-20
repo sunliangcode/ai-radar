@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { formatRelativeInstant } from '../../lib/format'
+import { textLinkClass } from '../../lib/cn'
 
 function StatusDot({ ok, warn }: { ok: boolean; warn?: boolean }) {
   const cls = ok ? 'bg-moss' : warn ? 'bg-ember/70' : 'bg-ember'
@@ -24,11 +25,15 @@ function Row({
   hint?: string
 }) {
   return (
-    <div className="flex items-start gap-2 py-1.5">
+    <div
+      className="flex items-start gap-2 py-1.5"
+      role="group"
+      aria-label={`${label}: ${value}${hint ? `. ${hint}` : ''}`}
+    >
       <span className="mt-1.5">
         <StatusDot ok={ok} warn={warn} />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1" aria-hidden>
         <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
           <span className="text-muted">{label}</span>
           <span className={`font-mono text-xs ${ok ? 'text-moss' : 'text-ember'}`}>{value}</span>
@@ -108,13 +113,16 @@ export function SystemHealthCard() {
 
   const stripOk = backendOk && llmOk
   const stripWarn = backendOk && (llmMode === 'heuristic' || llmMode === 'degraded')
-  const stripLabel = health.isError
-    ? t('settingsHub.healthDown')
-    : llmMode === 'ai'
-      ? t('settingsHub.stripAiOn')
-      : llmMode === 'degraded'
-        ? t('settingsHub.stripAiDegraded')
-        : t('settingsHub.stripAiOff')
+  const healthPending = health.isLoading && !h
+  const stripLabel = healthPending
+    ? t('settingsHub.healthChecking')
+    : health.isError
+      ? t('settingsHub.healthDown')
+      : llmMode === 'ai'
+        ? t('settingsHub.stripAiOn')
+        : llmMode === 'degraded'
+          ? t('settingsHub.stripAiDegraded')
+          : t('settingsHub.stripAiOff')
   const nextFetch = formatRelativeInstant(sched?.nextFetchAt)
   const nextPush = formatRelativeInstant(sched?.nextPushAt)
 
@@ -122,12 +130,23 @@ export function SystemHealthCard() {
     <div className="rounded-lg border border-border bg-surface">
       <button
         type="button"
-        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm"
+        className="flex min-h-11 w-full items-center gap-3 px-4 py-3 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        aria-controls="system-health-detail"
+        aria-busy={healthPending || undefined}
       >
-        <StatusDot ok={stripOk} warn={stripWarn || !stripOk} />
-        <span className="min-w-0 flex-1 text-ink">{stripLabel}</span>
+        {healthPending ? (
+          <span
+            className="inline-block h-2 w-2 shrink-0 rounded-full bg-border animate-pulse motion-reduce:animate-none"
+            aria-hidden
+          />
+        ) : (
+          <StatusDot ok={stripOk} warn={stripWarn || !stripOk} />
+        )}
+        <span className="min-w-0 flex-1 text-ink" aria-live="polite">
+          {stripLabel}
+        </span>
         {!health.isError && (nextFetch || nextPush) ? (
           <span className="hidden text-xs text-muted sm:inline">
             {[
@@ -142,11 +161,18 @@ export function SystemHealthCard() {
       </button>
 
       {open ? (
-        <div className="border-t border-border px-4 pb-3 pt-1">
+        <div
+          id="system-health-detail"
+          role="region"
+          aria-label={t('settingsHub.healthTitle')}
+          className="border-t border-border px-4 pb-3 pt-1"
+        >
           <div className="mb-1 flex justify-end">
             <button
               type="button"
-              className="text-xs text-accent hover:underline"
+              className="inline-flex min-h-9 items-center rounded-sm px-2 text-xs text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              aria-busy={health.isFetching || schedule.isFetching || undefined}
+              disabled={health.isFetching || schedule.isFetching}
               onClick={() => {
                 void health.refetch()
                 void schedule.refetch()
@@ -222,11 +248,11 @@ export function SystemHealthCard() {
             {t('settingsHub.healthCli')}{' '}
             <code className="rounded bg-border/60 px-1 font-mono">./scripts/status.sh</code>
             {' · '}
-            <Link to="/settings/preferences" className="text-accent hover:underline">
+            <Link to="/settings/preferences" className={`inline-flex min-h-9 items-center ${textLinkClass()}`}>
               {t('settingsHub.preferences')}
             </Link>
             {' · '}
-            <Link to="/settings/system" className="text-accent hover:underline">
+            <Link to="/settings/system" className={`inline-flex min-h-9 items-center ${textLinkClass()}`}>
               {t('nav.monitor')}
             </Link>
           </p>

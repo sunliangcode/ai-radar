@@ -8,7 +8,7 @@ import {
   EmptyState,
   ListSkeleton,
   PageHeader,
-  StateBox,
+  QueryErrorState,
   useToast,
 } from '../components/ui'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
@@ -16,7 +16,7 @@ import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { errorText } from '../lib/errors'
 import { formatPushResult, type PushResultBody } from '../lib/formatPushResult'
 import { dateLocale } from '../i18n'
-import { cn } from '../lib/cn'
+import { cn, focusRingClass } from '../lib/cn'
 
 function todayIso(): string {
   const d = new Date()
@@ -57,14 +57,18 @@ function BriefCard({
 }) {
   const { t } = useTranslation()
   const parts = briefDateParts(brief.date, locale)
+  const labelParts = [parts.full]
+  if (isToday) labelParts.push(t('briefs.todayBadge'))
+  if (featured) labelParts.push(t('briefs.latest'))
 
   return (
     <Link
       to={`/briefs/${brief.date}`}
+      aria-label={labelParts.join(' · ')}
       className={cn(
-        'brief-card group flex gap-4 rounded-2xl border border-border bg-surface p-4 transition duration-150',
-        'hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_8px_22px_color-mix(in_srgb,var(--color-ink)_8%,transparent)]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+        'brief-card group flex gap-4 rounded-2xl border border-border bg-surface p-4 transition duration-150 motion-reduce:transition-none',
+        'hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_8px_22px_color-mix(in_srgb,var(--color-ink)_8%,transparent)] motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none',
+        focusRingClass(),
         featured && 'brief-card--featured md:p-6',
         isToday && 'brief-card--today',
       )}
@@ -115,7 +119,7 @@ function BriefCard({
       </div>
 
       <ChevronRight
-        className="mt-1 h-5 w-5 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-accent"
+        className="mt-1 h-5 w-5 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-accent motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
         aria-hidden
       />
     </Link>
@@ -156,7 +160,7 @@ export default function BriefsPage() {
   const hasToday = list.some((b) => b.date === today)
 
   return (
-    <div>
+    <div aria-busy={isPending || pushNow.isPending || undefined}>
       <PageHeader
         title={t('briefs.title')}
         subtitle={t('briefs.subtitle')}
@@ -166,11 +170,13 @@ export default function BriefsPage() {
               variant="ghost"
               onClick={() => pushNow.mutate()}
               loading={pushNow.isPending}
-              disabled={!hasToday}
+              disabled={!hasToday || pushNow.isPending}
+              title={!hasToday ? t('briefs.pushNeedToday') : undefined}
+              aria-label={!hasToday ? t('briefs.pushNeedToday') : t('briefs.pushToday')}
             >
               {pushNow.isPending ? t('common.pushing') : t('briefs.pushToday')}
             </Button>
-            <Button onClick={() => fetchJob.mutate()} loading={isPending}>
+            <Button onClick={() => fetchJob.mutate()} loading={isPending} disabled={isPending}>
               {phase === 'running' ? t('common.fetching') : t('briefs.generate')}
             </Button>
           </>
@@ -187,12 +193,10 @@ export default function BriefsPage() {
 
       {briefs.isLoading ? <ListSkeleton rows={5} /> : null}
       {briefs.isError ? (
-        <StateBox>
-          <p className="mb-3">{t('common.loadFailed', { message: errorText(briefs.error, t) })}</p>
-          <Button variant="ghost" size="sm" onClick={() => void briefs.refetch()}>
-            {t('common.retry')}
-          </Button>
-        </StateBox>
+        <QueryErrorState
+          message={t('common.loadFailed', { message: errorText(briefs.error, t) })}
+          onRetry={() => void briefs.refetch()}
+        />
       ) : null}
       {!briefs.isLoading && !briefs.isError && list.length === 0 ? (
         <EmptyState
@@ -203,13 +207,24 @@ export default function BriefsPage() {
               {t('briefs.generate')}
             </Button>
           }
+          secondary={
+            <Link
+              to="/"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
+                focusRingClass(),
+              )}
+            >
+              {t('common.backToToday')}
+            </Link>
+          }
         />
       ) : null}
 
       {list.length > 0 ? (
-        <div className="space-y-6">
+        <div className="space-y-6" aria-busy={briefs.isFetching || undefined}>
           {latest ? (
-            <section>
+            <section aria-label={t('briefs.latest')}>
               <BriefCard
                 brief={latest}
                 locale={locale}
@@ -220,10 +235,13 @@ export default function BriefsPage() {
           ) : null}
 
           {rest.length > 0 ? (
-            <section>
-              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+            <section aria-labelledby="briefs-archive-heading">
+              <h2
+                id="briefs-archive-heading"
+                className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint"
+              >
                 {t('briefs.archive')}
-              </h3>
+              </h2>
               <ul className="grid gap-2.5 sm:grid-cols-2">
                 {rest.map((b) => (
                   <li key={b.date}>

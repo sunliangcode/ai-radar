@@ -1,17 +1,16 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { BriefEntryCard } from '../components/brief/BriefEntryCard'
-import { PageHeader, ScorePill, StateBox } from '../components/ui'
+import { PageHeader, ScorePill, ListSkeleton, QueryErrorState, EmptyState } from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
 import { itemMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { dateLocale } from '../i18n'
 import { parseBriefMarkdown } from '../lib/parseBriefMarkdown'
-import { cn } from '../lib/cn'
+import { cn, focusRingClass } from '../lib/cn'
 
 function briefDateParts(date: string, locale: string) {
   const d = new Date(`${date}T00:00:00`)
@@ -73,28 +72,44 @@ export default function BriefDetailPage() {
     return visibleItems.filter((item) => !inBrief.has(item.canonicalUrl))
   }, [parsed, events, topItems, visibleItems])
 
-  if (q.isLoading) return <StateBox>{t('briefs.loading')}</StateBox>
-  if (q.isError) return <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox>
-  if (!q.data || !parsed) return <StateBox>{t('common.notFound')}</StateBox>
+  if (q.isLoading) return <ListSkeleton rows={5} />
+  if (q.isError) {
+    return (
+      <QueryErrorState
+        message={t('common.loadFailed', { message: errorText(q.error, t) })}
+        onRetry={() => void q.refetch()}
+      />
+    )
+  }
+  if (!q.data || !parsed) {
+    return (
+      <EmptyState
+        title={t('common.notFound')}
+        primary={
+          <Link
+            to="/briefs"
+            className={cn(
+              'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+              focusRingClass(),
+            )}
+          >
+            {t('common.backToList')}
+          </Link>
+        }
+      />
+    )
+  }
 
   const parts = briefDateParts(q.data.date, locale)
   const curatedCount = events.length + topItems.length
   const hasCurated = curatedCount > 0
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-3xl" aria-busy={q.isFetching || undefined}>
       <PageHeader
         title={t('briefs.detailTitle', { date: parts.titleDate })}
         subtitle={parts.weekday}
-        actions={
-          <Link
-            to="/briefs"
-            className="inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-ink"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            {t('briefs.backToArchive')}
-          </Link>
-        }
+        back={{ label: t('briefs.backToArchive'), to: '/briefs' }}
       />
 
       <header
@@ -102,6 +117,7 @@ export default function BriefDetailPage() {
           'brief-detail-hero mb-6 flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 md:p-5',
           'brief-card--featured',
         )}
+        aria-label={parts.titleDate}
       >
         <div className="flex min-w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-bg px-3 py-2 text-center">
           <span className="text-3xl font-semibold leading-none tabular-nums text-ink">{parts.day}</span>
@@ -126,12 +142,39 @@ export default function BriefDetailPage() {
       </header>
 
       {!hasCurated && extraItems.length === 0 ? (
-        <StateBox>{parsed.emptyNote ?? t('briefs.emptyDay')}</StateBox>
+        <EmptyState
+          title={parsed.emptyNote ?? t('briefs.emptyDay')}
+          description={t('briefs.emptyDayHint')}
+          primary={
+            <Link
+              to="/"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                focusRingClass(),
+              )}
+            >
+              {t('common.backToToday')}
+            </Link>
+          }
+          secondary={
+            <Link
+              to="/briefs"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
+                focusRingClass(),
+              )}
+            >
+              {t('briefs.backToArchive')}
+            </Link>
+          }
+        />
       ) : null}
 
       {events.length > 0 ? (
-        <section className="mb-8">
-          <h2 className="brief-section-label">{t('briefs.sectionEvents')}</h2>
+        <section className="mb-8" aria-labelledby="brief-events-heading">
+          <h2 id="brief-events-heading" className="brief-section-label">
+            {t('briefs.sectionEvents')}
+          </h2>
           <ul className="space-y-3">
             {events.map((entry) => (
               <li key={`event-${entry.rank}-${entry.title}`}>
@@ -143,8 +186,10 @@ export default function BriefDetailPage() {
       ) : null}
 
       {topItems.length > 0 ? (
-        <section className="mb-8">
-          <h2 className="brief-section-label">{t('briefs.sectionTopItems')}</h2>
+        <section className="mb-8" aria-labelledby="brief-top-heading">
+          <h2 id="brief-top-heading" className="brief-section-label">
+            {t('briefs.sectionTopItems')}
+          </h2>
           <ul className="space-y-3">
             {topItems.map((entry) => (
               <li key={`item-${entry.rank}-${entry.url ?? entry.title}`}>
@@ -156,8 +201,8 @@ export default function BriefDetailPage() {
       ) : null}
 
       {extraItems.length > 0 ? (
-        <section>
-          <h2 className="brief-section-label">
+        <section aria-labelledby="brief-extra-heading">
+          <h2 id="brief-extra-heading" className="brief-section-label">
             {t('briefs.moreFromDayTitle')}
             <span className="ml-2 font-normal normal-case tracking-normal text-muted">
               · {t('common.itemsCount', { count: extraItems.length })}
@@ -170,7 +215,7 @@ export default function BriefDetailPage() {
                   href={item.canonicalUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-start gap-3 px-4 py-3 transition hover:bg-bg/80"
+                  className="flex min-h-11 items-start gap-3 px-4 py-3 transition hover:bg-bg/80 focus-visible:outline-none focus-visible:bg-bg/80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 motion-reduce:transition-none"
                 >
                   <ScorePill score={item.score} />
                   <div className="min-w-0 flex-1">

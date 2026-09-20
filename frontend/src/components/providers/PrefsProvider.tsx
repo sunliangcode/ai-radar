@@ -43,6 +43,11 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-density', density)
   }, [density])
 
+  useEffect(() => {
+    document.documentElement.style.colorScheme =
+      theme === 'system' ? '' : theme === 'dark' ? 'dark' : 'light'
+  }, [theme])
+
   const setTheme = (t: Theme) => {
     localStorage.setItem('radar-theme', t)
     setThemeState(t)

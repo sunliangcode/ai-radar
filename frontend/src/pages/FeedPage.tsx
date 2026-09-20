@@ -13,6 +13,7 @@ import {
   buttonVariants,
   ConfirmDialog,
   EmptyState,
+  QueryErrorState,
   ImmersiveDrawer,
   ItemDetailBody,
   ListSkeleton,
@@ -21,7 +22,6 @@ import {
   MagGrid,
   PageHeader,
   SourceBadge,
-  StateBox,
   isZhihuSource,
 } from '../components/ui'
 import { InboxZeroBurst } from '../components/engagement/InboxZeroBurst'
@@ -154,9 +154,10 @@ export default function FeedPage({
   })
 
   useEffect(() => {
-    listRef.current
-      ?.querySelector(`[data-item-id="${list.selectedId}"]`)
-      ?.scrollIntoView({ block: 'nearest' })
+    const el = listRef.current?.querySelector(`[data-item-id="${list.selectedId}"]`)
+    if (!el) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' })
   }, [list.selectedId])
 
   useEffect(() => {
@@ -281,7 +282,7 @@ export default function FeedPage({
           actions={
             <>
               {list.hasSources ? (
-                <Button onClick={runFetch} loading={isPending}>
+                <Button onClick={runFetch} loading={isPending} disabled={isPending}>
                   {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
                 </Button>
               ) : (
@@ -293,6 +294,7 @@ export default function FeedPage({
                 variant="ghost"
                 onClick={() => actions.setConfirmMarkAllOpen(true)}
                 disabled={actions.markAll.isPending}
+                loading={actions.markAll.isPending}
               >
                 {t('feed.markAllRead')}
               </Button>
@@ -300,9 +302,13 @@ export default function FeedPage({
           }
         />
       ) : (
-        <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <div
+          className="mb-4 flex flex-wrap justify-end gap-2"
+          role="group"
+          aria-label={t('radar.title')}
+        >
           {list.hasSources ? (
-            <Button onClick={runFetch} loading={isPending}>
+            <Button onClick={runFetch} loading={isPending} disabled={isPending}>
               {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
             </Button>
           ) : (
@@ -314,6 +320,7 @@ export default function FeedPage({
             variant="ghost"
             onClick={() => actions.setConfirmMarkAllOpen(true)}
             disabled={actions.markAll.isPending}
+            loading={actions.markAll.isPending}
           >
             {t('feed.markAllRead')}
           </Button>
@@ -325,12 +332,16 @@ export default function FeedPage({
         title={t('feed.markAllReadConfirm')}
         confirmLabel={t('common.confirm')}
         cancelLabel={t('common.cancel')}
+        danger
         pending={actions.markAll.isPending}
         onConfirm={() => {
-          actions.setConfirmMarkAllOpen(false)
-          actions.markAll.mutate()
+          actions.markAll.mutate(undefined, {
+            onSuccess: () => actions.setConfirmMarkAllOpen(false),
+          })
         }}
-        onCancel={() => actions.setConfirmMarkAllOpen(false)}
+        onCancel={() => {
+          if (!actions.markAll.isPending) actions.setConfirmMarkAllOpen(false)
+        }}
       />
 
       <FetchProgressSection
@@ -373,24 +384,16 @@ export default function FeedPage({
       {list.feedQuery.isLoading && !list.searchMode ? <ListSkeleton rows={6} /> : null}
       {list.searchMode && list.searchQuery.isLoading ? <ListSkeleton rows={4} /> : null}
       {!list.searchMode && list.feedQuery.isError ? (
-        <StateBox>
-          <p className="mb-3">
-            {t('common.loadFailed', { message: errorText(list.feedQuery.error, t) })}
-          </p>
-          <Button variant="ghost" onClick={() => void list.feedQuery.refetch()}>
-            {t('common.retry')}
-          </Button>
-        </StateBox>
+        <QueryErrorState
+          message={t('common.loadFailed', { message: errorText(list.feedQuery.error, t) })}
+          onRetry={() => void list.feedQuery.refetch()}
+        />
       ) : null}
       {list.searchMode && list.searchQuery.isError ? (
-        <StateBox>
-          <p className="mb-3">
-            {t('common.loadFailed', { message: errorText(list.searchQuery.error, t) })}
-          </p>
-          <Button variant="ghost" onClick={() => void list.searchQuery.refetch()}>
-            {t('common.retry')}
-          </Button>
-        </StateBox>
+        <QueryErrorState
+          message={t('common.loadFailed', { message: errorText(list.searchQuery.error, t) })}
+          onRetry={() => void list.searchQuery.refetch()}
+        />
       ) : null}
       {list.items.length === 0 &&
       !list.feedQuery.isLoading &&
@@ -401,19 +404,37 @@ export default function FeedPage({
           title={
             list.searchMode
               ? t('feed.noSearchResult')
-              : list.hasSources
-                ? t('feed.empty')
-                : t('feed.emptyNoSources')
+              : list.hasSources && (list.unreadOnly || !!list.sourceType)
+                ? t('feed.filterEmpty')
+                : list.hasSources
+                  ? t('feed.empty')
+                  : t('feed.emptyNoSources')
           }
           description={
             list.searchMode
               ? t('feed.noSearchResultHint')
-              : list.hasSources
-                ? t('feed.emptyHint')
-                : t('feed.emptyNoSourcesHint')
+              : list.hasSources && (list.unreadOnly || !!list.sourceType)
+                ? t('feed.filterEmptyHint')
+                : list.hasSources
+                  ? t('feed.emptyHint')
+                  : t('feed.emptyNoSourcesHint')
           }
           primary={
-            list.searchMode ? undefined : list.hasSources ? (
+            list.searchMode ? (
+              <Button variant="ghost" onClick={list.clearSearch}>
+                {t('feed.clearSearch')}
+              </Button>
+            ) : list.hasSources && (list.unreadOnly || !!list.sourceType) ? (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  list.setUnreadOnly(false)
+                  list.onSourceTypeChange('')
+                }}
+              >
+                {t('feed.clearFilters')}
+              </Button>
+            ) : list.hasSources ? (
               <Button onClick={runFetch}>{t('common.fetchNow')}</Button>
             ) : (
               <Link to="/settings/sources" className={buttonVariants()}>
@@ -427,7 +448,11 @@ export default function FeedPage({
       {list.items.length > 0 && focusMode && selectedItem ? (
         <div ref={listRef} className="mx-auto max-w-lg">
           {renderCard(selectedItem, { focus: true })}
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-1 rounded-xl border border-border bg-surface px-3 py-2">
+          <div
+            className="mt-3 flex flex-wrap items-center justify-center gap-1 rounded-xl border border-border bg-surface px-3 py-2"
+            role="group"
+            aria-label={selectedItem.titleDisplay || selectedItem.title}
+          >
             {!selectedItem.read ? (
               <MagAction onClick={() => actions.markItemSelectedRead(selectedItem)}>
                 {t('feed.read')}
@@ -456,56 +481,75 @@ export default function FeedPage({
       ) : null}
 
       {list.items.length > 0 && !focusMode ? (
-        <div ref={listRef}>
-          <MagGrid dimmed={drawerOpen} variant={filteredSource ? 'list' : 'waterfall'}>
+        <div ref={listRef} className="scroll-mt-28 md:scroll-mt-32">
+          <MagGrid
+            dimmed={drawerOpen}
+            variant={filteredSource ? 'list' : 'waterfall'}
+            aria-label={t('nav.radar')}
+          >
             {list.items.map((item) => renderCard(item))}
           </MagGrid>
         </div>
       ) : null}
 
       {!list.searchMode ? (
-        <FeedPagination page={list.page} total={list.total} pageSize={PAGE} onChange={list.changePage} />
+        <FeedPagination
+          page={list.page}
+          total={list.total}
+          pageSize={PAGE}
+          onChange={(next) => {
+            list.changePage(next)
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            listRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+          }}
+        />
       ) : null}
 
       <div className="mt-4">
         <button
           type="button"
-          className="text-xs text-muted hover:text-ink"
+          className="inline-flex min-h-9 items-center rounded-sm px-1 text-xs text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-bg"
           aria-expanded={shortcutsOpen}
+          aria-controls="feed-shortcuts-panel"
           onClick={() => setShortcutsOpen((v) => !v)}
         >
           {shortcutsOpen ? t('feed.shortcutsHide') : t('feed.shortcutsShow')}
         </button>
         {shortcutsOpen ? (
-          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+          <p
+            id="feed-shortcuts-panel"
+            role="region"
+            aria-label={t('feed.shortcutsShow')}
+            className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted"
+          >
             <span>
-              <kbd>j</kbd>/<kbd>k</kbd> {t('feed.keyMove')}
+              <kbd aria-hidden>j</kbd>/<kbd aria-hidden>k</kbd> {t('feed.keyMove')}
             </span>
             {focusMode ? (
               <span>
-                <kbd>n</kbd>/<kbd>p</kbd> {t('feed.keyFocusNav')}
+                <kbd aria-hidden>n</kbd>/<kbd aria-hidden>p</kbd> {t('feed.keyFocusNav')}
               </span>
             ) : null}
             <span>
-              <kbd>Enter</kbd> {t('feed.keyOpen')}
+              <kbd aria-hidden>Enter</kbd> {t('feed.keyOpen')}
             </span>
             <span>
-              <kbd>o</kbd> {t('feed.keyExpand')}
+              <kbd aria-hidden>o</kbd> {t('feed.keyExpand')}
             </span>
             <span>
-              <kbd>s</kbd> {t('feed.keySave')}
+              <kbd aria-hidden>s</kbd> {t('feed.keySave')}
             </span>
             <span>
-              <kbd>x</kbd> {t('feed.keyDismiss')}
+              <kbd aria-hidden>x</kbd> {t('feed.keyDismiss')}
             </span>
             <span>
-              <kbd>m</kbd> {t('feed.keyRead')}
+              <kbd aria-hidden>m</kbd> {t('feed.keyRead')}
             </span>
             <span>
-              <kbd>/</kbd> {t('feed.keySearch')}
+              <kbd aria-hidden>/</kbd> {t('feed.keySearch')}
             </span>
             <span>
-              <kbd>⌘K</kbd> {t('nav.search')}
+              <kbd aria-hidden>⌘K</kbd> {t('nav.search')}
             </span>
           </p>
         ) : null}
@@ -537,7 +581,7 @@ export default function FeedPage({
               target="_blank"
               rel="noreferrer"
               onClick={() => actions.markReadOnOpen(selectedItem)}
-              className="inline-flex items-center rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+              className="inline-flex min-h-9 items-center rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               {t('feed.openOriginal')} ↗
             </a>
@@ -545,26 +589,33 @@ export default function FeedPage({
         }
         footer={
           selectedItem ? (
-            <div className="flex flex-wrap items-center gap-1">
-              <MagAction onClick={() => actions.toggleSaved(selectedItem)} tone="moss">
+            <div
+              className="flex flex-wrap items-center gap-1"
+              role="group"
+              aria-label={selectedItem.titleDisplay || selectedItem.title}
+            >
+              <MagAction onClick={() => actions.toggleSaved(selectedItem)} tone="moss" title={selectedItem.saved ? t('feed.unsave') : t('feed.save')}>
                 {selectedItem.saved ? t('feed.unsave') : t('feed.save')}
               </MagAction>
               {!selectedItem.read ? (
-                <MagAction onClick={() => actions.markItemSelectedRead(selectedItem)}>
+                <MagAction onClick={() => actions.markItemSelectedRead(selectedItem)} title={t('feed.read')}>
                   {t('feed.read')}
                 </MagAction>
               ) : null}
-              <MagAction onClick={() => actions.dismissItem(selectedItem)} tone="ember">
+              <MagAction onClick={() => actions.dismissItem(selectedItem)} tone="ember" title={t('feed.notInterested')}>
                 {t('feed.notInterested')}
               </MagAction>
               <MagAction
                 href={selectedItem.canonicalUrl}
                 onClick={() => actions.markReadOnOpen(selectedItem)}
                 tone="accent"
+                title={t('feed.openOriginal')}
               >
                 {t('feed.openOriginal')} ↗
               </MagAction>
-              <span className="ml-auto text-[11px] text-faint">{t('magazine.drawerNavHint')}</span>
+              <span className="ml-auto text-[11px] text-faint" aria-hidden>
+                {t('magazine.drawerNavHint')}
+              </span>
             </div>
           ) : null
         }

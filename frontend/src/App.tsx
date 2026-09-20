@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { PrefsProvider, StateBox, ToastProvider } from './components/ui'
+import { PrefsProvider, EmptyState, ListSkeleton, ToastProvider } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Sidebar } from './components/layout/Sidebar'
 import { CommandPalette } from './components/CommandPalette'
@@ -10,6 +10,7 @@ import { DisplaySourcesProvider } from './hooks/useDisplaySources'
 import { useSources } from './hooks/useSources'
 import { useDisplaySources } from './hooks/useDisplaySources'
 import { useUnreadCounts } from './hooks/useUnreadCounts'
+import { cn, focusRingClass } from './lib/cn'
 
 // Route-level code splitting: each page is a separate chunk so the shell and
 // Today page load without pulling in every other route's code.
@@ -26,36 +27,41 @@ const SourcesPage = lazy(() => import('./pages/SourcesPage'))
 const TodayPage = lazy(() => import('./pages/TodayPage'))
 const AiMonitorPage = lazy(() => import('./pages/AiMonitorPage'))
 const BriefsPage = lazy(() => import('./pages/BriefsPage'))
+const ActionsPage = lazy(() => import('./pages/ActionsPage'))
 
 function NotFoundPage() {
   const { t } = useTranslation()
   return (
-    <StateBox>
-      <h3 className="text-lg font-medium text-ink">{t('common.notFound')}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted">{t('common.notFoundHint')}</p>
-      <Link to="/" className="mt-4 inline-block text-sm text-accent hover:underline">
-        {t('common.backToToday')}
-      </Link>
-    </StateBox>
+    <EmptyState
+      title={t('common.notFound')}
+      description={t('common.notFoundHint')}
+      primary={
+        <Link
+          to="/"
+          className={cn(
+            'inline-flex min-h-10 items-center rounded-md text-sm font-medium text-accent hover:underline',
+            focusRingClass(),
+          )}
+        >
+          {t('common.backToToday')}
+        </Link>
+      }
+    />
   )
 }
 
 function PageFallback() {
-  return (
-    <div className="space-y-3" aria-busy="true" aria-label="Loading">
-      <div className="h-7 w-40 animate-pulse rounded bg-border/60" />
-      <div className="h-4 w-64 max-w-full animate-pulse rounded bg-border/40" />
-      <div className="h-40 animate-pulse rounded-lg bg-border/40" />
-    </div>
-  )
+  return <ListSkeleton rows={4} />
 }
 
 function Shell() {
+  const { t } = useTranslation()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const location = useLocation()
   const mainRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     mainRef.current?.focus({ preventScroll: true })
   }, [location.pathname])
 
@@ -98,6 +104,12 @@ function Shell() {
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[230px_1fr] bg-bg text-ink">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-[max(1rem,env(safe-area-inset-left))] focus:top-[max(1rem,env(safe-area-inset-top))] focus:z-[70] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg focus:ring-2 focus:ring-accent/40 focus:outline-none"
+      >
+        {t('common.skipToContent')}
+      </a>
       <Sidebar
         totalUnread={totalUnread}
         unreadByType={unread.data ?? {}}
@@ -105,6 +117,7 @@ function Shell() {
         onOpenPalette={() => setPaletteOpen(true)}
       />
       <main
+        id="main-content"
         ref={mainRef}
         tabIndex={-1}
         className="px-4 py-5 outline-none md:px-8 md:py-7"
@@ -118,6 +131,7 @@ function Shell() {
                 <Route path="/radar" element={<RadarPage />} />
                 <Route path="/decisions" element={<DecisionsPage />} />
                 <Route path="/chat" element={<ChatPage />} />
+                <Route path="/actions" element={<ActionsPage />} />
                 <Route path="/briefs" element={<BriefsPage />} />
                 <Route path="/settings" element={<SettingsHubPage />} />
                 <Route path="/settings/system" element={<AiMonitorPage />} />
@@ -135,7 +149,6 @@ function Shell() {
                 <Route path="/events" element={<Navigate to="/radar" replace />} />
                 <Route path="/changes" element={<Navigate to="/radar?view=changes" replace />} />
                 <Route path="/watching" element={<Navigate to="/" replace />} />
-                <Route path="/actions" element={<Navigate to="/decisions" replace />} />
                 <Route path="/contexts" element={<Navigate to="/settings/context" replace />} />
                 <Route path="/sources" element={<Navigate to="/settings/sources" replace />} />
                 <Route path="/sources/:id" element={<SourceIdRedirect />} />

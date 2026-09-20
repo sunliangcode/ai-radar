@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MonitorBubble } from './MonitorBubble'
 import type { IoEntry } from './monitorUtils'
+import { cn, focusRingClass } from '../../lib/cn'
 
 /**
  * Live in/out console: header controls (pause / stick-bottom), operation
@@ -63,7 +64,11 @@ export function LiveConsole({
           ) : null}
           <button
             type="button"
-            className="rounded border border-border px-2 py-0.5 text-[11px] text-ink hover:border-accent/50 hover:text-accent"
+            className={cn(
+              'inline-flex min-h-9 items-center rounded border border-border px-2.5 py-1 text-[11px] text-ink hover:border-accent/50 hover:text-accent',
+              focusRingClass(),
+            )}
+            aria-pressed={paused}
             onClick={onTogglePause}
           >
             {paused ? t('settings.monitorResume') : t('settings.monitorPause')}
@@ -71,7 +76,10 @@ export function LiveConsole({
           {!stickBottom ? (
             <button
               type="button"
-              className="rounded border border-border px-2 py-0.5 text-[11px] text-ink hover:border-accent/50 hover:text-accent"
+              className={cn(
+                'inline-flex min-h-9 items-center rounded border border-border px-2.5 py-1 text-[11px] text-ink hover:border-accent/50 hover:text-accent',
+                focusRingClass(),
+              )}
               onClick={() => {
                 setStickBottom(true)
                 if (consoleRef.current) {
@@ -85,15 +93,22 @@ export function LiveConsole({
         </div>
       </div>
       {operations.length > 1 ? (
-        <div className="flex flex-wrap gap-1 border-b border-border px-3 py-2">
+        <div
+          className="flex flex-wrap gap-1 border-b border-border px-3 py-2"
+          role="group"
+          aria-label={t('settings.monitorOpFilter')}
+        >
           <button
             type="button"
             onClick={() => onOpFilterChange('')}
-            className={`rounded px-2 py-0.5 text-[11px] ${
+            aria-pressed={!opFilter}
+            className={cn(
+              'min-h-9 rounded px-2.5 py-1 text-[11px]',
+              focusRingClass(),
               !opFilter
                 ? 'bg-moss text-surface'
-                : 'border border-border text-muted hover:text-accent'
-            }`}
+                : 'border border-border text-muted hover:text-accent',
+            )}
           >
             {t('settings.monitorAllOps')}
           </button>
@@ -102,11 +117,14 @@ export function LiveConsole({
               key={op}
               type="button"
               onClick={() => onOpFilterChange(op)}
-              className={`rounded px-2 py-0.5 font-mono text-[11px] ${
+              aria-pressed={opFilter === op}
+              className={cn(
+                'min-h-9 rounded px-2.5 py-1 font-mono text-[11px]',
+                focusRingClass(),
                 opFilter === op
                   ? 'bg-moss text-surface'
-                  : 'border border-border text-muted hover:text-accent'
-              }`}
+                  : 'border border-border text-muted hover:text-accent',
+              )}
             >
               {op}
             </button>
@@ -117,9 +135,16 @@ export function LiveConsole({
         ref={consoleRef}
         onScroll={onConsoleScroll}
         className="thin-scroll max-h-[min(52vh,28rem)] min-h-[12rem] overflow-y-auto px-3 py-4"
+        role="log"
+        aria-label={t('settings.monitorLiveIo')}
+        aria-live={paused ? 'off' : 'polite'}
+        aria-relevant="additions"
+        aria-busy={inFlightCount > 0 && !paused ? true : undefined}
       >
         {ioEntries.length === 0 ? (
-          <p className="text-sm text-muted">{t('settings.monitorEmpty')}</p>
+          <p className="text-sm text-muted" role="status">
+            {t('settings.monitorEmpty')}
+          </p>
         ) : (
           ioEntries.map((entry) => (
             <MonitorBubble

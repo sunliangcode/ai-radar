@@ -74,6 +74,9 @@ radar:
     to: zh
     connect-timeout-ms: 2000
     read-timeout-ms: 15000
+  # Self-hosted DailyHotApi (https://github.com/imsyy/DailyHotApi) for CN hot lists
+  daily-hot:
+    base-url: ${DAILY_HOT_BASE_URL:http://127.0.0.1:6688}
   openai:
     api-key: ${OPENAI_API_KEY:}
     base-url: ${OPENAI_BASE_URL:http://localhost:11434/v1}

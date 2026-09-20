@@ -14,19 +14,21 @@ export function ProgressBar({
   label?: string
 } & HTMLAttributes<HTMLDivElement>) {
   const pct = Math.min(100, Math.max(0, value))
+  const barWidth = pct <= 0 ? 0 : Math.max(8, pct)
   return (
     <div
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(pct)}
+      aria-valuetext={`${Math.round(pct)}%`}
       aria-label={label}
       className={cn('h-2 overflow-hidden rounded-full bg-border', className)}
       {...props}
     >
       <div
-        className={cn('h-full rounded-full bg-moss transition-[width] duration-300', barClassName)}
-        style={{ width: `${pct}%` }}
+        className={cn('h-full rounded-full bg-moss transition-[width] duration-300 motion-reduce:transition-none', barClassName)}
+        style={{ width: `${barWidth}%` }}
       />
     </div>
   )

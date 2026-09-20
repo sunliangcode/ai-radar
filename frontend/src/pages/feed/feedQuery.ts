@@ -13,6 +13,7 @@ export const DOMESTIC_CHANNEL_ORDER = [
   'V2EX',
   'BILIBILI',
   'WEIBO',
+  'DAILY_HOT',
   'RSS',
   'GOOGLE_NEWS',
 ] as const

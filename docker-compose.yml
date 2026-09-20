@@ -14,6 +14,18 @@ services:
       retries: 5
       start_period: 90s
 
+  # CN hot lists via https://github.com/imsyy/DailyHotApi — enable DAILY_HOT sources after healthy.
+  daily-hot:
+    build:
+      context: https://github.com/imsyy/DailyHotApi.git#master
+      dockerfile: Dockerfile
+      target: runner
+    ports:
+      - "6688:6688"
+    environment:
+      PORT: "6688"
+    restart: unless-stopped
+
   ai-radar:
     build: .
     ports:
@@ -27,11 +39,14 @@ services:
       RADAR_UI_BASE_URL: http://localhost:8080
       RADAR_TRANSLATE_URL: http://argos-translate:8765
       RADAR_TRANSLATE_ENABLED: "true"
+      DAILY_HOT_BASE_URL: http://daily-hot:6688
     volumes:
       - ./data:/app/data
     depends_on:
       argos-translate:
         condition: service_healthy
+      daily-hot:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]

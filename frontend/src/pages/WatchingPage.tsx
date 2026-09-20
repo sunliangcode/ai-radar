@@ -9,6 +9,7 @@ import { useDisplaySources } from '../hooks/useDisplaySources'
 import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
+import { textLinkClass } from '../lib/cn'
 import { TimelineSection, TIMELINE_PREVIEW } from './watching/TimelineSection'
 import { TrackedChangesSection } from './watching/TrackedChangesSection'
 import { SavedItemsSection } from './watching/SavedItemsSection'
@@ -71,7 +72,10 @@ export default function WatchingPage() {
         title={t('watching.title')}
         subtitle={t('watching.subtitle')}
         actions={
-          <Link to="/actions" className="text-sm text-moss underline underline-offset-2">
+          <Link
+            to="/actions"
+            className={`inline-flex min-h-9 items-center text-sm ${textLinkClass('moss')}`}
+          >
             {t('watching.openActions')}
           </Link>
         }
@@ -82,6 +86,9 @@ export default function WatchingPage() {
         visibleGroups={visibleGroups}
         showAll={showAllTimeline}
         locale={locale}
+        loading={timeline.isLoading}
+        error={timeline.isError ? timeline.error : null}
+        onRetry={() => void timeline.refetch()}
         onToggleShowAll={() => setShowAllTimeline((v) => !v)}
       />
 

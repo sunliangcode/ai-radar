@@ -7,13 +7,15 @@ import { errorText } from '../lib/errors'
 import { formatPushResult, type PushResultBody } from '../lib/formatPushResult'
 import { useMarkItemRead } from '../hooks/useMarkItemRead'
 import { useDisplaySources } from '../hooks/useDisplaySources'
+import { useFocusTrap } from './layout/useFocusTrap'
 import { useToast } from './ui'
 
 type Command = {
   id: string
   label: string
   hint?: string
-  run: () => void
+  /** Return false to keep the palette open (e.g. arm a two-step confirm). */
+  run: () => boolean | void | Promise<unknown>
 }
 
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -30,6 +32,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const inputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+
+  useFocusTrap({ open, onClose, containerRef: dialogRef, initialFocusRef: inputRef })
 
   const markItemReadMutate = markItemRead.mutate
   const openItemExternal = useCallback(
@@ -43,12 +48,28 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   useEffect(() => {
     if (open) {
+      returnFocusRef.current = document.activeElement as HTMLElement | null
       setQ('')
       setIdx(0)
       setArmed(null)
-      setTimeout(() => inputRef.current?.focus(), 20)
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+      returnFocusRef.current?.focus?.({ preventScroll: true })
+      returnFocusRef.current = null
+    }
+    return () => {
+      document.body.style.overflow = ''
     }
   }, [open])
+
+  const runAndMaybeClose = useCallback(
+    (run: () => boolean | void | Promise<unknown>) => {
+      const keepOpen = run() === false
+      if (!keepOpen) onClose()
+    },
+    [onClose],
+  )
 
   const navCommands: Command[] = useMemo(
     () => [
@@ -56,6 +77,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'radar', label: t('nav.radar'), hint: '/radar', run: () => navigate('/radar') },
       { id: 'decisions', label: t('nav.decisions'), hint: '/decisions', run: () => navigate('/decisions') },
       { id: 'chat', label: t('nav.chat'), hint: '/chat', run: () => navigate('/chat') },
+      { id: 'actions', label: t('nav.actions'), hint: '/actions', run: () => navigate('/actions') },
+      {
+        id: 'sources',
+        label: t('nav.sources'),
+        hint: '/settings/sources',
+        run: () => navigate('/settings/sources'),
+      },
       { id: 'settings', label: t('nav.settings'), hint: '/settings', run: () => navigate('/settings') },
       { id: 'briefs', label: t('nav.briefs'), hint: '/briefs', run: () => navigate('/briefs') },
       { id: 'monitor', label: t('nav.monitor'), hint: '/settings/system', run: () => navigate('/settings/system') },
@@ -92,7 +120,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         run: () => {
           if (armed !== 'mark-all-read') {
             setArmed('mark-all-read')
-            return
+            return false
           }
           setArmed(null)
           void api
@@ -140,25 +168,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      } else if (e.key === 'Tab') {
-        const root = dialogRef.current
-        if (!root) return
-        const focusable = root.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        )
-        if (focusable.length === 0) return
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
-      } else if (e.key === 'ArrowDown') {
+      if (e.key === 'ArrowDown') {
         e.preventDefault()
         setIdx((i) => Math.min(items.length - 1, i + 1))
       } else if (e.key === 'ArrowUp') {
@@ -172,14 +182,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           openItemExternal(chosen.item)
           onClose()
         } else {
-          ;(chosen as Command).run()
-          onClose()
+          runAndMaybeClose((chosen as Command).run)
         }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, items, idx, onClose, openItemExternal])
+  }, [open, items, idx, onClose, openItemExternal, runAndMaybeClose])
 
   useEffect(() => {
     listRef.current?.querySelector(`[data-idx="${idx}"]`)?.scrollIntoView({ block: 'nearest' })
@@ -187,10 +196,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   if (!open) return null
 
+  const activeOptionId = items.length ? `palette-opt-${idx}` : undefined
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[10vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-3 pb-[env(safe-area-inset-bottom)] pt-[max(10vh,env(safe-area-inset-top))] backdrop-blur-[1px] motion-reduce:backdrop-blur-none"
       onMouseDown={onClose}
+      role="presentation"
     >
       <div
         ref={dialogRef}
@@ -209,20 +221,55 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t('palette.placeholder')}
-            className="h-12 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+            role="combobox"
+            aria-expanded="true"
+            aria-haspopup="listbox"
+            aria-controls="palette-listbox"
+            aria-autocomplete="list"
+            aria-activedescendant={activeOptionId}
+            className="h-12 min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
           />
-          <kbd>esc</kbd>
+          {q ? (
+            <button
+              type="button"
+              aria-label={t('feed.clearSearch')}
+              onClick={() => {
+                setQ('')
+                setIdx(0)
+                inputRef.current?.focus()
+              }}
+              className="inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-md text-muted hover:bg-border hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              <span aria-hidden>×</span>
+            </button>
+          ) : null}
+          <kbd aria-hidden>esc</kbd>
         </div>
-        <div ref={listRef} className="max-h-[50vh] overflow-y-auto thin-scroll py-2" role="listbox">
-          {items.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-muted">{t('palette.empty')}</p>
+        <div
+          id="palette-listbox"
+          ref={listRef}
+          className="max-h-[50vh] overflow-y-auto thin-scroll py-2"
+          role="listbox"
+          aria-label={t('nav.search')}
+          aria-busy={searchQuery.isFetching || undefined}
+        >
+          {searchQuery.isFetching && items.length === 0 && q.trim().length > 1 ? (
+            <p className="px-4 py-6 text-sm text-muted" role="status">
+              {t('common.loading')}
+            </p>
+          ) : items.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted" role="status">
+              {t('palette.empty')}
+            </p>
           ) : (
             items.map((it, i) => {
               const active = i === idx
+              const optionId = `palette-opt-${i}`
               if ('type' in it && it.type === 'item') {
                 return (
                   <button
                     key={it.id}
+                    id={optionId}
                     type="button"
                     role="option"
                     aria-selected={active}
@@ -232,7 +279,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                       openItemExternal(it.item)
                       onClose()
                     }}
-                    className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${active ? 'bg-border/60' : ''}`}
+                    className={`flex min-h-10 w-full items-center gap-2 px-4 py-2.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${active ? 'bg-border/60' : ''}`}
                   >
                     <span className="truncate text-ink">{it.item.title}</span>
                     <span className="ml-auto shrink-0 font-mono text-[11px] text-muted">
@@ -245,16 +292,14 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               return (
                 <button
                   key={cmd.id}
+                  id={optionId}
                   type="button"
                   role="option"
                   aria-selected={active}
                   data-idx={i}
                   onMouseEnter={() => setIdx(i)}
-                  onClick={() => {
-                    cmd.run()
-                    onClose()
-                  }}
-                  className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${active ? 'bg-border/60' : ''}`}
+                  onClick={() => runAndMaybeClose(cmd.run)}
+                  className={`flex min-h-10 w-full items-center gap-2 px-4 py-2.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${active ? 'bg-border/60' : ''}`}
                 >
                   <span className="text-ink">{cmd.label}</span>
                   {cmd.hint ? (

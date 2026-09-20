@@ -11,8 +11,10 @@ export function BasicsSection({
 }) {
   const { t } = useTranslation()
   return (
-    <Card>
-      <h3 className="mb-1 font-serif text-lg">{t('settings.basicsSection')}</h3>
+    <Card aria-labelledby="settings-basics-heading">
+      <h3 id="settings-basics-heading" className="mb-1 font-serif text-lg">
+        {t('settings.basicsSection')}
+      </h3>
       <p className="mb-3 text-xs text-muted">{t('settings.primaryLanguageHint')}</p>
       <Field label={t('settings.primaryLanguage')}>
         <Select

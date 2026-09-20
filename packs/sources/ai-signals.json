@@ -1,21 +1,9 @@
 [
   {
     "type": "RSS",
-    "name": "vLLM Blog",
-    "defaultEnabled": true,
-    "config": { "feedUrl": "https://blog.vllm.ai/feed.xml" }
-  },
-  {
-    "type": "RSS",
     "name": "GitHub Trending Daily RSS",
     "defaultEnabled": true,
     "config": { "feedUrl": "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml" }
-  },
-  {
-    "type": "RSS",
-    "name": "DeepMind Blog",
-    "defaultEnabled": true,
-    "config": { "feedUrl": "https://deepmind.google/blog/rss.xml" }
   },
   {
     "type": "PRODUCT_HUNT",
@@ -46,11 +34,5 @@
       "extractionPrompt": "Extract distinct AI/tech news stories from this newsletter with title, url, and short content.",
       "maxMessages": 15
     }
-  },
-  {
-    "type": "RSS",
-    "name": "Karpathy via X RSS proxy (fallback)",
-    "defaultEnabled": false,
-    "config": { "feedUrl": "https://nitter.privacyredirect.com/karpathy/rss" }
   }
 ]

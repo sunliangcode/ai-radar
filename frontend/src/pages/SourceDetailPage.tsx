@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { Button, PageHeader, ScoreBar, StateBox, useToast } from '../components/ui'
+import { EmptyState, FormSaveBar, ListSkeleton, PageHeader, QueryErrorState, ScoreBar, useToast } from '../components/ui'
 import { errorText } from '../lib/errors'
+import { cn, focusRingClass, textLinkClass } from '../lib/cn'
 import { useConnectors } from '../hooks/useConnectors'
 import { SourceConfigFieldInput } from './sources/SourceConfigFieldInput'
 import { buildSourceConfig } from './sources/buildSourceConfig'
@@ -61,13 +62,38 @@ export default function SourceDetailPage() {
     onError: (e) => pushToast('error', errorText(e, t)),
   })
 
-  if (q.isLoading) return <StateBox>{t('common.loading')}</StateBox>
-  if (q.isError) return <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox>
-  if (!q.data) return <StateBox>{t('sources.notFound')}</StateBox>
+  if (q.isLoading) return <ListSkeleton rows={4} />
+  if (q.isError) {
+    return (
+      <QueryErrorState
+        message={t('common.loadFailed', { message: errorText(q.error, t) })}
+        onRetry={() => void q.refetch()}
+      />
+    )
+  }
+  if (!q.data) {
+    return (
+      <EmptyState
+        title={t('sources.notFound')}
+        primary={
+          <Link
+            to="/settings/sources"
+            className={cn(
+              'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+              focusRingClass(),
+            )}
+          >
+            {t('common.backToList')}
+          </Link>
+        }
+      />
+    )
+  }
 
   const s = q.data
   const fields = descriptor?.configFields ?? []
   const isOssCli = s.type === 'ZHIHU' || s.type === 'WEIBO' || s.type === 'BILIBILI'
+  const isDirty = Object.keys(overrides).length > 0
 
   function saveConfig() {
     const config = buildSourceConfig(descriptor, fieldValues)
@@ -75,26 +101,21 @@ export default function SourceDetailPage() {
   }
 
   return (
-    <div>
+    <div aria-busy={patch.isPending || undefined}>
       <PageHeader
         title={s.name}
         subtitle={`${s.type} · ${s.enabled ? t('sources.statusEnabled') : t('sources.statusDisabled')}`}
-        actions={
-          <Link to="/settings/sources" className="text-sm text-moss underline underline-offset-2">
-            {t('common.backToList')}
-          </Link>
-        }
+        back={{ label: t('common.backToList'), to: '/settings/sources' }}
       />
 
-      <section className="mb-6 rounded-xl border border-border bg-surface/80 p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-serif text-lg text-ink">{t('sources.config')}</h3>
-          {fields.length > 0 ? (
-            <Button type="button" loading={patch.isPending} onClick={saveConfig}>
-              {patch.isPending ? t('common.saving') : t('sources.saveConfig')}
-            </Button>
-          ) : null}
-        </div>
+      <section
+        className="mb-6 rounded-xl border border-border bg-surface/80 p-4"
+        aria-busy={patch.isPending || undefined}
+        aria-labelledby="source-config-heading"
+      >
+        <h2 id="source-config-heading" className="mb-3 font-serif text-lg text-ink">
+          {t('sources.config')}
+        </h2>
         {isOssCli ? (
           <p className="mb-3 text-xs text-muted">{t('sources.ossCliHint')}</p>
         ) : null}
@@ -113,36 +134,76 @@ export default function SourceDetailPage() {
             ))}
           </div>
         )}
+        {fields.length > 0 ? (
+          <FormSaveBar
+            dirty={isDirty}
+            saving={patch.isPending}
+            onSave={saveConfig}
+            onDiscard={() => setOverrides({})}
+          />
+        ) : null}
       </section>
 
-      <h3 className="mb-2 font-serif text-xl">{t('sources.sampleItems')}</h3>
-      {!s.sampleItems?.length ? <StateBox>{t('sources.noSampleItems')}</StateBox> : null}
-      <div className="rounded-xl border border-border bg-surface/70 px-4">
-        {s.sampleItems?.map((item) => (
-          <article key={item.id} className="row-py border-b border-border/70 last:border-0">
-            <div className="flex items-start gap-3">
-              <div className="pt-0.5 w-12 shrink-0">
-                <ScoreBar score={item.score} size="sm" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <a
-                  href={item.canonicalUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-ink transition duration-150 hover:underline"
-                >
-                  {item.title}
-                </a>
-                {item.summary ? (
-                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted">
-                    {item.summary}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+      <section aria-labelledby="source-sample-heading">
+        <h2 id="source-sample-heading" className="mb-2 font-serif text-xl">
+          {t('sources.sampleItems')}
+        </h2>
+        {!s.sampleItems?.length ? (
+          <EmptyState
+            title={t('sources.noSampleItems')}
+            description={t('sources.noSampleItemsHint')}
+            primary={
+              <Link
+                to="/radar"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                  focusRingClass(),
+                )}
+              >
+                {t('nav.radar')}
+              </Link>
+            }
+            secondary={
+              <Link
+                to="/settings/sources"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
+                  focusRingClass(),
+                )}
+              >
+                {t('common.backToList')}
+              </Link>
+            }
+          />
+        ) : (
+          <div className="rounded-xl border border-border bg-surface/70 px-4">
+            {s.sampleItems.map((item) => (
+              <article key={item.id} className="row-py border-b border-border/70 last:border-0">
+                <div className="flex items-start gap-3">
+                  <div className="pt-0.5 w-12 shrink-0">
+                    <ScoreBar score={item.score} size="sm" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <a
+                      href={item.canonicalUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`inline-flex min-h-9 items-center font-medium text-ink transition duration-150 motion-reduce:transition-none ${textLinkClass()}`}
+                    >
+                      {item.title}
+                    </a>
+                    {item.summary ? (
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted">
+                        {item.summary}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

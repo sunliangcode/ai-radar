@@ -80,6 +80,53 @@ public class SourceSeeder implements ApplicationRunner {
         ensureNamedRss("Solidot", "https://www.solidot.org/index.rss");
         ensureNamedRss("极客公园", "https://www.geekpark.net/rss");
         ensureNamedRss("爱范儿", "https://www.ifanr.com/feed");
+        ensureNamedRss("虎嗅", "https://rss.huxiu.com/");
+        ensureNamedRss("InfoQ 中国", "https://www.infoq.cn/feed");
+        ensureNamedRss("钛媒体", "https://www.tmtpost.com/feed");
+        ensureNamedRss("雷峰网", "https://www.leiphone.com/feed");
+        ensureNamedRss("掘金", "https://juejin.cn/rss");
+        ensureNamedRss("新浪科技", "https://rss.sina.com.cn/tech/rollnews.xml");
+        ensureNamedRss("人人都是产品经理", "https://www.woshipm.com/feed");
+        ensureNamedRss("HelloGitHub", "https://hellogithub.com/rss");
+        ensureNamedRss("SegmentFault", "https://segmentfault.com/feeds");
+        ensureNamedRss("数英", "https://www.digitaling.com/rss");
+        ensureNamedRss("数字尾巴", "https://www.dgtle.com/rss/dgtle.xml");
+        repairNamedRssFeedUrl("36氪", "https://36kr.com/feed", "https://www.36kr.com/feed");
+    }
+
+    /** Repair a known-broken feed URL for an existing named RSS source. */
+    void repairNamedRssFeedUrl(String name, String brokenFeedUrl, String fixedFeedUrl) {
+        try {
+            sourceRepository.findFirstByName(name).ifPresent(entity -> {
+                if (entity.getType() != SourceType.RSS) {
+                    return;
+                }
+                try {
+                    String raw = entity.getConfigJson();
+                    if (raw == null || raw.isBlank()) {
+                        return;
+                    }
+                    JsonNode parsed = objectMapper.readTree(raw);
+                    if (!parsed.isObject()) {
+                        return;
+                    }
+                    ObjectNode config = (ObjectNode) parsed;
+                    String current = config.path("feedUrl").asText(config.path("url").asText("")).trim();
+                    if (!brokenFeedUrl.equals(current)) {
+                        return;
+                    }
+                    config.put("feedUrl", fixedFeedUrl);
+                    config.remove("url");
+                    entity.setConfigJson(objectMapper.writeValueAsString(config));
+                    sourceRepository.save(entity);
+                    log.info("repaired_rss_feed name={} from={} to={}", name, brokenFeedUrl, fixedFeedUrl);
+                } catch (Exception e) {
+                    log.warn("repair_rss_feed_failed name={} error={}", name, e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            log.warn("repair_rss_feed_lookup_failed name={} error={}", name, e.getMessage());
+        }
     }
 
     /** Disable homemade connectors that were removed (no open-source project). */

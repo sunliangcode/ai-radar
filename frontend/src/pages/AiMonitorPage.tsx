@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { StateBox, PageHeader } from '../components/ui'
+import { ListSkeleton, PageHeader, QueryErrorState } from '../components/ui'
 import { useAiMonitorStream } from './monitor/useAiMonitorStream'
 import { buildIoEntries } from './monitor/monitorUtils'
 import { MonitorQueueCard } from './monitor/MonitorQueueCard'
@@ -14,9 +14,14 @@ export default function AiMonitorPage() {
   const { monitor, mon, inFlights, sseLive, paused, setPaused } = useAiMonitorStream()
   const [opFilter, setOpFilter] = useState('')
 
-  if (monitor.isLoading) return <StateBox>{t('settings.loading')}</StateBox>
+  if (monitor.isLoading) return <ListSkeleton rows={5} />
   if (monitor.isError) {
-    return <StateBox>{t('common.loadFailed', { message: errorText(monitor.error, t) })}</StateBox>
+    return (
+      <QueryErrorState
+        message={t('common.loadFailed', { message: errorText(monitor.error, t) })}
+        onRetry={() => void monitor.refetch()}
+      />
+    )
   }
 
   const queue = mon?.queue
@@ -35,16 +40,26 @@ export default function AiMonitorPage() {
   const streamLen = inFlights.reduce((n, f) => n + (f.responseSoFar?.length ?? 0), 0)
 
   return (
-    <div>
-      <PageHeader title={t('nav.monitor')} subtitle={t('settings.monitorHint')} />
+    <div aria-busy={filteredFlights.length > 0 && !paused ? true : undefined}>
+      <PageHeader
+        title={t('nav.monitor')}
+        subtitle={t('settings.monitorHint')}
+        back={{ label: t('common.backToList'), to: '/settings' }}
+      />
       <p className="mb-4 text-xs text-muted">
         {t('settings.monitorOpenSettings')}{' '}
         <code className="rounded bg-border/60 px-1 font-mono">OPENAI_*</code>
         {' '}
         {t('settings.monitorEnvHint')}
         {sseLive ? (
-          <span className="ml-2 text-moss">{t('settings.monitorStreaming')}</span>
-        ) : null}
+          <span className="ml-2 text-moss" role="status" aria-live="polite">
+            {t('settings.monitorStreaming')}
+          </span>
+        ) : (
+          <span className="ml-2 text-muted" role="status" aria-live="polite">
+            {t('settings.monitorSseOff')}
+          </span>
+        )}
       </p>
 
       {queue && (queue.itemsTotal ?? 0) > 0 ? <MonitorQueueCard queue={queue} /> : null}

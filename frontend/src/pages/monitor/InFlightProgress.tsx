@@ -24,7 +24,7 @@ export function InFlightProgress({
   if (flights.length === 0) return null
 
   return (
-    <div className="mb-4 grid gap-2">
+    <div className="mb-4 grid gap-2" aria-busy={!paused || undefined} aria-live="polite">
       {flights.map((flight) => {
         const started = Date.parse(flight.startedAt)
         const liveElapsedMs = Number.isFinite(started)
@@ -34,6 +34,7 @@ export function InFlightProgress({
           flight.responseSoFar && flight.responseSoFar.length > 0
             ? Math.min(95, 20 + flight.responseSoFar.length / 20)
             : progressFromElapsed(liveElapsedMs)
+        const pct = Math.round(liveProgress)
         return (
           <div
             key={flight.id}
@@ -53,11 +54,12 @@ export function InFlightProgress({
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={Math.round(liveProgress)}
-              aria-label={t('settings.monitorInFlight')}
+              aria-valuenow={pct}
+              aria-valuetext={`${pct}%`}
+              aria-label={`${t('settings.monitorInFlight')} ${flight.operation}`}
             >
               <div
-                className="h-full rounded-full bg-accent transition-[width] duration-200"
+                className="h-full rounded-full bg-accent transition-[width] duration-200 motion-reduce:transition-none"
                 style={{ width: `${Math.max(8, liveProgress)}%` }}
               />
             </div>

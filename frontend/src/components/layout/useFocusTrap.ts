@@ -27,9 +27,16 @@ export function useFocusTrap({
       if (e.key !== 'Tab') return
       const root = containerRef.current
       if (!root) return
-      const focusable = root.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      )
+      const focusable = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => {
+        if (el.getAttribute('aria-disabled') === 'true' || el.hasAttribute('disabled')) return false
+        if (el.getAttribute('aria-hidden') === 'true' || el.hasAttribute('hidden')) return false
+        if (el.closest('[aria-hidden="true"], [hidden], [inert]')) return false
+        return true
+      })
       if (focusable.length === 0) return
       const first = focusable[0]
       const last = focusable[focusable.length - 1]

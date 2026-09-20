@@ -36,7 +36,10 @@ export function ChangeAttentionCard({
     .join(' · ')
 
   return (
-    <article className="group relative overflow-hidden rounded-2xl bg-surface px-5 py-6 shadow-[0_1px_0_0_var(--color-border)] ring-1 ring-border/80 transition hover:ring-accent/35">
+    <article
+      className="group relative overflow-hidden rounded-2xl bg-surface px-5 py-6 shadow-[0_1px_0_0_var(--color-border)] ring-1 ring-border/80 transition hover:ring-accent/35 motion-reduce:transition-none"
+      aria-busy={busy || undefined}
+    >
       <div className="flex items-baseline justify-between gap-3">
         <p className={cn('font-mono text-[11px] tracking-wider uppercase', tierTone(card.tier))}>
           {t('today.attentionIndex', { index: index + 1, total })}
@@ -45,7 +48,13 @@ export function ChangeAttentionCard({
       </div>
 
       <h3 className="mt-3 text-[1.35rem] font-semibold leading-snug tracking-tight text-ink">
-        {card.title}
+        <Link
+          to={`/changes/${changeId}`}
+          state={{ from: '/' }}
+          className="rounded-sm hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+        >
+          {card.title}
+        </Link>
       </h3>
       {entities ? <p className="mt-1.5 text-xs text-muted">{entities}</p> : null}
 
@@ -59,17 +68,21 @@ export function ChangeAttentionCard({
         </p>
       ) : null}
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
+      <div
+        className="mt-6 flex flex-wrap items-center gap-2"
+        role="group"
+        aria-label={card.title}
+      >
         <Link
           to={`/changes/${changeId}`}
           state={{ from: '/' }}
-          className="inline-flex min-h-10 items-center rounded-full bg-accent px-4 text-sm font-medium text-white hover:opacity-90"
+          className="inline-flex min-h-10 items-center rounded-full bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           {t('today.exploreChange')}
         </Link>
         <Link
           to={`/chat?changeId=${changeId}`}
-          className="inline-flex min-h-10 items-center rounded-full border border-border px-4 text-sm text-ink hover:border-accent/40"
+          className="inline-flex min-h-10 items-center rounded-full border border-border px-4 text-sm text-ink hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           {t('today.askAi')}
         </Link>
@@ -96,24 +109,31 @@ export function ChangeAttentionCard({
 
 export function ChangeAttentionList({
   cards,
-  busy,
+  busyEventId,
   onFollow,
   onDismiss,
 }: {
   cards: ImpactCard[]
-  busy?: boolean
+  /** Only the card whose mutation is in flight is disabled. */
+  busyEventId?: number | null
   onFollow: (card: ImpactCard) => void
   onDismiss: (card: ImpactCard) => void
 }) {
+  const { t } = useTranslation()
   return (
-    <div className="space-y-5">
+    <div
+      className="space-y-5"
+      role="feed"
+      aria-label={t('today.attentionFeed')}
+      aria-busy={busyEventId != null || undefined}
+    >
       {cards.map((card, index) => (
         <ChangeAttentionCard
           key={card.id ?? card.eventId}
           card={card}
           index={index}
           total={cards.length}
-          busy={busy}
+          busy={busyEventId != null && card.eventId === busyEventId}
           onFollow={onFollow}
           onDismiss={onDismiss}
         />

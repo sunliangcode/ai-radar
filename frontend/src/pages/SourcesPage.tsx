@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
-import { Button, EmptyState, PageHeader, StateBox, useToast } from '../components/ui'
+import { api, type Source } from '../lib/api'
+import { Button, EmptyState, ListSkeleton, PageHeader, QueryErrorState, useToast } from '../components/ui'
 import { PackPicker } from '../components/PackPicker'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
@@ -47,10 +47,24 @@ export default function SourcesPage() {
       setFieldValues({})
       setShowMoreTypes(false)
       setType('RSS')
+      pushToast('success', t('sources.created'))
     },
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
   const patch = useMutation({
     mutationFn: ({ id, body }: { id: number; body: unknown }) => api.patchSource(id, body),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ['sources'] })
+      const prev = qc.getQueryData<Source[]>(['sources'])
+      const enabled = (vars.body as { enabled?: boolean })?.enabled
+      if (prev && enabled != null) {
+        qc.setQueryData<Source[]>(
+          ['sources'],
+          prev.map((s) => (s.id === vars.id ? { ...s, enabled } : s)),
+        )
+      }
+      return { prev }
+    },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ['sources'] })
       const enabled = (vars.body as { enabled?: boolean })?.enabled
@@ -63,7 +77,10 @@ export default function SourcesPage() {
             : t('sources.disabledToast'),
       )
     },
-    onError: (e) => pushToast('error', errorText(e, t)),
+    onError: (e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['sources'], ctx.prev)
+      pushToast('error', errorText(e, t))
+    },
   })
   const remove = useMutation({
     mutationFn: api.deleteSource,
@@ -93,13 +110,14 @@ export default function SourcesPage() {
   const isEmpty = !sources.isLoading && sources.data?.length === 0
 
   return (
-    <div>
+    <div aria-busy={isPending || create.isPending || sources.isFetching || undefined}>
       <PageHeader
         title={t('sources.title')}
         subtitle={t('sources.subtitle')}
+        back={{ label: t('common.backToList'), to: '/settings' }}
         actions={
           <>
-            <Button variant="ghost" onClick={() => fetchJob.mutate()} loading={isPending}>
+            <Button variant="ghost" onClick={() => fetchJob.mutate()} loading={isPending} disabled={isPending}>
               {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
             </Button>
             <Button
@@ -111,6 +129,8 @@ export default function SourcesPage() {
                 }
               }}
               disabled={isPending}
+              aria-expanded={open}
+              aria-controls={open ? 'source-create-form' : undefined}
             >
               {open ? t('common.cancel') : t('sources.addRss')}
             </Button>
@@ -141,15 +161,19 @@ export default function SourcesPage() {
           onTypeChange={onTypeChange}
           onShowMoreTypes={() => setShowMoreTypes(true)}
           onFieldChange={(key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }))}
+          onCancel={() => setOpen(false)}
           onSubmit={(config, sourceType) =>
             create.mutate({ name, type: sourceType, enabled: true, config })
           }
         />
       ) : null}
 
-      {sources.isLoading ? <StateBox>{t('sources.loading')}</StateBox> : null}
+      {sources.isLoading ? <ListSkeleton rows={5} /> : null}
       {sources.isError ? (
-        <StateBox>{t('common.loadFailed', { message: errorText(sources.error, t) })}</StateBox>
+        <QueryErrorState
+          message={t('common.loadFailed', { message: errorText(sources.error, t) })}
+          onRetry={() => void sources.refetch()}
+        />
       ) : null}
       {isEmpty && !open ? (
         <EmptyState
@@ -176,7 +200,10 @@ export default function SourcesPage() {
           sources={sources.data}
           locale={locale}
           fetchPending={isPending}
-          patchPending={patch.isPending}
+          testingSourceType={
+            isPending ? (fetchJob.variables?.sourceType ?? '*') : null
+          }
+          patchPendingId={patch.isPending ? (patch.variables?.id ?? null) : null}
           removePending={remove.isPending}
           onTestFetch={(sourceType) => fetchJob.mutate({ sourceType })}
           onToggleEnabled={(id, enabled) => patch.mutate({ id, body: { enabled } })}

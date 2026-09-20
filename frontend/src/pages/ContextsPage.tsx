@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type UserContext } from '../lib/api'
-import { Button, FormSaveBar, PageHeader, StateBox, useToast } from '../components/ui'
+import { Button, Field, FormSaveBar, Input, ListSkeleton, PageHeader, QueryErrorState, Textarea, useToast } from '../components/ui'
 import { errorText } from '../lib/errors'
+import { cn, focusRingClass } from '../lib/cn'
 
 function listToText(values?: string[]) {
   return (values ?? []).join(', ')
@@ -99,30 +100,54 @@ export default function ContextsPage() {
     setRawText(parsed.rawText)
   }
 
-  if (ctx.isLoading) return <StateBox>{t('contexts.loading')}</StateBox>
+  if (ctx.isLoading) return <ListSkeleton rows={4} />
   if (ctx.isError) {
-    return <StateBox>{t('common.loadFailed', { message: errorText(ctx.error, t) })}</StateBox>
+    return (
+      <QueryErrorState
+        message={t('common.loadFailed', { message: errorText(ctx.error, t) })}
+        onRetry={() => void ctx.refetch()}
+      />
+    )
   }
-  if (!payload) return <StateBox>{t('contexts.loading')}</StateBox>
+  if (!payload) return <ListSkeleton rows={4} />
 
   return (
     <div className="space-y-10">
-      <PageHeader title={t('contexts.title')} subtitle={t('contexts.subtitle')} />
+      <PageHeader
+        title={t('contexts.title')}
+        subtitle={t('contexts.subtitle')}
+        back={{ label: t('common.backToList'), to: '/settings' }}
+      />
 
-      <div className="space-y-6">
-        <section>
+      <div
+        className="space-y-6"
+        aria-busy={save.isPending || extract.isPending || importGithub.isPending || undefined}
+      >
+        <section aria-labelledby="context-intro-heading">
           <div className="space-y-4 rounded-xl border border-border bg-surface/70 p-4">
             <div>
-              <h3 className="mb-1 font-serif text-lg text-ink">{t('contexts.introTitle')}</h3>
-              <p className="mb-3 text-sm text-muted">{t('contexts.introHint')}</p>
-              <textarea
-                className="min-h-28 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+              <h3 id="context-intro-heading" className="mb-1 font-serif text-lg text-ink">
+                {t('contexts.introTitle')}
+              </h3>
+              <p id="context-intro-hint" className="mb-3 text-sm text-muted">
+                {t('contexts.introHint')}
+              </p>
+              <Textarea
+                className="min-h-28"
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
                 placeholder={t('contexts.extractPlaceholder')}
+                aria-label={t('contexts.introTitle')}
+                aria-describedby="context-intro-hint"
               />
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button type="button" variant="ghost" loading={extract.isPending} onClick={() => extract.mutate()}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  loading={extract.isPending}
+                  disabled={!rawText.trim() || extract.isPending}
+                  onClick={() => extract.mutate()}
+                >
                   {t('contexts.extract')}
                 </Button>
               </div>
@@ -132,10 +157,8 @@ export default function ContextsPage() {
               <h4 className="mb-1 text-sm font-medium text-ink">{t('contexts.understoodTitle')}</h4>
               <p className="mb-3 text-xs text-muted">{t('contexts.understoodHint')}</p>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="mb-1 block text-muted">{t('contexts.role')}</span>
-                  <input
-                    className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                <Field label={t('contexts.role')}>
+                  <Input
                     value={payload.profile?.role ?? ''}
                     onChange={(e) =>
                       setPayload({
@@ -144,53 +167,49 @@ export default function ContextsPage() {
                       })
                     }
                   />
-                </label>
-                <label className="block text-sm md:col-span-2">
-                  <span className="mb-1 block text-muted">{t('contexts.technologies')}</span>
-                  <input
-                    className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                </Field>
+                <Field label={t('contexts.technologies')} className="md:col-span-2">
+                  <Input
                     value={listToText(payload.technologies)}
                     onChange={(e) => setPayload({ ...payload, technologies: textToList(e.target.value) })}
                   />
-                </label>
-                <label className="block text-sm md:col-span-2">
-                  <span className="mb-1 block text-muted">{t('contexts.currentFocus')}</span>
-                  <input
-                    className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                </Field>
+                <Field label={t('contexts.currentFocus')} className="md:col-span-2">
+                  <Input
                     value={listToText(payload.current_focus)}
                     onChange={(e) =>
                       setPayload({ ...payload, current_focus: textToList(e.target.value), schemaVersion: 2 })
                     }
                   />
-                </label>
-                <label className="block text-sm md:col-span-2">
-                  <span className="mb-1 block text-muted">{t('contexts.explicitIgnore')}</span>
-                  <input
-                    className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                </Field>
+                <Field label={t('contexts.explicitIgnore')} className="md:col-span-2">
+                  <Input
                     value={listToText(payload.explicit_ignore)}
                     onChange={(e) =>
                       setPayload({ ...payload, explicit_ignore: textToList(e.target.value), schemaVersion: 2 })
                     }
                   />
-                </label>
+                </Field>
               </div>
             </div>
 
             <div className="border-t border-border pt-3">
               <button
                 type="button"
-                className="text-sm text-accent hover:underline"
+                className={cn(
+                  'inline-flex min-h-9 items-center rounded-sm text-sm text-accent hover:underline',
+                  focusRingClass(),
+                )}
                 onClick={() => setAdvancedOpen((o) => !o)}
                 aria-expanded={advancedOpen}
+                aria-controls="context-advanced-fields"
               >
                 {advancedOpen ? t('contexts.hideMore') : t('contexts.showMore')}
               </button>
               {advancedOpen ? (
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <label className="block text-sm md:col-span-2">
-                    <span className="mb-1 block text-muted">{t('contexts.summary')}</span>
-                    <input
-                      className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                <div id="context-advanced-fields" className="mt-4 grid gap-4 md:grid-cols-2">
+                  <Field label={t('contexts.summary')} className="md:col-span-2">
+                    <Input
                       value={payload.profile?.summary ?? ''}
                       onChange={(e) =>
                         setPayload({
@@ -199,27 +218,22 @@ export default function ContextsPage() {
                         })
                       }
                     />
-                  </label>
-                  <label className="block text-sm md:col-span-2">
-                    <span className="mb-1 block text-muted">{t('contexts.interests')}</span>
-                    <input
-                      className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                  </Field>
+                  <Field label={t('contexts.interests')} className="md:col-span-2">
+                    <Input
                       value={listToText(payload.interests)}
                       onChange={(e) => setPayload({ ...payload, interests: textToList(e.target.value) })}
                     />
-                  </label>
-                  <label className="block text-sm md:col-span-2">
-                    <span className="mb-1 block text-muted">{t('contexts.goals')}</span>
-                    <input
-                      className="w-full rounded-md border border-border bg-surface px-3 py-2"
+                  </Field>
+                  <Field label={t('contexts.goals')} className="md:col-span-2">
+                    <Input
                       value={listToText(payload.goals)}
                       onChange={(e) => setPayload({ ...payload, goals: textToList(e.target.value) })}
                     />
-                  </label>
-                  <label className="block text-sm md:col-span-2">
-                    <span className="mb-1 block text-muted">{t('contexts.projects')}</span>
-                    <textarea
-                      className="min-h-24 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                  </Field>
+                  <Field label={t('contexts.projects')} className="md:col-span-2">
+                    <Textarea
+                      className="min-h-24"
                       value={(payload.projects ?? [])
                         .map((p) => `${p.name ?? ''}${p.stack?.length ? ` [${p.stack.join(', ')}]` : ''}`)
                         .join('\n')}
@@ -241,18 +255,21 @@ export default function ContextsPage() {
                         })
                       }
                     />
-                  </label>
+                  </Field>
                   <div className="flex flex-wrap items-center gap-2 md:col-span-2">
-                    <input
-                      className="min-w-64 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                    <Input
+                      className="min-w-64 flex-1"
                       value={githubUrl}
                       onChange={(e) => setGithubUrl(e.target.value)}
                       placeholder="https://github.com/owner/repo"
+                      aria-label={t('contexts.importGithub')}
+                      disabled={importGithub.isPending}
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       loading={importGithub.isPending}
+                      disabled={!githubUrl.trim() || importGithub.isPending}
                       onClick={() => importGithub.mutate()}
                     >
                       {t('contexts.importGithub')}

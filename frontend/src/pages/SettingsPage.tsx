@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Settings } from '../lib/api'
-import { FormSaveBar, PageHeader, StateBox } from '../components/ui'
+import { FormSaveBar, ListSkeleton, PageHeader, QueryErrorState } from '../components/ui'
 import { useSettings, useSaveSettings } from '../hooks/useSettings'
 import { BasicsSection } from './settings/BasicsSection'
 import { NotifySection } from './settings/NotifySection'
@@ -22,6 +22,15 @@ export default function SettingsPage() {
 
   const discard = () => setDraft(null)
 
+  useEffect(() => {
+    if (settings.isLoading || settings.isError) return
+    if (window.location.hash !== '#notify') return
+    const el = document.getElementById('notify')
+    if (!el) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  }, [settings.isLoading, settings.isError])
+
   function saveSettings() {
     save.mutate(
       {
@@ -37,19 +46,30 @@ export default function SettingsPage() {
     )
   }
 
-  if (settings.isLoading) return <StateBox>{t('settings.loading')}</StateBox>
+  if (settings.isLoading) return <ListSkeleton rows={4} />
   if (settings.isError) {
-    return <StateBox>{t('common.loadFailed', { message: errorText(settings.error, t) })}</StateBox>
+    return (
+      <QueryErrorState
+        message={t('common.loadFailed', { message: errorText(settings.error, t) })}
+        onRetry={() => void settings.refetch()}
+      />
+    )
   }
 
   return (
     <div>
-      <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
+      <PageHeader
+        title={t('settings.title')}
+        subtitle={t('settings.subtitle')}
+        back={{ label: t('common.backToList'), to: '/settings' }}
+      />
       <form
         onSubmit={(e) => {
           e.preventDefault()
           saveSettings()
         }}
+        aria-label={t('settings.title')}
+        aria-busy={save.isPending || undefined}
         className="grid max-w-3xl gap-4"
       >
         <BasicsSection form={form} patch={patch} />

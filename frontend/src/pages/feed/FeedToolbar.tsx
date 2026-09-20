@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Focus, ChevronDown } from 'lucide-react'
 import { PRIMARY_RANGES, MORE_RANGES, type Range } from './feedQuery'
 import type { ExploreView } from '../../lib/engagement'
+import { focusRingClass } from '../../lib/cn'
 
 /** Search + light filters: time, unread, sources (CN-first). Low chrome for daily browse. */
 export function FeedToolbar({
@@ -48,9 +49,13 @@ export function FeedToolbar({
   const timeRanges = showMoreTime ? [...PRIMARY_RANGES, ...MORE_RANGES] : PRIMARY_RANGES
 
   return (
-    <div className="mb-4 space-y-2.5">
+    <div
+      role="toolbar"
+      aria-label={t('feed.toolbarLabel')}
+      className="sticky top-12 z-[9] mb-4 space-y-2.5 bg-bg/95 py-2 backdrop-blur-sm motion-reduce:backdrop-blur-none supports-[backdrop-filter]:bg-bg/80 motion-reduce:supports-[backdrop-filter]:bg-bg md:top-14 pt-[max(0px,env(safe-area-inset-top))]"
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
+        <div className="relative min-w-[200px] flex-1" role="search">
           <input
             id="feed-search-input"
             value={inputQ}
@@ -61,7 +66,8 @@ export function FeedToolbar({
               }
             }}
             placeholder={t('feed.searchPlaceholder')}
-            className="h-10 w-full rounded-full border border-border bg-surface px-4 pr-9 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/15"
+            aria-label={t('feed.searchPlaceholder')}
+            className="h-10 w-full rounded-full border border-border bg-surface px-4 pr-11 text-sm outline-none transition motion-reduce:transition-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/15"
           />
           {inputQ ? (
             <button
@@ -71,12 +77,14 @@ export function FeedToolbar({
                 onClearSearch()
                 document.getElementById('feed-search-input')?.focus()
               }}
-              className="absolute right-2.5 top-2 flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-border hover:text-ink"
+              className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:bg-border hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             >
-              ×
+              <span aria-hidden>×</span>
             </button>
           ) : (
-            <kbd className="absolute right-3 top-2.5">/</kbd>
+            <kbd className="absolute right-3 top-2.5" aria-hidden>
+              /
+            </kbd>
           )}
         </div>
         <div
@@ -86,7 +94,7 @@ export function FeedToolbar({
         >
           <button
             type="button"
-            className={`inline-flex items-center justify-center px-2.5 py-1.5 transition ${
+            className={`inline-flex min-h-9 min-w-9 items-center justify-center px-2.5 py-1.5 transition motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
               exploreView === 'waterfall'
                 ? 'bg-accent-soft text-accent'
                 : 'text-muted hover:bg-border hover:text-ink'
@@ -100,7 +108,7 @@ export function FeedToolbar({
           </button>
           <button
             type="button"
-            className={`inline-flex items-center justify-center px-2.5 py-1.5 transition ${
+            className={`inline-flex min-h-9 min-w-9 items-center justify-center px-2.5 py-1.5 transition motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
               exploreView === 'focus'
                 ? 'bg-accent-soft text-accent'
                 : 'text-muted hover:bg-border hover:text-ink'
@@ -113,7 +121,7 @@ export function FeedToolbar({
             <Focus size={14} aria-hidden />
           </button>
         </div>
-        <span className="font-mono text-xs text-muted">
+        <span className="font-mono text-xs text-muted" aria-live="polite">
           {searchMode ? t('feed.searchingFor', { q }) : t('feed.count', { count: total })}
           {unreadCount > 0 && !unreadOnly ? ` · ${t('feed.unreadInline', { count: unreadCount })}` : ''}
         </span>
@@ -121,6 +129,9 @@ export function FeedToolbar({
 
       <div
         className={`flex gap-1.5 overflow-x-auto pb-0.5 thin-scroll ${searchMode ? 'pointer-events-none opacity-45' : ''}`}
+        role="group"
+        aria-label={t('feed.filtersLabel')}
+        aria-disabled={searchMode || undefined}
         title={searchMode ? t('feed.searchFiltersDisabled') : undefined}
       >
         {timeRanges.map((r) => (
@@ -135,17 +146,20 @@ export function FeedToolbar({
             {t(`feed.range.${r}`)}
           </Chip>
         ))}
-        {!showMoreTime ? (
-          <button
-            type="button"
-            disabled={searchMode}
-            onClick={() => setShowMoreTime(true)}
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs text-muted hover:bg-border hover:text-ink disabled:opacity-40"
-          >
-            {t('feed.moreTime')}
-            <ChevronDown size={12} aria-hidden />
-          </button>
-        ) : null}
+        <button
+          type="button"
+          disabled={searchMode}
+          onClick={() => setShowMoreTime((v) => !v)}
+          aria-expanded={showMoreTime}
+          className={`inline-flex min-h-9 shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs text-muted hover:bg-border hover:text-ink disabled:opacity-40 ${focusRingClass()}`}
+        >
+          {showMoreTime ? t('feed.lessTime') : t('feed.moreTime')}
+          <ChevronDown
+            size={12}
+            aria-hidden
+            className={showMoreTime ? 'rotate-180 transition motion-reduce:transition-none' : 'transition motion-reduce:transition-none'}
+          />
+        </button>
         <Chip
           shape="pill"
           active={unreadOnly}

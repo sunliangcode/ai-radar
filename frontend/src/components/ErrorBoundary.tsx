@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Component, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from './primitives/Button'
 
@@ -27,18 +27,32 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
 
 function ErrorFallback({ error, onReset }: { error: Error; onReset: () => void }) {
   const { t } = useTranslation()
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [])
+
   return (
     <div
       role="alert"
       className="rounded-lg border border-ember/40 bg-surface px-5 py-8 text-center text-sm"
     >
-      <h2 className="text-lg font-medium text-ink">{t('common.crashTitle')}</h2>
+      <h1
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-lg font-medium text-ink outline-none"
+      >
+        {t('common.crashTitle')}
+      </h1>
       <p className="mx-auto mt-2 max-w-md text-muted">{t('common.crashHint')}</p>
       <pre className="mx-auto mt-3 max-w-xl overflow-x-auto rounded bg-border/40 px-3 py-2 text-left text-xs text-muted">
         {error.message || String(error)}
       </pre>
-      <div className="mt-4 flex flex-wrap justify-center gap-3">
+      <div className="mt-4 flex flex-wrap justify-center gap-3" role="group" aria-label={t('common.crashTitle')}>
+        <Button onClick={onReset}>{t('common.retry')}</Button>
         <Button
+          variant="ghost"
           onClick={() => {
             onReset()
             window.location.assign('/')

@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMemo } from 'react'
 import { api, type DecisionRecord } from '../lib/api'
-import { ListSkeleton, PageHeader, StateBox } from '../components/ui'
+import { ListSkeleton, PageHeader, QueryErrorState, EmptyState } from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
 import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { dateLocale } from '../i18n'
+import { cn, focusRingClass } from '../lib/cn'
 
 function kindLabel(kind: string, t: (key: string) => string) {
   switch (kind) {
@@ -35,43 +36,57 @@ function DecisionRow({
 }) {
   const { t } = useTranslation()
   return (
-    <li
-      className={
-        emphasize
-          ? 'rounded-xl border border-moss/30 bg-moss/5 px-4 py-3'
-          : 'rounded-lg border border-border px-4 py-3'
-      }
-    >
-      <p className="font-medium text-ink">{d.changeTitle ?? t('decisions.untitled')}</p>
-      <dl className="mt-2 grid gap-1 text-sm sm:grid-cols-[5rem_1fr]">
-        <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">{t('decisions.fieldDecision')}</dt>
-        <dd className="text-ink">{kindLabel(d.kind, t)}</dd>
-        {d.reason ? (
-          <>
-            <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">{t('decisions.fieldWhy')}</dt>
-            <dd className="text-muted">{d.reason}</dd>
-          </>
-        ) : null}
-        {d.revisitAt ? (
-          <>
-            <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">{t('decisions.fieldReview')}</dt>
-            <dd className={emphasize ? 'text-moss' : 'text-muted'}>
-              {new Date(d.revisitAt).toLocaleDateString(locale)}
-            </dd>
-          </>
-        ) : null}
-      </dl>
-      {emphasize && (d.updatesSinceDecision ?? 0) > 0 ? (
-        <p className="mt-2 text-xs text-muted">
-          {t('decisions.updatesSince', { count: d.updatesSinceDecision ?? 0 })}
-        </p>
-      ) : null}
+    <li>
       <Link
         to={`/changes/${d.changeId}`}
         state={{ from: '/decisions' }}
-        className={`mt-2 inline-block text-sm hover:underline ${emphasize ? 'text-moss' : 'text-accent'}`}
+        aria-label={`${d.changeTitle ?? t('decisions.untitled')} — ${kindLabel(d.kind, t)}`}
+        className={cn(
+          'block px-4 py-3 transition motion-reduce:transition-none hover:border-accent/40',
+          focusRingClass(),
+          emphasize
+            ? 'rounded-xl border border-moss/30 bg-moss/5'
+            : 'rounded-lg border border-border bg-surface',
+        )}
       >
-        {t('decisions.relatedChange')} →
+        <p className="font-medium text-ink">{d.changeTitle ?? t('decisions.untitled')}</p>
+        <dl className="mt-2 grid gap-1 text-sm sm:grid-cols-[5rem_1fr]">
+          <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">
+            {t('decisions.fieldDecision')}
+          </dt>
+          <dd className="text-ink">{kindLabel(d.kind, t)}</dd>
+          {d.reason ? (
+            <>
+              <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">
+                {t('decisions.fieldWhy')}
+              </dt>
+              <dd className="text-muted">{d.reason}</dd>
+            </>
+          ) : null}
+          {d.revisitAt ? (
+            <>
+              <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">
+                {t('decisions.fieldReview')}
+              </dt>
+              <dd className={emphasize ? 'text-moss' : 'text-muted'}>
+                {new Date(d.revisitAt).toLocaleDateString(locale)}
+              </dd>
+            </>
+          ) : null}
+        </dl>
+        {emphasize && (d.updatesSinceDecision ?? 0) > 0 ? (
+          <p className="mt-2 text-xs text-muted">
+            {t('decisions.updatesSince', { count: d.updatesSinceDecision ?? 0 })}
+          </p>
+        ) : null}
+        <span
+          className={cn(
+            'mt-2 inline-block text-sm',
+            emphasize ? 'text-moss' : 'text-accent',
+          )}
+        >
+          {t('decisions.relatedChange')} →
+        </span>
       </Link>
     </li>
   )
@@ -94,14 +109,33 @@ export default function DecisionsPage() {
   )
 
   return (
-    <div>
+    <div aria-busy={q.isFetching || due.isFetching || undefined}>
       <PageHeader title={t('decisions.title')} subtitle={t('decisions.subtitle')} />
+
+      {due.isError ? (
+        <div className="mb-6">
+          <QueryErrorState
+            message={t('common.loadFailed', { message: errorText(due.error, t) })}
+            onRetry={() => void due.refetch()}
+          />
+        </div>
+      ) : null}
+
+      {due.isLoading ? (
+        <div className="mb-8">
+          <ListSkeleton rows={2} />
+        </div>
+      ) : null}
+
       {dueRows.length > 0 ? (
-        <section className="mb-8">
-          <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-moss">
+        <section className="mb-8" aria-labelledby="decisions-due-heading">
+          <h2
+            id="decisions-due-heading"
+            className="mb-3 font-mono text-xs uppercase tracking-widest text-moss"
+          >
             {t('decisions.dueSection')}
           </h2>
-          <ul className="space-y-3">
+          <ul className="space-y-3" aria-busy={due.isFetching || undefined}>
             {dueRows.map((d) => (
               <DecisionRow key={d.id} d={d} locale={locale} emphasize />
             ))}
@@ -110,20 +144,46 @@ export default function DecisionsPage() {
       ) : null}
 
       {q.isLoading ? <ListSkeleton rows={4} /> : null}
-      {q.isError ? <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox> : null}
+      {q.isError ? (
+        <QueryErrorState
+          message={t('common.loadFailed', { message: errorText(q.error, t) })}
+          onRetry={() => void q.refetch()}
+        />
+      ) : null}
 
-      <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-muted">
-        {t('decisions.openSection')}
-      </h2>
-      {openRows.length ? (
-        <ul className="space-y-2">
-          {openRows.map((d) => (
-            <DecisionRow key={d.id} d={d} locale={locale} />
-          ))}
-        </ul>
-      ) : (
-        !q.isLoading && <StateBox>{t('decisions.empty')}</StateBox>
-      )}
+      <section aria-labelledby="decisions-open-heading">
+        <h2
+          id="decisions-open-heading"
+          className="mb-3 font-mono text-xs uppercase tracking-widest text-muted"
+        >
+          {t('decisions.openSection')}
+        </h2>
+        {openRows.length ? (
+          <ul className="space-y-2" aria-busy={q.isFetching || undefined}>
+            {openRows.map((d) => (
+              <DecisionRow key={d.id} d={d} locale={locale} />
+            ))}
+          </ul>
+        ) : (
+          !q.isLoading && (
+            <EmptyState
+              title={t('decisions.empty')}
+              description={t('decisions.emptyHint')}
+              primary={
+                <Link
+                  to="/radar"
+                  className={cn(
+                    'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                    focusRingClass(),
+                  )}
+                >
+                  {t('decisions.browseRadar')}
+                </Link>
+              }
+            />
+          )
+        )}
+      </section>
     </div>
   )
 }

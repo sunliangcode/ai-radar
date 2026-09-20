@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Item } from '../../lib/api'
 import {
-  Button,
   EmptyState,
   ImmersiveDrawer,
   ItemDetailBody,
@@ -11,11 +10,12 @@ import {
   MagAction,
   MagCard,
   MagGrid,
+  QueryErrorState,
   SourceBadge,
-  StateBox,
 } from '../../components/ui'
 import { timeAgo } from '../../components/magazine/timeAgo'
 import { errorText } from '../../lib/errors'
+import { cn, focusRingClass } from '../../lib/cn'
 
 function scoreTier(score?: number): string | undefined {
   if (score == null) return undefined
@@ -50,35 +50,41 @@ export function SavedItemsSection({
   const drawerItem = items.find((i) => i.id === drawerId) ?? null
 
   return (
-    <section>
+    <section aria-labelledby="watching-saved-heading" aria-busy={patchPending || undefined}>
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-base font-semibold text-ink">{t('watching.savedItems')}</h2>
-        <span className="font-mono text-xs text-muted">
+        <h2 id="watching-saved-heading" className="text-base font-semibold text-ink">
+          {t('watching.savedItems')}
+        </h2>
+        <span className="font-mono text-xs text-muted" aria-live="polite">
           {t('watching.savedCount', { count: items.length })}
         </span>
       </div>
       {loading ? <ListSkeleton rows={3} /> : null}
       {error ? (
-        <StateBox>
-          <p className="mb-3">{t('common.loadFailed', { message: errorText(error, t) })}</p>
-          <Button variant="ghost" onClick={onRetry}>
-            {t('common.retry')}
-          </Button>
-        </StateBox>
+        <QueryErrorState
+          message={t('common.loadFailed', { message: errorText(error, t) })}
+          onRetry={onRetry}
+        />
       ) : null}
       {!loading && !error && items.length === 0 ? (
         <EmptyState
           title={t('watching.noSaved')}
           description={t('watching.noSavedHint')}
           primary={
-            <Link to="/feed">
-              <Button>{t('watching.goFeed')}</Button>
+            <Link
+              to="/radar"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                focusRingClass(),
+              )}
+            >
+              {t('watching.goRadar')}
             </Link>
           }
         />
       ) : null}
       {!error && items.length > 0 ? (
-        <MagGrid dimmed={drawerId != null}>
+        <MagGrid dimmed={drawerId != null} aria-label={t('watching.savedItems')}>
           {items.map((item) => (
             <MagCard
               key={item.id}
@@ -109,6 +115,7 @@ export function SavedItemsSection({
                   disabled={patchPending}
                   onClick={() => onUnsave(item.id)}
                   tone="ember"
+                  title={t('watching.unsave')}
                 >
                   {t('watching.unsave')}
                 </MagAction>
@@ -153,7 +160,10 @@ export function SavedItemsSection({
               onClick={() => {
                 if (!drawerItem.read) onMarkRead(drawerItem.id)
               }}
-              className="inline-flex items-center rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+              className={cn(
+                'inline-flex min-h-9 items-center rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90',
+                focusRingClass('none'),
+              )}
             >
               {t('feed.openOriginal')} ↗
             </a>

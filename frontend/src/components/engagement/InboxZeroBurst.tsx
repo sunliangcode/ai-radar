@@ -33,6 +33,7 @@ export function InboxZeroBurst({
         className,
       )}
       role="status"
+      aria-labelledby="inbox-zero-title"
     >
       {!reduceMotion
         ? Array.from({ length: PARTICLE_COUNT }, (_, i) => (
@@ -50,7 +51,7 @@ export function InboxZeroBurst({
             />
           ))
         : null}
-      <p className="relative font-serif text-xl text-ink md:text-2xl">
+      <p id="inbox-zero-title" className="relative font-serif text-xl text-ink md:text-2xl">
         {title ?? t('fun.inboxZeroTitle')}
       </p>
       <p className="relative mt-2 text-sm text-muted">{subtitle ?? t('fun.inboxZeroSubtitle')}</p>

@@ -20,5 +20,7 @@ public enum SourceType {
     JUEJIN,
     WEIBO,
     BILIBILI,
-    CSDN
+    CSDN,
+    /** Self-hosted DailyHotApi hot lists (weibo/zhihu/baidu/…). */
+    DAILY_HOT
 }

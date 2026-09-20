@@ -1,4 +1,9 @@
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ConnectorConfigField } from '../../lib/api'
+import { Input } from '../../components/primitives/Input'
+import { Textarea } from '../../components/primitives/Textarea'
+import { textLinkClass } from '../../lib/cn'
 
 /** Shared config field control — secret fields get textarea + clipboard paste. */
 export function SourceConfigFieldInput({
@@ -12,16 +17,25 @@ export function SourceConfigFieldInput({
   onChange: (value: string) => void
   pasteLabel: string
 }) {
+  const { t } = useTranslation()
+  const [pasteStatus, setPasteStatus] = useState<'ok' | 'fail' | null>(null)
   const isSecret = field.type === 'secret' || field.key.toLowerCase().includes('cookie')
   const isMultiline =
     isSecret || field.key.toLowerCase().includes('prompt') || field.type === 'textarea'
 
   async function pasteFromClipboard() {
+    setPasteStatus(null)
     try {
       const text = await navigator.clipboard.readText()
-      if (text?.trim()) onChange(text.trim())
+      if (text?.trim()) {
+        onChange(text.trim())
+        setPasteStatus('ok')
+      } else {
+        setPasteStatus('fail')
+      }
     } catch {
       // Clipboard permission denied — user can still paste manually.
+      setPasteStatus('fail')
     }
   }
 
@@ -35,16 +49,17 @@ export function SourceConfigFieldInput({
         {isSecret ? (
           <button
             type="button"
-            className="shrink-0 text-xs text-moss underline underline-offset-2"
+            className={`inline-flex min-h-9 shrink-0 items-center text-xs ${textLinkClass('moss')}`}
             onClick={() => void pasteFromClipboard()}
+            aria-label={`${pasteLabel}: ${field.label}`}
           >
             {pasteLabel}
           </button>
         ) : null}
       </span>
       {isMultiline ? (
-        <textarea
-          className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs"
+        <Textarea
+          className="mt-1 font-mono text-xs"
           rows={isSecret ? 4 : 3}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -54,14 +69,23 @@ export function SourceConfigFieldInput({
           placeholder={isSecret ? 'name=value; name2=value2; …' : undefined}
         />
       ) : (
-        <input
-          className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2"
+        <Input
+          className="mt-1"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required={field.required}
           autoComplete={isSecret ? 'off' : undefined}
         />
       )}
+      {pasteStatus ? (
+        <span
+          role="status"
+          aria-live="polite"
+          className={`mt-1 block text-xs ${pasteStatus === 'ok' ? 'text-moss' : 'text-ember'}`}
+        >
+          {pasteStatus === 'ok' ? t('sources.pasteOk') : t('sources.pasteFail')}
+        </span>
+      ) : null}
     </label>
   )
 }

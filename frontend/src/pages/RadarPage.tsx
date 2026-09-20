@@ -31,7 +31,8 @@ export default function RadarPage() {
 
   if (view === 'signals') {
     return (
-      <div>
+      <div aria-busy={isPending || undefined}>
+        <h1 className="sr-only">{t('radar.title')}</h1>
         <RadarModeBar view={view} filter={filter} onView={setView} onFilter={setFilter} />
         <FeedSignalsPage forceUnread={filter === 'unread'} hideTitle />
       </div>
@@ -39,10 +40,10 @@ export default function RadarPage() {
   }
 
   return (
-    <div>
+    <div aria-busy={isPending || undefined}>
       <RadarPageHeader />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Button onClick={() => fetchJob.mutate(undefined)} loading={isPending}>
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={t('radar.title')}>
+        <Button onClick={() => fetchJob.mutate(undefined)} loading={isPending} disabled={isPending}>
           {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
         </Button>
         <Link to="/settings/sources" className={buttonVariants({ variant: 'ghost' })}>
@@ -62,7 +63,11 @@ export default function RadarPage() {
         onChange={setChangeQ}
         placeholder={t('radar.searchPlaceholder')}
       />
-      <RadarChangesPanel followingOnly={filter === 'following'} searchQ={changeQ} />
+      <RadarChangesPanel
+        followingOnly={filter === 'following'}
+        searchQ={changeQ}
+        onClearSearch={() => setChangeQ('')}
+      />
     </div>
   )
 }

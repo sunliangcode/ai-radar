@@ -15,7 +15,7 @@
     "type": "RSS",
     "name": "36氪",
     "defaultEnabled": true,
-    "config": { "feedUrl": "https://36kr.com/feed" }
+    "config": { "feedUrl": "https://www.36kr.com/feed" }
   },
   {
     "type": "RSS",
@@ -48,15 +48,81 @@
     "config": { "feedUrl": "https://rsshub.umzzz.com/jike/topic/577c5a122fa95b1100da059f" }
   },
   {
+    "type": "RSS",
+    "name": "虎嗅",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://rss.huxiu.com/" }
+  },
+  {
+    "type": "RSS",
+    "name": "InfoQ 中国",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.infoq.cn/feed" }
+  },
+  {
+    "type": "RSS",
+    "name": "钛媒体",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.tmtpost.com/feed" }
+  },
+  {
+    "type": "RSS",
+    "name": "雷峰网",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.leiphone.com/feed" }
+  },
+  {
+    "type": "RSS",
+    "name": "掘金",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://juejin.cn/rss" }
+  },
+  {
+    "type": "RSS",
+    "name": "新浪科技",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://rss.sina.com.cn/tech/rollnews.xml" }
+  },
+  {
+    "type": "RSS",
+    "name": "人人都是产品经理",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.woshipm.com/feed" }
+  },
+  {
+    "type": "RSS",
+    "name": "HelloGitHub",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://hellogithub.com/rss" }
+  },
+  {
+    "type": "RSS",
+    "name": "SegmentFault",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://segmentfault.com/feeds" }
+  },
+  {
+    "type": "RSS",
+    "name": "数英",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.digitaling.com/rss" }
+  },
+  {
+    "type": "RSS",
+    "name": "数字尾巴",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.dgtle.com/rss/dgtle.xml" }
+  },
+  {
     "type": "GOOGLE_NEWS",
     "name": "Google News 科技 CN",
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "config": { "query": "人工智能 OR 大模型 OR AI", "hl": "zh-CN", "gl": "CN", "ceid": "CN:zh-Hans", "maxResults": 25 }
   },
   {
     "type": "V2EX",
     "name": "V2EX create/share",
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "config": { "nodes": ["create", "share", "programmer"], "limit": 20 }
   },
   {
@@ -68,7 +134,7 @@
   {
     "type": "ZHIHU",
     "name": "知乎推荐",
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "config": {
       "cliPath": "zhihu",
       "limit": 5,
@@ -78,13 +144,13 @@
   {
     "type": "WEIBO",
     "name": "微博热搜",
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "config": { "cliPath": "weibo", "limit": 20 }
   },
   {
     "type": "BILIBILI",
     "name": "B站热门",
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "config": { "cliPath": "bili", "limit": 20 }
   },
   {

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { ImpactCard } from '../../lib/api'
 import { Button, StatusBadge } from '../ui'
+import { cn, textLinkClass } from '../../lib/cn'
 
 function tierDot(tier?: string) {
   const t = (tier ?? '').toUpperCase()
@@ -30,7 +31,10 @@ export function ChangeCard({
   const timeline = card.recentTimeline ?? []
 
   return (
-    <article className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+    <article
+      className="rounded-xl border border-border bg-surface p-5 shadow-sm"
+      aria-busy={busy || undefined}
+    >
       <div className="mb-3 flex flex-wrap items-start gap-2">
         <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${tierDot(card.tier)}`} aria-hidden />
         <div className="min-w-0 flex-1">
@@ -45,7 +49,7 @@ export function ChangeCard({
           <Link
             to={`/changes/${changeId}`}
             state={{ from: '/' }}
-            className="text-xs text-accent hover:underline"
+            className={cn('inline-flex min-h-9 items-center text-xs', textLinkClass())}
           >
             {t('today.openChange')} →
           </Link>
@@ -85,7 +89,12 @@ export function ChangeCard({
         </section>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+      <div
+        className="flex flex-wrap gap-2 border-t border-border pt-4"
+        role="group"
+        aria-label={card.title}
+        aria-busy={busy || undefined}
+      >
         <Button variant="ghost" size="sm" onClick={onDecide} disabled={busy}>
           {t('today.decide')}
         </Button>

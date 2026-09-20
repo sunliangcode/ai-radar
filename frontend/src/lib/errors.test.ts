@@ -9,6 +9,12 @@ describe('errorText', () => {
     expect(errorText(new ApiError(0, 'network', 'Failed to fetch'), t)).toBe('t:common.networkError')
   })
 
+  it('sanitizes JVM connection chains from chat/LLM failures', () => {
+    expect(
+      errorText(new ApiError(500, 'error', 'ConnectException <- ClosedChannelException'), t),
+    ).toBe('t:common.llmUnavailable')
+  })
+
   it('keeps the server-provided message for real API errors', () => {
     expect(errorText(new ApiError(500, 'internal_error', 'boom'), t)).toBe('boom')
   })

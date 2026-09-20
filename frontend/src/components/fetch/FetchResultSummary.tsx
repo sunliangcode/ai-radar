@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FetchProgress, FetchSourceProgress } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
@@ -21,6 +22,18 @@ export function FetchResultSummary({
   retrying?: boolean
 }) {
   const { t } = useTranslation()
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      const target = e.target as HTMLElement | null
+      if (target?.closest?.('dialog,[role="dialog"],[role="alertdialog"]')) return
+      onDismiss()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onDismiss])
+
   if (!progress) return null
 
   const failed = progress.sources?.filter((s) => s.status === 'error') ?? []
@@ -33,7 +46,11 @@ export function FetchResultSummary({
     : t('fetchProgress.summary.titleDone')
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-border bg-surface/90">
+    <div
+      className="mb-6 overflow-hidden rounded-xl border border-border bg-surface/90"
+      role={isError || failedCount > 0 ? 'alert' : 'status'}
+      aria-live={isError || failedCount > 0 ? 'assertive' : 'polite'}
+    >
       <div className="border-b border-border/80 px-5 py-5">
         <h3 className="font-serif text-2xl text-ink">{title}</h3>
         <p className="mt-2 font-mono text-sm text-muted">
@@ -59,8 +76,8 @@ export function FetchResultSummary({
             <li key={source.id} className="flex items-start gap-3 px-5 py-3.5">
               <span
                 className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${statusDot(source.status)}`}
-                title={source.status}
-                aria-label={source.status}
+                title={t(`fetchProgress.status.${source.status}`, { defaultValue: source.status })}
+                aria-label={t(`fetchProgress.status.${source.status}`, { defaultValue: source.status })}
               />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
@@ -99,7 +116,9 @@ export function FetchResultSummary({
             {t('fetchProgress.summary.retryFailed')}
           </Button>
         ) : null}
-        <Button onClick={onDismiss}>{t('fetchProgress.summary.dismiss')}</Button>
+        <Button onClick={onDismiss} title={`${t('fetchProgress.summary.dismiss')} (Esc)`}>
+          {t('fetchProgress.summary.dismiss')}
+        </Button>
       </div>
     </div>
   )

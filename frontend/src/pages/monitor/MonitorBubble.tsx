@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useTranslation } from 'react-i18next'
 import { formatAiMonitorBody } from '../../lib/formatAiMonitorBody'
@@ -33,6 +33,9 @@ export function MonitorBubble({
   return (
     <div
       className={`mb-4 flex ${isInput ? 'justify-end' : 'justify-start'}`}
+      role="article"
+      aria-label={`${isInput ? t('settings.monitorYou') : t('settings.monitorAssistant')} · ${entry.operation}`}
+      aria-busy={entry.pending || undefined}
     >
       <div
         className={`max-w-[min(92%,36rem)] ${
@@ -54,7 +57,7 @@ export function MonitorBubble({
           <span className="font-mono text-[11px] text-muted">{entry.operation}</span>
           <span className="text-[11px] text-muted/70">{formatClock(entry.at)}</span>
           {entry.pending ? (
-            <span className="animate-pulse text-[11px] text-accent">
+            <span className="animate-pulse text-[11px] text-accent motion-reduce:animate-none">
               {entry.streaming
                 ? t('settings.monitorIoStreaming')
                 : t('settings.monitorIoWaiting')}
@@ -88,14 +91,19 @@ export function MonitorBubble({
         {!isInput && entry.body && entry.body !== '—' ? (
           <button
             type="button"
-            className="px-1 text-[11px] text-muted underline-offset-2 hover:text-accent hover:underline"
+            className="inline-flex min-h-9 items-center rounded-sm px-1 text-[11px] text-muted underline-offset-2 hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             onClick={onToggleRaw}
+            aria-expanded={showRaw}
+            aria-controls={`monitor-raw-${entry.key}`}
           >
             {showRaw ? t('settings.monitorHideRaw') : t('settings.monitorShowRaw')}
           </button>
         ) : null}
         {!isInput && showRaw && entry.body ? (
-          <pre className="max-h-40 w-full overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-surface/90 p-2 font-mono text-[11px] text-muted">
+          <pre
+            id={`monitor-raw-${entry.key}`}
+            className="max-h-40 w-full overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-surface/90 p-2 font-mono text-[11px] text-muted"
+          >
             {entry.body}
           </pre>
         ) : null}
@@ -115,6 +123,7 @@ export function HistoryBody({
 }) {
   const { t } = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
+  const rawId = useId()
   const formatted = formatAiMonitorBody(body || '—', { kind, operation })
   return (
     <div>
@@ -125,13 +134,18 @@ export function HistoryBody({
         <>
           <button
             type="button"
-            className="mb-1 text-[11px] text-muted underline-offset-2 hover:text-accent hover:underline"
+            className="mb-1 inline-flex min-h-9 items-center rounded-sm text-[11px] text-muted underline-offset-2 hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             onClick={() => setShowRaw((v) => !v)}
+            aria-expanded={showRaw}
+            aria-controls={rawId}
           >
             {showRaw ? t('settings.monitorHideRaw') : t('settings.monitorShowRaw')}
           </button>
           {showRaw ? (
-            <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border p-2 font-mono text-[11px] text-muted">
+            <pre
+              id={rawId}
+              className="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border p-2 font-mono text-[11px] text-muted"
+            >
               {body}
             </pre>
           ) : null}

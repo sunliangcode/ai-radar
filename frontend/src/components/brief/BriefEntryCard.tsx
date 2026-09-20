@@ -1,8 +1,9 @@
 import { ExternalLink } from 'lucide-react'
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { BriefEntry } from '../../lib/parseBriefMarkdown'
 import { ScorePill } from '../score/ScorePill'
-import { cn } from '../../lib/cn'
+import { cn, focusRingClass, textLinkClass } from '../../lib/cn'
 
 function formatPublished(iso: string | undefined, locale: string): string | null {
   if (!iso) return null
@@ -28,6 +29,7 @@ export function BriefEntryCard({
   className?: string
 }) {
   const { t } = useTranslation()
+  const titleId = useId()
   const published = formatPublished(entry.published, locale)
   const tags = entry.tags.slice(0, 4)
   const tagOverflow = entry.tags.length - tags.length
@@ -39,6 +41,7 @@ export function BriefEntryCard({
         entry.rank <= 3 && variant === 'item' && 'brief-entry--top',
         className,
       )}
+      aria-labelledby={titleId}
     >
       <div className="flex items-start gap-3">
         <span
@@ -49,13 +52,17 @@ export function BriefEntryCard({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <h3 className="text-base font-semibold leading-snug text-ink md:text-[1.05rem]">
+            <h3 id={titleId} className="text-base font-semibold leading-snug text-ink md:text-[1.05rem]">
+              <span className="sr-only">{entry.rank}. </span>
               {entry.url ? (
                 <a
                   href={entry.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-accent transition-colors"
+                  className={cn(
+                    'rounded-sm transition-colors hover:text-accent motion-reduce:transition-none',
+                    focusRingClass(),
+                  )}
                 >
                   {entry.title}
                 </a>
@@ -110,14 +117,14 @@ export function BriefEntryCard({
           ) : null}
 
           {entry.evidence.length > 0 ? (
-            <ul className="mt-3 space-y-1.5">
+            <ul className="mt-3 space-y-1.5" aria-label={t('home.evidence')}>
               {entry.evidence.map((ev) => (
                 <li key={ev.url}>
                   <a
                     href={ev.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-accent underline-offset-2 hover:underline"
+                    className={`inline-flex min-h-8 items-center gap-1 text-xs ${textLinkClass()}`}
                   >
                     {ev.title}
                     <ExternalLink className="h-3 w-3" aria-hidden />
@@ -140,7 +147,10 @@ export function BriefEntryCard({
                 href={entry.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-bg px-2.5 py-1 text-xs font-medium text-ink transition hover:border-accent/40 hover:text-accent"
+                className={cn(
+                  'inline-flex min-h-9 items-center gap-1 rounded-md border border-border bg-bg px-2.5 py-1 text-xs font-medium text-ink transition hover:border-accent/40 hover:text-accent motion-reduce:transition-none',
+                  focusRingClass(),
+                )}
               >
                 {t('briefs.openOriginal')}
                 <ExternalLink className="h-3 w-3" aria-hidden />

@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import { errorText } from '../../lib/errors'
+import { cn, textLinkClass } from '../../lib/cn'
+import { Button } from '../ui'
 
 /** Lazy-loaded item body for the immersive drawer (Zhihu HTML or plain text). */
 export function ItemDetailBody({
@@ -22,12 +24,13 @@ export function ItemDetailBody({
 
   if (detail.isLoading) {
     return (
-      <div className="space-y-2" aria-busy="true">
+      <div className="space-y-2" aria-busy="true" aria-live="polite">
+        <span className="sr-only">{t('common.loading')}</span>
         {lead ? <p className="mb-2 text-sm leading-relaxed text-ink/90">{lead}</p> : null}
-        <div className="skeleton h-4 w-2/3" />
-        <div className="skeleton h-4 w-full" />
-        <div className="skeleton h-4 w-5/6" />
-        <div className="skeleton h-4 w-4/6" />
+        <div className="skeleton h-4 w-2/3" aria-hidden />
+        <div className="skeleton h-4 w-full" aria-hidden />
+        <div className="skeleton h-4 w-5/6" aria-hidden />
+        <div className="skeleton h-4 w-4/6" aria-hidden />
       </div>
     )
   }
@@ -36,9 +39,18 @@ export function ItemDetailBody({
     return (
       <>
         {lead ? <p className="mb-4 text-sm leading-relaxed text-ink/90">{lead}</p> : null}
-        <p className="text-xs text-ember">
-          {t('feed.detailError')} {errorText(detail.error, t)}
-        </p>
+        <div role="alert" className="rounded-lg border border-dashed border-border bg-surface px-3 py-4">
+          <p className="text-xs text-ember">
+            {t('feed.detailError')} {errorText(detail.error, t)}
+          </p>
+          <Button
+            variant="ghost"
+            className="mt-2"
+            onClick={() => void detail.refetch()}
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
       </>
     )
   }
@@ -78,14 +90,20 @@ export function ItemDetailBody({
         </div>
         <div
           className="zhihu-html max-h-[min(60vh,520px)] overflow-y-auto pr-1 text-sm leading-[1.75]"
+          role="region"
+          aria-label={t('feed.readInRadar')}
           dangerouslySetInnerHTML={{ __html: data.html ?? '' }}
         />
         {comments.length > 0 ? (
           <div className="mt-4 border-t border-border pt-3">
-            <p className="mb-2 text-xs font-medium text-muted">
+            <p id="item-detail-comments-heading" className="mb-2 text-xs font-medium text-muted">
               {t('feed.commentsTitle', { count: comments.length })}
             </p>
-            <ul className="space-y-2.5">
+            <ul
+              id="item-detail-comments"
+              aria-labelledby="item-detail-comments-heading"
+              className="space-y-2.5"
+            >
               {visibleComments.map((c, i) => (
                 <li key={i} className="text-xs leading-relaxed">
                   <span className="font-medium text-ink">{c.author}</span>
@@ -96,8 +114,10 @@ export function ItemDetailBody({
             {comments.length > 3 ? (
               <button
                 type="button"
+                aria-expanded={showAllComments}
+                aria-controls="item-detail-comments"
                 onClick={() => setShowAllComments((v) => !v)}
-                className="mt-2 text-xs text-accent hover:underline"
+                className={cn('mt-2 inline-flex min-h-9 items-center text-xs', textLinkClass())}
               >
                 {showAllComments
                   ? t('feed.collapseComments')

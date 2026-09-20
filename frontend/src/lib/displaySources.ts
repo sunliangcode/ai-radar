@@ -10,6 +10,7 @@ export const DOMESTIC_SOURCE_TYPES = new Set([
   'ZHIHU',
   'WEIBO',
   'BILIBILI',
+  'DAILY_HOT',
   'V2EX',
   'RSS',
   'GOOGLE_NEWS',

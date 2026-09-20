@@ -38,8 +38,15 @@ export function FeedbackBar({
   })
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 text-[11px] text-muted">{t('feedback.label')}</span>
+    <div
+      className="mt-3 flex flex-wrap items-center gap-1.5"
+      role="group"
+      aria-label={t('feedback.label')}
+      aria-busy={feedback.isPending || undefined}
+    >
+      <span className="mr-1 text-[11px] text-muted" aria-hidden>
+        {t('feedback.label')}
+      </span>
       {KINDS.map((kind) => {
         const active = activeKind === kind
         return (
@@ -48,7 +55,7 @@ export function FeedbackBar({
             shape="pill"
             tone={kind === 'ignore' ? 'danger' : 'default'}
             active={active}
-            disabled={feedback.isPending}
+            disabled={feedback.isPending || active}
             onClick={() => feedback.mutate(kind)}
           >
             {t(`feedback.${kind}`)}
@@ -56,12 +63,12 @@ export function FeedbackBar({
         )
       })}
       {feedback.isSuccess ? (
-        <span className="self-center text-xs text-moss" role="status">
+        <span className="self-center text-xs text-moss" role="status" aria-live="polite">
           {t('feedback.saved')}
         </span>
       ) : null}
       {feedback.isError ? (
-        <span className="self-center text-xs text-ember" role="status">
+        <span className="self-center text-xs text-ember" role="alert">
           {errorText(feedback.error, t)}
         </span>
       ) : null}

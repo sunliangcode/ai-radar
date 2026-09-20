@@ -6,6 +6,93 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Frontend UX polish**: keyboard `focus-visible` rings on Button/Chip/nav/toolbar; MagCard roving tabindex (j/k stays primary); shared `QueryErrorState` with Retry on Today/Radar/Sources/Feed/Decisions/Actions/Settings; Toast dismiss + assertive errors; Sources create toast + optimistic enable toggle; `prefers-reduced-motion` covers skeleton/spinner; ListSkeleton announces loading to AT
+- **Frontend UX (batch 2)**: Command Palette uses shared focus trap + body scroll lock + restore focus; 「全部已读」二次确认不再误关面板；危险 ConfirmDialog 默认焦点在取消；侧栏增加情报源入口且移动端可见主题/语言；Today 关注/忽略仅锁当前卡片；Settings/Context 统一骨架与 Retry
+- **Frontend UX (batch 3)**: Brief/Change/Source 详情与 Briefs/Watching 错误态统一 Retry；移动端源类型横向 chips；Context/情报源配置/Radar 搜索改用共享 Input·Textarea 焦点样式
+- **Frontend UX (batch 4)**: `PageHeader` 统一返回控件（Brief/Change/Source/Settings 子页）；Settings Hub 卡片与列表行 `focus-visible`；跳过导航链；进度条尊重 reduced-motion；Changes/Decisions/Radar 空态统一 `EmptyState`
+- **Frontend UX (batch 5)**: Decisions 整行可聚焦跳转；Context/创建情报源用 `Field`；`textLinkClass` 统一 Today/健康条文字链焦点；due 决策错误可 Retry
+- **Frontend UX (batch 6)**: Change 证据链/抽屉评论展开、Brief 证据链接、Notify 高级配置与 Watching 时间线展开按钮统一 `textLinkClass`；无时间线改用 EmptyState
+- **Frontend UX (batch 7)**: 路由 Suspense 改用 ListSkeleton；PackPicker 用共享 Select；剩余文字链/Fetch 详情/Monitor raw/区域模式按钮补齐 focus-visible；侧栏在情报源页不再误标「设置」为当前
+- **Frontend UX (batch 8)**: 侧栏次级入口改 Link + 路径高亮，避免「设置/情报源」双标当前；Source/Brief/Change 详情 not-found 与显示过滤空态统一 EmptyState；Fetch 进度条补 reduced-motion
+- **Frontend UX (batch 9)**: 共享 `focusRingClass`；Chat 清空/引用链焦点、错误 `role=alert`、流式状态 `aria-live`、滚动尊重 reduced-motion；Actions 筛选/状态/步骤勾选、RadarDeck/Hero 标题、Monitor 控制台、Feed 快捷键切换补齐焦点环
+- **Frontend UX (batch 10)**: ImmersiveDrawer 背景层 `tabIndex=-1` 避免进 Tab 序；情报源名/Today 探索与次要信号/Watching 时间线与卡片次操作/Brief 原文链补齐焦点环
+- **Frontend UX (batch 11)**: Today 空态区分「仅有源」与「雷达已有未读」——后者引导浏览雷达或单独重算 Impact；Brief 标题/创建源更多类型/Feed「更多时间」补焦点环
+- **Frontend UX (batch 12)**: Sources 创建表单改用共享 Input/Select、打开自动聚焦、Esc 关闭、`aria-expanded`；创建错误 `role=alert`；Settings 未保存条 `aria-live`；Fetch/Monitor 脉冲与进度条补 reduced-motion；monitor 光标减动效
+- **Frontend UX (batch 13)**: Source 详情配置改用 sticky `FormSaveBar`（脏态/放弃/导航守卫）；配置字段 Textarea 统一；Radar 搜索 `role=search`+aria-label；Brief 卡片悬浮动效尊重 reduced-motion
+- **Frontend UX (batch 14)**: 路由切换滚回顶部；404 用 EmptyState；Settings 健康条加载态「检查中」；Radar 模式栏 sticky + `aria-pressed`；Hub 卡片减动效
+- **Frontend UX (batch 15)**: Radar 搜索无结果可「清除搜索」；筛选空态可「清除筛选」；FeedToolbar sticky；Toast/侧栏补 safe-area；Chip 减动效
+- **Frontend UX (batch 16)**: Chat 流式可停止、清空二次确认、建议用 Chip；Decisions 空态引导去雷达；Today 关注卡片减动效
+- **Frontend UX (batch 17)**: Chat/LLM 错误不再泄露 JVM 异常链、可关闭；停止生成清理空回复；Actions 空态引导回 Today；移动端侧栏纵向布局并收紧品牌区
+- **Frontend UX (batch 18)**: Settings Hub「通知」深链到 `#notify` 并滚动定位；卡片 CTA 文案；Pack 导入中禁用选择
+- **Frontend UX (batch 19)**: 恢复 `/actions` 路由（Settings Hub + ⌘K）；空态引导回 Today；返回设置
+- **Frontend UX (batch 20)**: Sources 试抓取仅当前类型显示加载；Actions 筛选 `aria-pressed`、步骤触控与无障碍；MagCard 操作触控目标；Feedback 错误 `role=alert`；中文 Actions 标题
+- **Frontend UX (batch 21)**: Feed 分页 `nav` + 翻页滚回列表（尊重 reduced-motion）；筛选组无障碍标签；Change「问 AI」焦点环；Radar/视图切换减动效
+- **Frontend UX (batch 22)**: Sources 国内/国外模式 `aria-pressed`；飞书绑定链接焦点环；FormSaveBar 安全区；Context「更多」`aria-controls`；Brief 卡片焦点偏移
+- **Frontend UX (batch 23)**: Today 甲板清空 CTA 焦点、减动效跳过离场、卡片 picker `aria-pressed`；Fetch 详情展开无障碍；Monitor 暂停/筛选 pressed + live log
+- **Frontend UX (batch 24)**: Brief 额外条目行焦点；Toast 悬停/聚焦暂停自动关闭 + 安全区；Fetch 结果摘要 live region；Brief 卡片减动效
+- **Frontend UX (batch 25)**: ConfirmDialog 描述关联 + pending 禁关/锁滚动/安全区；⌘K listbox `aria-activedescendant`；Radar 变化空态 CTA（Context/清除搜索/回 Today）；抽屉正文错误可重试 + 评论 `aria-expanded`；创建源取消与提交中禁用
+- **Frontend UX (batch 26)**: ImmersiveDrawer 安全区 + 焦点环；Radar 搜索 `role=search`；Watching 空态 CTA（Today/雷达）；收藏空态改去雷达；语言切换 `aria-pressed` + 触控目标
+- **Frontend UX (batch 27)**: Notify/时间线/Feed 快捷键补 `aria-controls`；凭证粘贴 live 反馈；Today 关注标题可聚焦；Briefs 空态回 Today
+- **Frontend UX (batch 28)**: MagCard 可访问名 + focus-visible；健康条 `aria-controls`；源详情抽样空态 CTA；Feed 计数 live region；MagAction 减动效
+- **Frontend UX (batch 29)**: Change 详情空态/问 AI/证据链焦点；时间线空态说明；Monitor 原始输出 `aria-expanded`；队列进度用 ProgressBar；ScorePill 可读
+- **Frontend UX (batch 30)**: ScoreBar progressbar；Input/Select/Textarea 减动效；FormSaveBar `aria-busy`；Radar 模式栏安全区；跳过导航安全区；Brief 空日 CTA
+- **Frontend UX (batch 31)**: Sources 删除确认在 pending 中保持打开；Actions 筛选/状态触控与 `aria-pressed`、步骤 44px 触控；Monitor 历史行 focus + `aria-controls`；ErrorBoundary 聚焦标题 + 就地 Retry；PageHeader 返回触控/减动效
+- **Frontend UX (batch 32)**: Decisions 行统一 focusRing/减动效；Feed 搜索清除触控、视图切换 min 触控、sticky 安全区；Chat 清空/关闭触控、composer sticky+安全区、`aria-busy`；icon Button 触控加大
+- **Frontend UX (batch 33)**: Chip/Button 默认 min 触控高度；Today 甲板进度条标签、快捷键/卡片切换/打开变化焦点；Brief 卡片 aria-label + reduced-motion 阴影；Settings Hub 统一 focusRing；来源区域模式触控
+- **Frontend UX (batch 34)**: 侧栏导航/源类型触控与减动效；语言/主题/密度触控；Toast Esc 关闭（避让 dialog）+ 栈上限 3 + 关闭触控；Radar 模式栏触控；Context「更多」焦点；展示选择行触控；Card/MagAction 触控与减动效
+- **Frontend UX (batch 35)**: Fetch 详情触控 + 抓取中 live；Notify 高级/勾选触控；Watching 时间线展开触控；Hero 标题减动效；Feedback `aria-busy`；404 CTA；Monitor 控制台/筛选触控
+- **Frontend UX (batch 36)**: EmptyState `role=status`、QueryError `role=alert`；抽屉关闭触控；Change 分数可读 dl、证据「站内阅读」触控、抽屉标题链到原文；评论展开 `aria-controls`；源详情 not-found CTA
+- **Frontend UX (batch 37)**: Feed「全部已读」确认在 pending 中保持打开；快捷键触控；ChangeCard 打开链触控；⌘K 选项触控；健康条/刷新触控
+- **Frontend UX (batch 38)**: Input/Select/Textarea `min-h-10`；危险 ConfirmDialog 用 `alertdialog`；创建源 Esc 提交中禁用、`aria-busy`、更多类型触控；凭证粘贴触控；Brief 原文/证据链与 Today 关注/次要信号/日报链触控
+- **Frontend UX (batch 39)**: ListSkeleton i18n 加载文案；FormSaveBar ⌘/Ctrl+S；Feed 分页 sticky+安全区；Radar 搜索一键清除 + 变化行减动效；Chat 引用/种子链触控
+- **Frontend UX (batch 40)**: ⌘K 搜索清除；Sources 名链触控；Actions 关联链触控；Settings 表单 `aria-busy`；Feed「更多时间」触控；展示筛选 live；抽屉正文加载 i18n；PackPicker `role=group`
+- **Frontend UX (batch 41)**: MagCard 减动效禁滑动；Context 简介无障碍 + 空文禁用提取 + `aria-busy`；Today 提醒/回访/页脚触控；飞书链/健康条链触控；Change 分数 region + 证据标题触控；源详情抽样触控
+- **Frontend UX (batch 42)**: Feed 选中滚动尊重 reduced-motion；快捷键面板 region；主题切换 live + 密度触控；侧栏未读 aria-label；Brief 额外条目触控；Hero region；抓取步骤 `aria-current`；Field hint `aria-describedby`
+- **Frontend UX (batch 43)**: PageHeader 用 `h1`；焦点陷阱跳过 disabled；Chat 建议组/表单 busy/消息区 region；Radar Signals 隐藏标题补 sr-only h1；Timeline/Watching/Toast 动作触控；Monitor 进行中 live
+- **Frontend UX (batch 44)**: Sources 创建表单 `aria-controls`；Decisions 行 aria 含标题；LiveConsole 暂停关 live；甲板清空 CTA 触控 + 快捷键 region；注意力列表 `role=feed`；ErrorBoundary `h1`；抓取面板 busy；Hub 卡片 min 高度
+- **Frontend UX (batch 45)**: 源详情空抽样不再空框 + 配置 busy；Monitor 原始切换触控、历史表关联/行高；HistoryBody 唯一 raw id；Decisions 开放区 section；Brief/Mag 减动效补齐
+- **Frontend UX (batch 46)**: Feed 抽屉原文 CTA 触控/焦点；ConfirmDialog 唯一 title/desc id；健康条行可读名 + 详情 region；Tracked 打开链触控；ScorePill 可读 aria
+- **Frontend UX (batch 47)**: ChangeCard/甲板动作组 `aria-busy`；Changes 列表减动效；EmptyState 用 `h2`；文字链焦点 offset；MagCard `is-dimmed` 禁点 + 选中恢复
+- **Frontend UX (batch 48)**: ImmersiveDrawer 唯一标题 id + 减模糊；Sources 分类 `aria-labelledby`、行 busy、启用 `aria-pressed`；Monitor 流式 `role=status`；Feedback 已选禁用重提
+- **Frontend UX (batch 49)**: FormSaveBar ⌘/Ctrl+S 可视提示；Brief 条目 aria-label；MagAction 禁用链/aria-label；Today 空态减动效；⌘K 搜索加载态
+- **Frontend UX (batch 50)**: Actions 状态筛选/步骤 checkbox；PackPicker 下拉独立标签；Radar 视图/筛选组标签；Chat 消息 log + 流式禁用清空；ScoreBar 无分值；Changes 列表 busy
+- **Frontend UX (batch 51)**: Hero 无 onOpen 不渲染按钮；Briefs 推送禁用提示 + 归档 heading；SettingsHub 分区 labelledby；Monitor 历史空态/行 button；ScorePill 无分值可读
+- **Frontend UX (batch 52)**: Feed 时间筛选可收起 + 减模糊；抓取进度 valuetext/空详情；结果摘要 Esc 关闭；飞书绑定 busy/live；展示源 indeterminate `aria-checked=mixed`
+- **Frontend UX (batch 53)**: Sidebar 品牌链非 h1 + ⌘K shortcuts；Toast 区域标签 + 减动效延长；PageHeader 返回/操作组；Change 详情标题层级 h2
+- **Frontend UX (batch 54)**: Source 配置/样例 h2；收藏区 busy + 取消收藏 title；健康卡 live/刷新 busy；ProgressBar valuetext
+- **Frontend UX (batch 55)**: Field 合并 aria-describedby；Confirm 减模糊 + 按钮组；Brief 详情分区 labelledby；崩溃页操作组
+- **Frontend UX (batch 56)**: Feed 分页减模糊；InFlight valuetext；Deck busy 禁快捷键 + 进度文案；Monitor bubble article；MagCard 操作组
+- **Frontend UX (batch 57)**: ItemDetail 正文 region + 评论 labelledby；Feedback 保存 live；Attention 卡片 busy/操作组；Create 表单按钮组
+- **Frontend UX (batch 58)**: Monitor SSE/轮询状态；关注变化计数；Settings 表单 label；Basics/Queue labelledby
+- **Frontend UX (batch 59)**: ImmersiveDrawer 关闭符/内容 region/页脚操作组；Sources 分类 h2；Decisions labelledby + busy；Today 页 busy
+- **Frontend UX (batch 60)**: MagGrid `role=feed`；Feed 焦点栏操作组 + 快捷键 kbd；Sources 页 busy；Skip link 加粗
+- **Frontend UX (batch 61)**: Radar 页 busy + 操作组；Brief 证据列表；配置粘贴 aria-label；Drawer 减动效去位移
+- **Frontend UX (batch 62)**: FocusTrap 跳过 hidden/inert；Timeline labelledby/article；Radar 变化行 aria-label；StatusBadge title
+- **Frontend UX (batch 63)**: ProgressBar 真实百分比 + 可视最小宽度；⌘K combobox；Sources 行操作组
+- **Frontend UX (batch 64)**: Today 提醒/复盘 `role=status`、关注分区 labelledby；主题 `color-scheme`；Chip 显式 disabled
+- **Frontend UX (batch 65)**: Today 次要信号/日报 labelledby；Feed 全部已读 danger 确认 + loading；抽屉 footer 操作 title
+- **Frontend UX (batch 66)**: MagCard 未读 sr-only + aria-label；Contexts GitHub 导入空 URL 禁用 + 输入 aria-label；Notify 分区 labelledby；FormSaveBar backdrop 减动效实底；收藏分区 labelledby
+- **Frontend UX (batch 67)**: Watching 时间线加载/错误态；条目数可读 aria-label；创建源空名禁用提交；Changes 列表 aria-label；Hero labelledby；跟踪计数 aria-label
+- **Frontend UX (batch 68)**: PageHeader 语义 header；Brief 卡片今日/最新入 aria-label；抓取源状态 i18n；MagGrid feed 标签；Chat 发送/停止 aria-label；Briefs 页 busy
+- **Frontend UX (batch 69)**: Actions 筛选计数 aria-label + 分区 labelledby；步骤 checkbox labelledby；Decisions 行含决策类型；Monitor 统计区 labelledby + valuetext
+- **Frontend UX (batch 70)**: Sources 展示区 labelledby + 空区域 title；Change 详情分区 labelledby、「问 AI」入 header；RadarDeck/InboxZero labelledby；Sources 列表 busy
+- **Frontend UX (batch 71)**: Fetch 结果源状态 i18n；Context/源详情抽样 labelledby；Radar 变化列表 busy+label；Chip pressed 仅激活时；侧栏活跃度 label
+- **Frontend UX (batch 72)**: Status/Score badge aria-label；Today 关注 feed 标签；Monitor busy；空态按钮禁用链；Feed toolbar 语义；Brief 条目 labelledby；Settings Hub busy
+- **Frontend UX (batch 73)**: Decisions due 加载骨架 + 页 busy；Chat 清空 aria-label；Toast atomic；SourceBadge/分类计数可读
+### Added
+
+- **CN media RSS**: 虎嗅 / InfoQ 中国 / 钛媒体 / 雷峰网 / 掘金 / 新浪科技 / 人人都是产品经理 / HelloGitHub / SegmentFault / 数英 / 数字尾巴 — pack + boot-ensure (live-probed)
+- **DailyHot connector** (`DAILY_HOT`): self-hosted [DailyHotApi](https://github.com/imsyy/DailyHotApi) via `docker compose` `daily-hot` + `DAILY_HOT_BASE_URL`; create hot-list sources in UI after sidecar is verified (not pre-seeded until routes return live data)
+- **Sources settings categories**: 热榜 / 科技媒体 / 社区 / 公众号 / 国际与开源 / 需凭证 — list, display picker, and create-type optgroups
+
+### Changed
+
+- **36氪 feed**: `36kr.com/feed` (anti-bot HTML) → `www.36kr.com/feed`; boot repairs existing rows
+- **Google News 科技 CN / V2EX / Zhihu·Weibo·Bilibili pack defaults**: `defaultEnabled: false` until reachable (V2EX often times out; CLI sources enabled by seeder only when binary present)
+- **ai-signals**: dropped dead vLLM blog RSS and Nitter proxy sample
+
+### Changed
+
 - **Domestic open-source only**: removed homemade `JUEJIN` / `CSDN` HTTP scrapers; `WEIBO` / `BILIBILI` now wrap [weibo-cli](https://github.com/jackwener/weibo-cli) / [bilibili-cli](https://github.com/public-clis/bilibili-cli); paste Cookie in source config (writes CLI credential files) — no per-project setup
 - **Source region modes**: 国内模式 / 国外模式 / 全部 on Sources display picker
 - **IA contraction (2.0)**: primary nav is Today · Radar · Decisions · Chat · Settings. Changes / Watching / Context leave the sidebar (soft redirects keep deep links). Explore becomes **Radar** (`/radar`); default tab is browse waterfall (Signals), Changes secondary

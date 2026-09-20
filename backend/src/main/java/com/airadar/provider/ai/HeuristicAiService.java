@@ -306,7 +306,7 @@ public class HeuristicAiService implements AiService {
             case V2EX -> 6;
             case ZHIHU -> 8;
             case BILIBILI -> 5;
-            case WEIBO -> 3;
+            case WEIBO, DAILY_HOT -> 3;
             case JUEJIN, CSDN -> 0; // legacy rows; connectors removed
             case PRODUCT_HUNT, TWITTER, WEB -> 4;
             case EMAIL -> 3;

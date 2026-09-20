@@ -102,6 +102,12 @@ export function MagCard({
 
   const onTouchStart = (e: TouchEvent) => {
     if (!onSwipeSave && !onSwipeDismiss) return
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return
+    }
     const touch = e.touches[0]
     if (!touch) return
     startX.current = touch.clientX
@@ -193,8 +199,10 @@ export function MagCard({
       onTouchEnd={finishSwipe}
       onTouchCancel={finishSwipe}
       role="button"
-      tabIndex={0}
-      aria-selected={selected}
+      tabIndex={selected ? 0 : -1}
+      aria-label={unread ? `${title} · ${t('common.unread')}` : title}
+      aria-pressed={selected || undefined}
+      aria-current={selected ? 'true' : undefined}
     >
       {saveHint || dismissHint ? (
         <div
@@ -218,7 +226,12 @@ export function MagCard({
             <span />
           )}
           <div className="mag-card-top-right">
-            {unread ? <span className="mag-unread-dot" /> : null}
+            {unread ? (
+              <>
+                <span className="mag-unread-dot" aria-hidden />
+                <span className="sr-only">{t('common.unread')}</span>
+              </>
+            ) : null}
             {score != null ? <ScorePill score={score} /> : null}
           </div>
         </div>
@@ -258,7 +271,12 @@ export function MagCard({
       </div>
 
       {actions || secondaryActions ? (
-        <div className="mag-card-footer" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="mag-card-footer"
+          onClick={(e) => e.stopPropagation()}
+          role="group"
+          aria-label={title}
+        >
           {actions ? <div className="flex flex-wrap items-center gap-0.5">{actions}</div> : null}
           {secondaryActions ? (
             <div className="flex flex-wrap items-center gap-0.5 opacity-100">
@@ -296,20 +314,37 @@ export function MagAction({
           ? 'bg-accent text-white hover:bg-accent/90 hover:text-white'
           : 'hover:bg-border hover:text-ink'
   const cls = cn(
-    'inline-flex items-center rounded-full px-2.5 py-1 text-xs transition',
+    'inline-flex min-h-9 min-w-9 items-center justify-center rounded-full px-2.5 py-1.5 text-xs transition motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-bg sm:min-h-8 sm:min-w-8 sm:py-1',
     tone === 'accent' ? 'font-medium text-white' : 'text-muted',
     toneCls,
     disabled && 'pointer-events-none opacity-50',
   )
   if (href) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" onClick={onClick} className={cls} title={title}>
+      <a
+        href={disabled ? undefined : href}
+        target="_blank"
+        rel="noreferrer"
+        onClick={disabled ? undefined : onClick}
+        className={cls}
+        title={title}
+        aria-label={title || undefined}
+        aria-disabled={disabled || undefined}
+        tabIndex={disabled ? -1 : undefined}
+      >
         {children}
       </a>
     )
   }
   return (
-    <button type="button" disabled={disabled} onClick={onClick} className={cls} title={title}>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cls}
+      title={title}
+      aria-label={title || undefined}
+    >
       {children}
     </button>
   )

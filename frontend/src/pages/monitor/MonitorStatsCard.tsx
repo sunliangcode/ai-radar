@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AiMonitor, AiMonitorCall } from '../../lib/api'
+import { cn, focusRingClass } from '../../lib/cn'
 import { formatClock, formatTps } from './monitorUtils'
 import { HistoryBody } from './MonitorBubble'
 
@@ -19,11 +20,17 @@ export function MonitorStatsCard({
   const windowTokens = mon.lastContextWindow ?? mon.contextWindow ?? 4096
 
   return (
-    <div className="rounded-xl border border-border bg-surface/70 p-4">
+    <div
+      className="rounded-xl border border-border bg-surface/70 p-4"
+      aria-labelledby="monitor-stats-heading"
+    >
+      <h2 id="monitor-stats-heading" className="sr-only">
+        {t('settings.monitorStats')}
+      </h2>
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-border px-3 py-2">
           <p className="text-xs text-muted">{t('settings.monitorTps')}</p>
-          <p className="mt-1 font-mono text-lg text-ink">
+          <p className="mt-1 font-mono text-lg text-ink" aria-live="polite">
             {formatTps(mon.lastTokensPerSec)}
             <span className="ml-1 text-xs text-muted">tok/s</span>
           </p>
@@ -45,10 +52,11 @@ export function MonitorStatsCard({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(usedPct)}
+            aria-valuetext={`${Math.round(usedPct)}%`}
             aria-label={t('settings.monitorContext')}
           >
             <div
-              className={`h-full rounded-full transition-all ${
+              className={`h-full rounded-full transition-all motion-reduce:transition-none ${
                 usedPct >= 90 ? 'bg-ember' : usedPct >= 70 ? 'bg-accent' : 'bg-moss'
               }`}
               style={{ width: `${usedPct}%` }}
@@ -62,9 +70,14 @@ export function MonitorStatsCard({
         </div>
       </div>
 
-      <h3 className="mb-2 text-sm font-medium text-ink">{t('settings.monitorHistory')}</h3>
+      <h3 className="mb-2 text-sm font-medium text-ink" id="monitor-history-heading">
+        {t('settings.monitorHistory')}
+      </h3>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[540px] text-left text-xs">
+        <table
+          className="w-full min-w-[540px] text-left text-xs"
+          aria-labelledby="monitor-history-heading"
+        >
           <thead className="text-muted">
             <tr className="border-b border-border">
               <th className="py-1.5 pr-2 font-medium">{t('settings.monitorColTime')}</th>
@@ -75,16 +88,30 @@ export function MonitorStatsCard({
             </tr>
           </thead>
           <tbody>
-            {(filteredRecent ?? []).slice(0, 30).map((row) => {
+            {(filteredRecent ?? []).length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-muted" role="status">
+                  {t('settings.monitorHistoryEmpty')}
+                </td>
+              </tr>
+            ) : (
+              (filteredRecent ?? []).slice(0, 30).map((row, index) => {
               const key = `${row.ts}-${row.operation}-${row.promptTokens}-${row.completionTokens}`
               const open = expandedCall === key
+              const detailId = `monitor-call-detail-${index}`
               const toggle = () => setExpandedCall(open ? null : key)
               return (
                 <Fragment key={key}>
                   <tr
-                    className="cursor-pointer border-b border-border/60 text-ink hover:bg-border/30"
+                    className={cn(
+                      'min-h-10 cursor-pointer border-b border-border/60 text-ink hover:bg-border/30',
+                      focusRingClass(),
+                    )}
                     tabIndex={0}
+                    role="button"
                     aria-expanded={open}
+                    aria-controls={open ? detailId : undefined}
+                    aria-label={`${row.operation} · ${formatClock(row.ts)}`}
                     onClick={toggle}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -93,21 +120,21 @@ export function MonitorStatsCard({
                       }
                     }}
                   >
-                    <td className="py-1.5 pr-2 font-mono text-[11px] text-muted">
+                    <td className="py-2.5 pr-2 font-mono text-[11px] text-muted">
                       {formatClock(row.ts)}
                     </td>
-                    <td className="py-1.5 pr-2 font-mono">
+                    <td className="py-2.5 pr-2 font-mono">
                       {open ? '▾ ' : '▸ '}
                       {row.operation}
                     </td>
-                    <td className="py-1.5 pr-2 font-mono">
+                    <td className="py-2.5 pr-2 font-mono">
                       {row.promptTokens}+{row.completionTokens}
                       {row.truncated ? (
                         <span className="ml-1 text-ember">{t('settings.monitorTruncated')}</span>
                       ) : null}
                     </td>
-                    <td className="py-1.5 pr-2 font-mono">{formatTps(row.tokensPerSec)}</td>
-                    <td className="py-1.5 pr-2">
+                    <td className="py-2.5 pr-2 font-mono">{formatTps(row.tokensPerSec)}</td>
+                    <td className="py-2.5 pr-2">
                       {row.ok ? (
                         <span className="text-moss">{t('common.yes')}</span>
                       ) : (
@@ -119,7 +146,12 @@ export function MonitorStatsCard({
                   </tr>
                   {open ? (
                     <tr className="border-b border-border/60">
-                      <td colSpan={5} className="bg-surface/80 px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        id={detailId}
+                        colSpan={5}
+                        className="bg-surface/80 px-2 py-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <p className="mb-1 text-[11px] font-medium text-muted">
                           {t('settings.monitorInput')}
                         </p>
@@ -143,7 +175,8 @@ export function MonitorStatsCard({
                   ) : null}
                 </Fragment>
               )
-            })}
+            })
+            )}
           </tbody>
         </table>
       </div>
