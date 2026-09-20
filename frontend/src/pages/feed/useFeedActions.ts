@@ -107,6 +107,13 @@ export function useFeedActions(unreadOnly: boolean) {
     (item: Item) => patch.mutate({ id: item.id, saved: !item.saved }),
     [patch],
   )
+  /** Swipe / collect: always save (never toggle off). */
+  const saveItem = useCallback(
+    (item: Item) => {
+      if (!item.saved) patch.mutate({ id: item.id, saved: true })
+    },
+    [patch],
+  )
   const markItemSelectedRead = useCallback(
     (item: Item) => patch.mutate({ id: item.id, read: true }),
     [patch],
@@ -124,6 +131,7 @@ export function useFeedActions(unreadOnly: boolean) {
     markReadOnOpen,
     openExternalAndMarkRead,
     toggleSaved,
+    saveItem,
     markItemSelectedRead,
     dismissItem,
   }

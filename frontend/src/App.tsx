@@ -17,15 +17,13 @@ const BriefDetailPage = lazy(() => import('./pages/BriefDetailPage'))
 const ChangeDetailPage = lazy(() => import('./pages/ChangeDetailPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const ContextsPage = lazy(() => import('./pages/ContextsPage'))
-const FeedPage = lazy(() => import('./pages/FeedPage'))
-const ChangesPage = lazy(() => import('./pages/ChangesPage'))
+const RadarPage = lazy(() => import('./pages/RadarPage'))
 const DecisionsPage = lazy(() => import('./pages/DecisionsPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const SettingsHubPage = lazy(() => import('./pages/SettingsHubPage'))
 const SourceDetailPage = lazy(() => import('./pages/SourceDetailPage'))
 const SourcesPage = lazy(() => import('./pages/SourcesPage'))
 const TodayPage = lazy(() => import('./pages/TodayPage'))
-const WatchingPage = lazy(() => import('./pages/WatchingPage'))
 const AiMonitorPage = lazy(() => import('./pages/AiMonitorPage'))
 const BriefsPage = lazy(() => import('./pages/BriefsPage'))
 
@@ -117,13 +115,9 @@ function Shell() {
               <Routes>
                 <Route path="/monitor" element={<Navigate to="/settings/system" replace />} />
                 <Route path="/" element={<TodayPage />} />
-                <Route path="/explore" element={<FeedPage />} />
-                <Route path="/feed" element={<Navigate to="/explore" replace />} />
-                <Route path="/changes" element={<ChangesPage />} />
+                <Route path="/radar" element={<RadarPage />} />
                 <Route path="/decisions" element={<DecisionsPage />} />
-                <Route path="/watching" element={<WatchingPage />} />
                 <Route path="/chat" element={<ChatPage />} />
-                <Route path="/actions" element={<Navigate to="/decisions" replace />} />
                 <Route path="/briefs" element={<BriefsPage />} />
                 <Route path="/settings" element={<SettingsHubPage />} />
                 <Route path="/settings/system" element={<AiMonitorPage />} />
@@ -134,12 +128,17 @@ function Shell() {
                 <Route path="/settings/llm" element={<Navigate to="/settings/preferences" replace />} />
                 <Route path="/changes/:id" element={<ChangeDetailPage />} />
                 <Route path="/briefs/:date" element={<BriefDetailPage />} />
-                {/* Legacy redirects */}
-                <Route path="/items" element={<Navigate to="/explore" replace />} />
+                {/* Soft redirects — IA contraction keeps deep links alive */}
+                <Route path="/explore" element={<Navigate to="/radar" replace />} />
+                <Route path="/feed" element={<Navigate to="/radar" replace />} />
+                <Route path="/items" element={<Navigate to="/radar" replace />} />
+                <Route path="/events" element={<Navigate to="/radar" replace />} />
+                <Route path="/changes" element={<Navigate to="/radar?view=changes" replace />} />
+                <Route path="/watching" element={<Navigate to="/" replace />} />
+                <Route path="/actions" element={<Navigate to="/decisions" replace />} />
                 <Route path="/contexts" element={<Navigate to="/settings/context" replace />} />
                 <Route path="/sources" element={<Navigate to="/settings/sources" replace />} />
                 <Route path="/sources/:id" element={<SourceIdRedirect />} />
-                <Route path="/events" element={<Navigate to="/explore" replace />} />
                 <Route path="/events/:id" element={<EventRedirect />} />
                 {/* Unknown URLs used to render a blank main area with no explanation. */}
                 <Route path="*" element={<NotFoundPage />} />

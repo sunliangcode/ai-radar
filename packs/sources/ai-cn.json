@@ -70,9 +70,45 @@
     "name": "知乎推荐",
     "defaultEnabled": true,
     "config": {
-      "cliPath": "/Users/sunliang/workspace/own/zhihu-cli-go/zhihu",
+      "cliPath": "zhihu",
       "limit": 5,
       "commentLimit": 10
     }
+  },
+  {
+    "type": "WEIBO",
+    "name": "微博热搜",
+    "defaultEnabled": true,
+    "config": { "cliPath": "weibo", "limit": 20 }
+  },
+  {
+    "type": "BILIBILI",
+    "name": "B站热门",
+    "defaultEnabled": true,
+    "config": { "cliPath": "bili", "limit": 20 }
+  },
+  {
+    "type": "RSS",
+    "name": "IT之家",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.ithome.com/rss/" }
+  },
+  {
+    "type": "RSS",
+    "name": "Solidot",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.solidot.org/index.rss" }
+  },
+  {
+    "type": "RSS",
+    "name": "极客公园",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.geekpark.net/rss" }
+  },
+  {
+    "type": "RSS",
+    "name": "爱范儿",
+    "defaultEnabled": true,
+    "config": { "feedUrl": "https://www.ifanr.com/feed" }
   }
 ]

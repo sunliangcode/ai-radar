@@ -2,12 +2,80 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMemo } from 'react'
-import { api } from '../lib/api'
+import { api, type DecisionRecord } from '../lib/api'
 import { ListSkeleton, PageHeader, StateBox } from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
 import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { dateLocale } from '../i18n'
+
+function kindLabel(kind: string, t: (key: string) => string) {
+  switch (kind) {
+    case 'watch':
+      return t('decisions.kindWatch')
+    case 'investigate':
+      return t('decisions.kindInvestigate')
+    case 'adopt':
+      return t('decisions.kindAdopt')
+    case 'ignore':
+      return t('decisions.kindIgnore')
+    default:
+      return kind
+  }
+}
+
+function DecisionRow({
+  d,
+  locale,
+  emphasize,
+}: {
+  d: DecisionRecord
+  locale: string
+  emphasize?: boolean
+}) {
+  const { t } = useTranslation()
+  return (
+    <li
+      className={
+        emphasize
+          ? 'rounded-xl border border-moss/30 bg-moss/5 px-4 py-3'
+          : 'rounded-lg border border-border px-4 py-3'
+      }
+    >
+      <p className="font-medium text-ink">{d.changeTitle ?? t('decisions.untitled')}</p>
+      <dl className="mt-2 grid gap-1 text-sm sm:grid-cols-[5rem_1fr]">
+        <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">{t('decisions.fieldDecision')}</dt>
+        <dd className="text-ink">{kindLabel(d.kind, t)}</dd>
+        {d.reason ? (
+          <>
+            <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">{t('decisions.fieldWhy')}</dt>
+            <dd className="text-muted">{d.reason}</dd>
+          </>
+        ) : null}
+        {d.revisitAt ? (
+          <>
+            <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">{t('decisions.fieldReview')}</dt>
+            <dd className={emphasize ? 'text-moss' : 'text-muted'}>
+              {new Date(d.revisitAt).toLocaleDateString(locale)}
+            </dd>
+          </>
+        ) : null}
+      </dl>
+      {emphasize && (d.updatesSinceDecision ?? 0) > 0 ? (
+        <p className="mt-2 text-xs text-muted">
+          {t('decisions.updatesSince', { count: d.updatesSinceDecision ?? 0 })}
+        </p>
+      ) : null}
+      <Link
+        to={`/changes/${d.changeId}`}
+        state={{ from: '/decisions' }}
+        className={`mt-2 inline-block text-sm hover:underline ${emphasize ? 'text-moss' : 'text-accent'}`}
+      >
+        {t('decisions.relatedChange')} →
+      </Link>
+    </li>
+  )
+}
 
 export default function DecisionsPage() {
   const { t, i18n } = useTranslation()
@@ -30,19 +98,12 @@ export default function DecisionsPage() {
       <PageHeader title={t('decisions.title')} subtitle={t('decisions.subtitle')} />
       {dueRows.length > 0 ? (
         <section className="mb-8">
-          <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-moss">{t('decisions.dueSection')}</h2>
+          <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-moss">
+            {t('decisions.dueSection')}
+          </h2>
           <ul className="space-y-3">
             {dueRows.map((d) => (
-              <li key={d.id} className="rounded-xl border border-moss/30 bg-moss/5 px-4 py-3">
-                <p className="font-medium text-ink">{d.changeTitle}</p>
-                <p className="mt-1 text-sm text-muted">{d.reason}</p>
-                <p className="mt-2 text-xs text-muted">
-                  {t('decisions.updatesSince', { count: d.updatesSinceDecision ?? 0 })}
-                </p>
-                <Link to={`/changes/${d.changeId}`} className="mt-2 inline-block text-sm text-moss hover:underline">
-                  {t('today.openChange')} →
-                </Link>
-              </li>
+              <DecisionRow key={d.id} d={d} locale={locale} emphasize />
             ))}
           </ul>
         </section>
@@ -51,21 +112,13 @@ export default function DecisionsPage() {
       {q.isLoading ? <ListSkeleton rows={4} /> : null}
       {q.isError ? <StateBox>{t('common.loadFailed', { message: errorText(q.error, t) })}</StateBox> : null}
 
-      <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-muted">{t('decisions.openSection')}</h2>
+      <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-muted">
+        {t('decisions.openSection')}
+      </h2>
       {openRows.length ? (
         <ul className="space-y-2">
           {openRows.map((d) => (
-            <li key={d.id} className="rounded-lg border border-border px-3 py-2 text-sm">
-              <span className="font-mono text-xs uppercase text-faint">{d.kind}</span>
-              <Link to={`/changes/${d.changeId}`} className="ml-2 font-medium text-accent hover:underline">
-                {d.changeTitle}
-              </Link>
-              {d.revisitAt ? (
-                <span className="ml-2 text-xs text-muted">
-                  {new Date(d.revisitAt).toLocaleDateString(locale)}
-                </span>
-              ) : null}
-            </li>
+            <DecisionRow key={d.id} d={d} locale={locale} />
           ))}
         </ul>
       ) : (

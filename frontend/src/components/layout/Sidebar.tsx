@@ -2,26 +2,21 @@ import { Link, NavLink, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowRight,
-  Compass,
-  GitBranch,
   MessageSquare,
   Newspaper,
+  Radar,
   Search,
   Settings,
-  Star,
-  User,
 } from 'lucide-react'
 import { useEngagement } from '../../hooks/useEngagement'
 import { LanguageSwitcher, ThemeDensityControls } from './PrefsControls'
+import { cn } from '../../lib/cn'
 
 const NAV_ICONS = {
   '/': Newspaper,
-  '/changes': GitBranch,
-  '/watching': Star,
+  '/radar': Radar,
   '/decisions': ArrowRight,
-  '/explore': Compass,
   '/chat': MessageSquare,
-  '/settings/context': User,
   '/settings': Settings,
 } as const
 
@@ -41,14 +36,13 @@ export function Sidebar({
   const [searchParams] = useSearchParams()
   const activeSourceType = searchParams.get('sourceType') ?? ''
 
-  const nav = [
+  const primaryNav = [
     { to: '/', label: t('nav.today'), end: true },
-    { to: '/changes', label: t('nav.changes'), end: false },
-    { to: '/watching', label: t('nav.watching'), end: false },
+    { to: '/radar', label: t('nav.radar'), end: false },
     { to: '/decisions', label: t('nav.decisions'), end: false },
-    { to: '/explore', label: t('nav.explore'), end: false },
+  ]
+  const secondaryNav = [
     { to: '/chat', label: t('nav.chat'), end: false },
-    { to: '/settings/context', label: t('nav.contexts'), end: false },
     { to: '/settings', label: t('nav.settings'), end: false },
   ]
 
@@ -74,7 +68,7 @@ export function Sidebar({
         ) : null}
       </div>
       <nav className="flex md:flex-col gap-1 overflow-x-auto" aria-label={t('nav.main')}>
-        {nav.map((item) => {
+        {primaryNav.map((item) => {
           const Icon = NAV_ICONS[item.to as keyof typeof NAV_ICONS]
           return (
             <NavLink
@@ -82,18 +76,41 @@ export function Sidebar({
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition ${
-                  isActive ? 'bg-accent-soft text-accent font-medium' : 'text-muted hover:bg-border hover:text-ink'
-                }`
+                cn(
+                  'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition',
+                  isActive ? 'bg-accent-soft text-accent font-medium' : 'text-muted hover:bg-border hover:text-ink',
+                )
               }
             >
               {Icon ? <Icon size={14} className="shrink-0 opacity-70" aria-hidden /> : null}
               <span className="flex-1 whitespace-nowrap">{item.label}</span>
-              {item.to === '/explore' && totalUnread > 0 ? (
+              {item.to === '/radar' && totalUnread > 0 ? (
                 <span className="rounded-full bg-moss/15 px-1.5 py-px font-mono text-[10px] text-moss">
                   {totalUnread}
                 </span>
               ) : null}
+            </NavLink>
+          )
+        })}
+        <div className="my-1.5 hidden border-t border-border md:block" aria-hidden />
+        {secondaryNav.map((item) => {
+          const Icon = NAV_ICONS[item.to as keyof typeof NAV_ICONS]
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition',
+                  isActive
+                    ? 'bg-accent-soft text-accent font-medium'
+                    : 'text-faint hover:bg-border hover:text-muted',
+                )
+              }
+            >
+              {Icon ? <Icon size={14} className="shrink-0 opacity-50" aria-hidden /> : null}
+              <span className="flex-1 whitespace-nowrap">{item.label}</span>
             </NavLink>
           )
         })}
@@ -119,7 +136,7 @@ export function Sidebar({
               return (
                 <Link
                   key={type}
-                  to={`/explore?sourceType=${encodeURIComponent(type)}`}
+                  to={`/radar?view=signals&sourceType=${encodeURIComponent(type)}`}
                   aria-current={active ? 'page' : undefined}
                   className={`flex items-center gap-2 rounded px-2.5 py-1 text-xs transition ${
                     active

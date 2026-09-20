@@ -2,6 +2,10 @@
 export function coverSourceClass(sourceType?: string): string {
   const key = (sourceType ?? '').toUpperCase().replace(/-/g, '_')
   if (key.includes('ZHIHU')) return 'cover-zhihu'
+  if (key.includes('JUEJIN')) return 'cover-juejin'
+  if (key.includes('CSDN')) return 'cover-csdn'
+  if (key.includes('WEIBO')) return 'cover-weibo'
+  if (key.includes('BILIBILI') || key.includes('BILI')) return 'cover-bilibili'
   if (key.includes('GITHUB') || key.includes('OSS')) return 'cover-github'
   if (key.includes('HACKER') || key === 'HN') return 'cover-hn'
   if (key.includes('REDDIT')) return 'cover-reddit'
@@ -21,6 +25,10 @@ export function coverShortLabel(sourceType?: string, fallback = 'AI'): string {
   const key = raw.toUpperCase().replace(/-/g, '_')
   const known: Record<string, string> = {
     ZHIHU: 'Zhihu',
+    JUEJIN: '掘金',
+    CSDN: 'CSDN',
+    WEIBO: '微博',
+    BILIBILI: 'B站',
     GITHUB: 'GH',
     HACKER_NEWS: 'HN',
     REDDIT: 'RD',

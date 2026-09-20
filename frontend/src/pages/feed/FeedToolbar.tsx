@@ -1,10 +1,11 @@
 import { Chip } from '../../components/ui'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, Focus } from 'lucide-react'
-import { RANGES, type Range } from './feedQuery'
+import { LayoutGrid, Focus, ChevronDown } from 'lucide-react'
+import { PRIMARY_RANGES, MORE_RANGES, type Range } from './feedQuery'
 import type { ExploreView } from '../../lib/engagement'
 
-/** Search + one scrollable chip row (range / unread / source) + view toggle. */
+/** Search + light filters: time, unread, sources (CN-first). Low chrome for daily browse. */
 export function FeedToolbar({
   inputQ,
   onInputChange,
@@ -41,6 +42,10 @@ export function FeedToolbar({
   onExploreViewChange: (v: ExploreView) => void
 }) {
   const { t } = useTranslation()
+  const [showMoreTime, setShowMoreTime] = useState(
+    () => MORE_RANGES.includes(range as (typeof MORE_RANGES)[number]),
+  )
+  const timeRanges = showMoreTime ? [...PRIMARY_RANGES, ...MORE_RANGES] : PRIMARY_RANGES
 
   return (
     <div className="mb-4 space-y-2.5">
@@ -81,29 +86,31 @@ export function FeedToolbar({
         >
           <button
             type="button"
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs transition ${
+            className={`inline-flex items-center justify-center px-2.5 py-1.5 transition ${
               exploreView === 'waterfall'
-                ? 'bg-accent-soft font-medium text-accent'
+                ? 'bg-accent-soft text-accent'
                 : 'text-muted hover:bg-border hover:text-ink'
             }`}
             aria-pressed={exploreView === 'waterfall'}
+            aria-label={t('feed.viewWaterfall')}
+            title={t('feed.viewWaterfall')}
             onClick={() => onExploreViewChange('waterfall')}
           >
-            <LayoutGrid size={12} aria-hidden />
-            {t('feed.viewWaterfall')}
+            <LayoutGrid size={14} aria-hidden />
           </button>
           <button
             type="button"
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs transition ${
+            className={`inline-flex items-center justify-center px-2.5 py-1.5 transition ${
               exploreView === 'focus'
-                ? 'bg-accent-soft font-medium text-accent'
+                ? 'bg-accent-soft text-accent'
                 : 'text-muted hover:bg-border hover:text-ink'
             }`}
             aria-pressed={exploreView === 'focus'}
+            aria-label={t('feed.viewFocus')}
+            title={t('feed.viewFocus')}
             onClick={() => onExploreViewChange('focus')}
           >
-            <Focus size={12} aria-hidden />
-            {t('feed.viewFocus')}
+            <Focus size={14} aria-hidden />
           </button>
         </div>
         <span className="font-mono text-xs text-muted">
@@ -116,7 +123,7 @@ export function FeedToolbar({
         className={`flex gap-1.5 overflow-x-auto pb-0.5 thin-scroll ${searchMode ? 'pointer-events-none opacity-45' : ''}`}
         title={searchMode ? t('feed.searchFiltersDisabled') : undefined}
       >
-        {RANGES.map((r) => (
+        {timeRanges.map((r) => (
           <Chip
             key={r}
             shape="pill"
@@ -128,6 +135,17 @@ export function FeedToolbar({
             {t(`feed.range.${r}`)}
           </Chip>
         ))}
+        {!showMoreTime ? (
+          <button
+            type="button"
+            disabled={searchMode}
+            onClick={() => setShowMoreTime(true)}
+            className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs text-muted hover:bg-border hover:text-ink disabled:opacity-40"
+          >
+            {t('feed.moreTime')}
+            <ChevronDown size={12} aria-hidden />
+          </button>
+        ) : null}
         <Chip
           shape="pill"
           active={unreadOnly}

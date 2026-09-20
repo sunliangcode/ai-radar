@@ -4,6 +4,7 @@ import type { ConnectorDescriptor } from '../../lib/api'
 import { Button } from '../../components/ui'
 import { errorText } from '../../lib/errors'
 import { buildSourceConfig } from './buildSourceConfig'
+import { SourceConfigFieldInput } from './SourceConfigFieldInput'
 
 export function SourceCreateForm({
   descriptors,
@@ -90,28 +91,13 @@ export function SourceCreateForm({
         </div>
       )}
       {selected?.configFields.map((field) => (
-        <label key={field.key} className="text-sm sm:col-span-2">
-          <span className="text-muted">
-            {field.label}
-            {field.required ? ' *' : ''}
-          </span>
-          {field.key.toLowerCase().includes('prompt') ? (
-            <textarea
-              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2"
-              rows={3}
-              value={fieldValues[field.key] ?? ''}
-              onChange={(e) => onFieldChange(field.key, e.target.value)}
-              required={field.required}
-            />
-          ) : (
-            <input
-              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2"
-              value={fieldValues[field.key] ?? ''}
-              onChange={(e) => onFieldChange(field.key, e.target.value)}
-              required={field.required}
-            />
-          )}
-        </label>
+        <SourceConfigFieldInput
+          key={field.key}
+          field={field}
+          value={fieldValues[field.key] ?? ''}
+          onChange={(v) => onFieldChange(field.key, v)}
+          pasteLabel={t('sources.pasteCookie')}
+        />
       ))}
       {selected?.id === 'PRODUCT_HUNT' ? (
         <p className="text-xs text-muted sm:col-span-2">{t('sources.phTokenHint')}</p>
@@ -122,8 +108,8 @@ export function SourceCreateForm({
       {selected?.id === 'EMAIL' ? (
         <p className="text-xs text-muted sm:col-span-2">{t('sources.emailHint')}</p>
       ) : null}
-      {selected?.id === 'ZHIHU' ? (
-        <p className="text-xs text-muted sm:col-span-2">{t('sources.zhihuHint')}</p>
+      {selected?.id === 'ZHIHU' || selected?.id === 'WEIBO' || selected?.id === 'BILIBILI' ? (
+        <p className="text-xs text-muted sm:col-span-2">{t('sources.ossCliHint')}</p>
       ) : null}
       <div className="sm:col-span-2">
         <Button type="submit" loading={creating}>

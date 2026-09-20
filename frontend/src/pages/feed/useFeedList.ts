@@ -5,10 +5,10 @@ import { api, type Item } from '../../lib/api'
 import { useSources } from '../../hooks/useSources'
 import { useDisplaySources } from '../../hooks/useDisplaySources'
 import { itemMatchesDisplay } from '../../lib/sourceFilter'
-import { PAGE, sinceIso, type Range } from './feedQuery'
+import { PAGE, sinceIso, sortChannelTypes, type Range } from './feedQuery'
 
 export function useFeedList(progressRunning?: boolean) {
-  const [range, setRange] = useState<Range>('7d')
+  const [range, setRange] = useState<Range>('24h')
   const [searchParams, setSearchParams] = useSearchParams()
   const sourceType = searchParams.get('sourceType') ?? ''
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -27,7 +27,7 @@ export function useFeedList(progressRunning?: boolean) {
     for (const s of sources.data ?? []) {
       if (s.type && s.enabled && isDisplayed(s.id)) set.add(s.type)
     }
-    return Array.from(set).sort()
+    return sortChannelTypes(Array.from(set))
   }, [sources.data, isDisplayed])
 
   const searchMode = q.trim().length > 1
@@ -87,7 +87,14 @@ export function useFeedList(progressRunning?: boolean) {
   useEffect(() => {
     if (!sourceType) return
     if (!channelTypes.includes(sourceType)) {
-      setSearchParams({}, { replace: true })
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('sourceType')
+          return next
+        },
+        { replace: true },
+      )
     }
   }, [sourceType, channelTypes, setSearchParams])
 
@@ -103,8 +110,15 @@ export function useFeedList(progressRunning?: boolean) {
   }
 
   const onSourceTypeChange = (v: string) => {
-    if (v) setSearchParams({ sourceType: v }, { replace: true })
-    else setSearchParams({}, { replace: true })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (v) next.set('sourceType', v)
+        else next.delete('sourceType')
+        return next
+      },
+      { replace: true },
+    )
   }
 
   const changePage = (next: number) => {

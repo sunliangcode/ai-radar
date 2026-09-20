@@ -36,7 +36,7 @@ export default function ChangeDetailPage() {
   const locale = dateLocale(i18n.language)
 
   const fromState = (location.state as LocationState | null)?.from
-  const fallbackFrom = fromState ?? '/watching'
+  const fallbackFrom = fromState ?? '/radar?view=changes'
   const canGoBack = Boolean(fromState) && window.history.length > 1
 
   const goBack = () => {

@@ -121,6 +121,7 @@ export type ImpactCard = {
   recentTimeline?: TimelineSnippet[]
   firstDetectedAt?: string
   lastUpdatedAt?: string
+  watched?: boolean
 }
 
 export type ActionCard = {

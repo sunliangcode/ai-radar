@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from './primitives/Button'
 import { useImportPack } from '../hooks/useImportPack'
 
-const PACK_IDS = ['ai-core', 'ai-cn', 'ai-signals'] as const
+const PACK_IDS = ['ai-cn', 'ai-core', 'ai-signals'] as const
 
 export function PackPicker({
   buttonLabel,
@@ -20,8 +20,8 @@ export function PackPicker({
   variant?: 'primary' | 'ghost' | 'danger' | 'text' | 'icon'
   className?: string
 }) {
-  const { t, i18n } = useTranslation()
-  const [packId, setPackId] = useState(i18n.language.startsWith('zh') ? 'ai-cn' : 'ai-core')
+  const { t } = useTranslation()
+  const [packId, setPackId] = useState<(typeof PACK_IDS)[number]>('ai-cn')
   const importPack = useImportPack({ invalidate, successMessage })
 
   return (
@@ -29,7 +29,7 @@ export function PackPicker({
       <select
         className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
         value={packId}
-        onChange={(e) => setPackId(e.target.value)}
+        onChange={(e) => setPackId(e.target.value as (typeof PACK_IDS)[number])}
         aria-label={buttonLabel}
       >
         {PACK_IDS.map((id) => (

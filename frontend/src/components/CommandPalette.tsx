@@ -52,14 +52,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const navCommands: Command[] = useMemo(
     () => [
-      { id: 'monitor', label: t('nav.monitor'), hint: '/settings/system', run: () => navigate('/settings/system') },
       { id: 'today', label: t('nav.today'), hint: '/', run: () => navigate('/') },
-      { id: 'explore', label: t('nav.explore'), hint: '/explore', run: () => navigate('/explore') },
-      { id: 'changes', label: t('nav.changes'), hint: '/changes', run: () => navigate('/changes') },
+      { id: 'radar', label: t('nav.radar'), hint: '/radar', run: () => navigate('/radar') },
       { id: 'decisions', label: t('nav.decisions'), hint: '/decisions', run: () => navigate('/decisions') },
-      { id: 'watching', label: t('nav.watching'), hint: '/watching', run: () => navigate('/watching') },
-      { id: 'briefs', label: t('nav.briefs'), hint: '/briefs', run: () => navigate('/briefs') },
+      { id: 'chat', label: t('nav.chat'), hint: '/chat', run: () => navigate('/chat') },
       { id: 'settings', label: t('nav.settings'), hint: '/settings', run: () => navigate('/settings') },
+      { id: 'briefs', label: t('nav.briefs'), hint: '/briefs', run: () => navigate('/briefs') },
+      { id: 'monitor', label: t('nav.monitor'), hint: '/settings/system', run: () => navigate('/settings/system') },
       {
         id: 'push-now',
         label: t('common.pushNow'),
@@ -89,7 +88,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       {
         id: 'mark-all-read',
         label: armed === 'mark-all-read' ? t('feed.markAllReadConfirm') : t('feed.markAllRead'),
-        hint: armed === 'mark-all-read' ? t('common.confirm') : t('nav.feed'),
+        hint: armed === 'mark-all-read' ? t('common.confirm') : t('nav.radar'),
         run: () => {
           if (armed !== 'mark-all-read') {
             setArmed('mark-all-read')
@@ -102,7 +101,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               void qc.invalidateQueries({ queryKey: ['feed'] })
               void qc.invalidateQueries({ queryKey: ['unread-counts'] })
               void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-              navigate('/explore')
+              navigate('/radar?view=signals')
               pushToast('success', t('feed.markAllReadDone'))
             })
             .catch((err) => pushToast('error', t('common.loadFailed', { message: errorText(err, t) })))

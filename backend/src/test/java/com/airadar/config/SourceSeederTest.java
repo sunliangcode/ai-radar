@@ -10,7 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -40,6 +39,34 @@ class SourceSeederTest {
     }
 
     @Test
+    void createsNamedRssWhenMissing() {
+        when(sourceRepository.findFirstByName("IT之家")).thenReturn(Optional.empty());
+        when(sourceRepository.save(any(SourceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        seeder.ensureNamedRss("IT之家", "https://www.ithome.com/rss/");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(SourceEntity.class);
+        verify(sourceRepository).save(captor.capture());
+        SourceEntity saved = captor.getValue();
+        assertTrue(saved.isEnabled());
+        assertEquals("IT之家", saved.getName());
+        assertEquals(SourceType.RSS, saved.getType());
+    }
+
+    @Test
+    void doesNotRecreateExistingNamedRss() {
+        SourceEntity existing = new SourceEntity();
+        existing.setId(12L);
+        existing.setName("IT之家");
+        existing.setType(SourceType.RSS);
+        when(sourceRepository.findFirstByName("IT之家")).thenReturn(Optional.of(existing));
+
+        seeder.ensureNamedRss("IT之家", "https://www.ithome.com/rss/");
+
+        verify(sourceRepository, never()).save(any());
+    }
+
+    @Test
     void createsDisabledZhihuWhenCliMissing() {
         when(sourceRepository.findFirstByType(SourceType.ZHIHU)).thenReturn(Optional.empty());
         when(sourceRepository.save(any(SourceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -52,6 +79,38 @@ class SourceSeederTest {
         assertFalse(saved.isEnabled());
         assertEquals("知乎推荐", saved.getName());
         assertEquals("/no/such/zhihu-cli", readCliPath(saved));
+    }
+
+    @Test
+    void createsCliDomesticSourcesWhenMissing() {
+        when(sourceRepository.findFirstByType(SourceType.WEIBO)).thenReturn(Optional.empty());
+        when(sourceRepository.findFirstByType(SourceType.BILIBILI)).thenReturn(Optional.empty());
+        when(sourceRepository.save(any(SourceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        seeder.ensureOpenSourceCli(SourceType.WEIBO, "微博热搜", "weibo", 20, p -> false);
+        seeder.ensureOpenSourceCli(SourceType.BILIBILI, "B站热门", "bili", 20, p -> true);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(SourceEntity.class);
+        verify(sourceRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+        assertFalse(captor.getAllValues().get(0).isEnabled());
+        assertTrue(captor.getAllValues().get(1).isEnabled());
+        assertEquals(SourceType.BILIBILI, captor.getAllValues().get(1).getType());
+    }
+
+    @Test
+    void disablesRemovedHomemadeConnectors() {
+        SourceEntity juejin = new SourceEntity();
+        juejin.setId(7L);
+        juejin.setType(SourceType.JUEJIN);
+        juejin.setEnabled(true);
+        when(sourceRepository.findFirstByType(SourceType.JUEJIN)).thenReturn(Optional.of(juejin));
+        when(sourceRepository.findFirstByType(SourceType.CSDN)).thenReturn(Optional.empty());
+        when(sourceRepository.save(any(SourceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        seeder.disableRemovedConnectors(SourceType.JUEJIN, SourceType.CSDN);
+
+        assertFalse(juejin.isEnabled());
+        verify(sourceRepository).save(juejin);
     }
 
     @Test

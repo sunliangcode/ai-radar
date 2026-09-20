@@ -27,8 +27,8 @@ import java.util.Set;
 @Service
 public class IntelligenceHomeService {
 
-    private static final int MAJOR_CAP = 3;
-    private static final int MINOR_CAP = 5;
+    private static final int MAJOR_CAP = 5;
+    private static final int MINOR_CAP = 8;
 
     private final EventRepository eventRepository;
     private final TimelineEntryRepository timelineEntryRepository;
@@ -243,11 +243,13 @@ public class IntelligenceHomeService {
     }
 
     private List<Map<String, Object>> enrich(List<Map<String, Object>> cards) {
+        Set<Long> watchedIds = watchedChangeIds();
         for (Map<String, Object> card : cards) {
             Long eventId = asLong(card.get("eventId"));
             if (eventId == null) {
                 continue;
             }
+            card.put("watched", watchedIds.contains(eventId));
             List<Map<String, Object>> timeline = timelineEntryRepository.findByEventIdOrderByAtAsc(eventId).stream()
                     .sorted(Comparator.comparing(TimelineEntryEntity::getAt).reversed())
                     .limit(3)
@@ -269,6 +271,17 @@ public class IntelligenceHomeService {
             });
         }
         return cards;
+    }
+
+    private Set<Long> watchedChangeIds() {
+        Set<Long> ids = new LinkedHashSet<>();
+        for (Map<String, Object> sub : watchSubscriptionService.listAll()) {
+            Long changeId = asLong(sub.get("changeId"));
+            if (changeId != null) {
+                ids.add(changeId);
+            }
+        }
+        return ids;
     }
 
     private static Long asLong(Object value) {

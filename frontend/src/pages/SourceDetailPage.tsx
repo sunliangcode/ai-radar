@@ -1,25 +1,64 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { PageHeader, ScoreBar, StateBox } from '../components/ui'
+import { Button, PageHeader, ScoreBar, StateBox, useToast } from '../components/ui'
 import { errorText } from '../lib/errors'
+import { useConnectors } from '../hooks/useConnectors'
+import { SourceConfigFieldInput } from './sources/SourceConfigFieldInput'
+import { buildSourceConfig } from './sources/buildSourceConfig'
 
-function formatConfigValue(value: unknown): string {
-  if (value == null) return '—'
-  if (Array.isArray(value)) return value.map(String).join(', ')
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
+function configToFieldValues(config: Record<string, unknown> | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!config) return out
+  for (const [key, value] of Object.entries(config)) {
+    if (value == null) continue
+    if (Array.isArray(value)) out[key] = value.map(String).join(', ')
+    else if (typeof value === 'object') out[key] = JSON.stringify(value)
+    else out[key] = String(value)
+  }
+  return out
 }
 
 export default function SourceDetailPage() {
   const { t } = useTranslation()
+  const { push: pushToast } = useToast()
+  const qc = useQueryClient()
   const { id } = useParams()
   const sourceId = Number(id)
+  const connectors = useConnectors()
   const q = useQuery({
     queryKey: ['source', sourceId],
     queryFn: () => api.source(sourceId),
     enabled: Number.isFinite(sourceId),
+  })
+
+  const descriptor = useMemo(
+    () => connectors.data?.find((d) => d.id === q.data?.type),
+    [connectors.data, q.data?.type],
+  )
+
+  const serverValues = useMemo(
+    () => configToFieldValues(q.data?.config),
+    [q.data?.config],
+  )
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
+  const fieldValues = { ...serverValues, ...overrides }
+
+  useEffect(() => {
+    setOverrides({})
+  }, [sourceId])
+
+  const patch = useMutation({
+    mutationFn: (body: unknown) => api.patchSource(sourceId, body),
+    onSuccess: () => {
+      setOverrides({})
+      void qc.invalidateQueries({ queryKey: ['source', sourceId] })
+      void qc.invalidateQueries({ queryKey: ['sources'] })
+      pushToast('success', t('sources.updated'))
+    },
+    onError: (e) => pushToast('error', errorText(e, t)),
   })
 
   if (q.isLoading) return <StateBox>{t('common.loading')}</StateBox>
@@ -27,7 +66,13 @@ export default function SourceDetailPage() {
   if (!q.data) return <StateBox>{t('sources.notFound')}</StateBox>
 
   const s = q.data
-  const configEntries = Object.entries(s.config ?? {})
+  const fields = descriptor?.configFields ?? []
+  const isOssCli = s.type === 'ZHIHU' || s.type === 'WEIBO' || s.type === 'BILIBILI'
+
+  function saveConfig() {
+    const config = buildSourceConfig(descriptor, fieldValues)
+    patch.mutate({ config })
+  }
 
   return (
     <div>
@@ -42,18 +87,31 @@ export default function SourceDetailPage() {
       />
 
       <section className="mb-6 rounded-xl border border-border bg-surface/80 p-4">
-        <h3 className="mb-3 font-serif text-lg text-ink">{t('sources.config')}</h3>
-        {configEntries.length === 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-serif text-lg text-ink">{t('sources.config')}</h3>
+          {fields.length > 0 ? (
+            <Button type="button" loading={patch.isPending} onClick={saveConfig}>
+              {patch.isPending ? t('common.saving') : t('sources.saveConfig')}
+            </Button>
+          ) : null}
+        </div>
+        {isOssCli ? (
+          <p className="mb-3 text-xs text-muted">{t('sources.ossCliHint')}</p>
+        ) : null}
+        {fields.length === 0 ? (
           <p className="text-sm text-muted">—</p>
         ) : (
-          <dl className="grid gap-3 sm:grid-cols-2">
-            {configEntries.map(([key, value]) => (
-              <div key={key}>
-                <dt className="text-xs uppercase tracking-wide text-muted">{key}</dt>
-                <dd className="mt-1 break-all text-sm text-ink">{formatConfigValue(value)}</dd>
-              </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {fields.map((field) => (
+              <SourceConfigFieldInput
+                key={field.key}
+                field={field}
+                value={fieldValues[field.key] ?? ''}
+                onChange={(v) => setOverrides((prev) => ({ ...prev, [field.key]: v }))}
+                pasteLabel={t('sources.pasteCookie')}
+              />
             ))}
-          </dl>
+          </div>
         )}
       </section>
 

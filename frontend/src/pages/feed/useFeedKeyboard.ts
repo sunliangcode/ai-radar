@@ -4,7 +4,7 @@ import { isZhihuSource } from '../../components/magazine/magCover'
 
 /**
  * Feed keyboard: j/k (n/p in focus) move; Enter open original (drawer for Zhihu);
- * o open drawer; s save; m read; / search.
+ * o open drawer; s save; x not-interested (advance); m read; / search.
  * When the drawer is open, j/k still advances selection (drawer content follows).
  */
 export function useFeedKeyboard({
@@ -17,6 +17,7 @@ export function useFeedKeyboard({
   onCloseDrawer,
   onOpenExternal,
   onToggleSaved,
+  onDismiss,
   onMarkRead,
   onFocusSearch,
 }: {
@@ -29,6 +30,7 @@ export function useFeedKeyboard({
   onCloseDrawer: () => void
   onOpenExternal: (item: Item) => void
   onToggleSaved: (item: Item) => void
+  onDismiss?: (item: Item) => void
   onMarkRead: (item: Item) => void
   onFocusSearch: () => void
 }) {
@@ -76,6 +78,14 @@ export function useFeedKeyboard({
       } else if (e.key === 's') {
         const cur = items[idx]
         if (cur) onToggleSaved(cur)
+      } else if (e.key === 'x' || e.key === 'X') {
+        const cur = items[idx]
+        if (cur && onDismiss) {
+          e.preventDefault()
+          const next = items[Math.min(items.length - 1, Math.max(0, idx) + 1)]
+          onDismiss(cur)
+          if (next && next.id !== cur.id) onSelect(next.id)
+        }
       } else if (e.key === 'm') {
         const cur = items[idx]
         if (cur && !cur.read) onMarkRead(cur)
@@ -96,6 +106,7 @@ export function useFeedKeyboard({
     onCloseDrawer,
     onOpenExternal,
     onToggleSaved,
+    onDismiss,
     onMarkRead,
     onFocusSearch,
   ])

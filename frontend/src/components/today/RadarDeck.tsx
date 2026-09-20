@@ -103,7 +103,7 @@ export function RadarDeck({
     return (
       <InboxZeroBurst title={t('today.deckClearTitle')} subtitle={t('today.deckClearSubtitle')}>
         <Link
-          to="/explore"
+          to="/radar"
           className="inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
         >
           {t('today.exploreLink')}

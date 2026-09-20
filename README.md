@@ -7,13 +7,13 @@ English | [中文](README.zh.md)
 
 # AI Radar
 
-### Your personal AI intelligence system.
+### Personal AI Intelligence Radar
 
 ```
-Your Context → Signals → Score & Summarize → Today Deck → Decide
+Context → Signal → Change → Decision → Review on Today
 ```
 
-Know what changed. Know why it matters. Know what to do.
+Know what changed. Know why it matters. Decide what to do.
 
 [Demo](#demo)
 · [Quick Start](#quick-start)
@@ -25,16 +25,16 @@ Know what changed. Know why it matters. Know what to do.
 
 ### Why AI Radar?
 
-Most AI news is noise. AI Radar filters that noise against your context and surfaces only changes worth your attention — then helps you decide what to do.
+Most AI news is noise. AI Radar filters that noise against your context and surfaces only **changes** worth your attention — then helps you decide what to do.
 
+- ✓ **Today** — Daily home: 3–5 Changes that matter, why they matter, and what you can do
 - ✓ **Personal Context** — Profile, projects, and stack so relevance is about *you*
-- ✓ **Primary language** — Summaries in zh/en via LLM; English titles localized with **Argos Translate** (offline sidecar)
-- ✓ **Today Radar Deck** — Up to three major changes a day; **Watch**, **Dismiss**, or **Decide** one card at a time
-- ✓ **Explore** — Full signal browse with one-sentence AI summaries (legacy Feed lives here)
-- ✓ **Like / dislike keywords** — Save or mark Not interested to teach preference phrases
-- ✓ **Changes & Decisions** — Why a shift matters in plain language, plus decisions to revisit
-- ✓ **Radar Chat** — Multi-turn chat with your model; seed from a change via `?changeId=`
-- ✓ **AI Monitor** — Queue progress and streaming I/O under **Settings → System**
+- ✓ **Radar** — Browse-first waterfall feed with light save / skip feedback; Changes on demand
+- ✓ **CN sources first** — Empty DB seeds `ai-cn` (Zhihu / Weibo / Bilibili CLI + CN RSS / V2EX / …)
+- ✓ **Decisions** — Record Observe / Act choices and revisit when needed
+- ✓ **Chat** — Interpreter for a Change (seed via Ask AI), not a second feed
+- ✓ **Briefs** — Push artifact / archive (`/briefs/:date`), not a primary nav page
+- ✓ **Settings → System** — Health and AI monitor for self-host diagnostics
 
 ---
 
@@ -44,15 +44,15 @@ Most AI news is noise. AI Radar filters that noise against your context and surf
 
 - **What changed** — What truly mattered in the AI world today?
 - **Why care** — Why does this matter for *your* projects and stack?
-- **What to do** — Watch, dismiss, or decide — then revisit when needed.
+- **What to do** — Follow, ask AI, explore, or decide — then revisit when needed.
 
 **Demo story**
 
-1. Open **Who I am** (Settings / Context) and describe your role, projects, and tech stack; set your **primary language** (Chinese or English).
-2. Import a source pack if needed, then **Update once** — fetch scores and summarizes signals, then recomputes impact.
-3. Clear the **Today** Radar Deck one card at a time (**Watch** / **Dismiss** / **Decide**).
-4. Browse the full stream in **Explore**; open a change for evidence, or jump into **Radar Chat** from a change.
-5. Check **Settings → System** for queue progress and live Ollama token streaming.
+1. Open **Settings → Context** and describe your role, projects, and tech stack; set your primary language.
+2. Import a source pack if needed, then **Update once**.
+3. On **Today**, work through Changes that matter (**Explore** / **Ask AI** / **Follow** / **Not now**).
+4. Use **Radar** to search Changes or scan Signals; jump into **Chat** from a Change.
+5. Check **Settings → System** for self-host diagnostics.
 
 ---
 

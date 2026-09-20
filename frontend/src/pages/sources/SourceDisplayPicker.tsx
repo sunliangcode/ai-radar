@@ -1,16 +1,29 @@
 import { useTranslation } from 'react-i18next'
 import type { Source } from '../../lib/api'
 import { useDisplaySources } from '../../hooks/useDisplaySources'
+import {
+  DOMESTIC_SOURCE_TYPES,
+  FOREIGN_SOURCE_TYPES,
+  type SourceRegionMode,
+} from '../../lib/displaySources'
+
+function modeButtonClass(active: boolean): string {
+  return active
+    ? 'rounded-md border border-accent/50 bg-accent/10 px-2.5 py-1 text-xs text-accent'
+    : 'rounded-md border border-border px-2.5 py-1 text-xs text-ink transition hover:border-accent/40 hover:text-accent disabled:opacity-40'
+}
 
 export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
   const { t } = useTranslation()
   const {
     displaySourceIds,
+    regionMode,
     isRestricted,
     selectedCount,
     enabledCount,
     allSelected,
     noneSelected,
+    setRegionMode,
     setAllDisplayed,
     setNoneDisplayed,
     toggleDisplayed,
@@ -20,8 +33,19 @@ export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
   const enabled = sources.filter((s) => s.enabled)
   if (enabled.length === 0) return null
 
+  const domesticIds = enabled
+    .filter((s) => DOMESTIC_SOURCE_TYPES.has((s.type ?? '').toUpperCase()))
+    .map((s) => s.id)
+  const foreignIds = enabled
+    .filter((s) => FOREIGN_SOURCE_TYPES.has((s.type ?? '').toUpperCase()))
+    .map((s) => s.id)
+
   const masterChecked = allSelected
   const masterIndeterminate = isRestricted && !noneSelected && !allSelected
+
+  function applyMode(mode: SourceRegionMode) {
+    setRegionMode(mode)
+  }
 
   return (
     <section className="mb-6 rounded-xl border border-border bg-surface/70 px-4 py-4">
@@ -33,11 +57,27 @@ export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="rounded-md border border-border px-2.5 py-1 text-xs text-ink transition hover:border-accent/40 hover:text-accent disabled:opacity-40"
-            disabled={allSelected}
-            onClick={setAllDisplayed}
+            className={modeButtonClass(regionMode === 'domestic')}
+            disabled={domesticIds.length === 0}
+            onClick={() => applyMode('domestic')}
           >
-            {t('sources.displaySelectAll')}
+            {t('sources.regionDomestic')}
+          </button>
+          <button
+            type="button"
+            className={modeButtonClass(regionMode === 'foreign')}
+            disabled={foreignIds.length === 0}
+            onClick={() => applyMode('foreign')}
+          >
+            {t('sources.regionForeign')}
+          </button>
+          <button
+            type="button"
+            className={modeButtonClass(regionMode === 'all')}
+            disabled={allSelected && regionMode === 'all'}
+            onClick={() => applyMode('all')}
+          >
+            {t('sources.regionAll')}
           </button>
           <button
             type="button"

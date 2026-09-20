@@ -87,8 +87,9 @@ User-visible changes → update `CHANGELOG.md` (PR template checkbox).
 - **Default LLM is local Ollama** (`OPENAI_BASE_URL=http://localhost:11434/v1`, no API key for localhost). Cloud still needs `OPENAI_API_KEY`. LLM failure falls back to heuristics — unit tests do not need a live model.
 - **Backend tests are plain unit tests** (no `@SpringBootTest`). `./mvnw test` does not boot Spring, touch SQLite, or call the network. Keep it that way unless you intentionally add integration tests.
 - **en→zh titles use Argos Translate** (`translate-service/`, port 8765), **not** the LLM. Sidecar down → titles stay English; scoring/summarize still work. Do not install `argostranslate[stanza]` (see `docs/installation.md`).
-- **Packs**: empty DB is seeded from packs `ai-core` + `ai-cn` on first boot. `pom.xml` copies `packs/sources/*.json` and `packs/profiles/**` into the jar classpath. Prefer editing pack JSON over hardcoding sources.
-- **Zhihu boot seeder**: every startup, `SourceSeeder.ensureZhihu` creates 「知乎推荐」 if missing. Default-enable only when the preferred CLI is executable (`ZHIHU_CLI_PATH` else `ZhihuConnector.DEFAULT_CLI`). Does not overwrite a working custom `cliPath`. Missing binary → source created **disabled** so other machines stay quiet.
+- **Packs**: empty DB is seeded from pack `ai-cn` on first boot (CN-first). Import `ai-core` / `ai-signals` via Settings when needed. `pom.xml` copies `packs/sources/*.json` and `packs/profiles/**` into the jar classpath. Prefer editing pack JSON over hardcoding sources.
+- **Zhihu / Weibo / Bilibili boot seeders**: every startup ensures 「知乎推荐」「微博热搜」「B站热门」 if missing. Default-enable only when the preferred CLI is executable (`ZHIHU_CLI_PATH` / `WEIBO_CLI_PATH` / `BILI_CLI_PATH`, else connector defaults). Does not overwrite a working custom `cliPath`. Paste Cookie in Sources UI — fetch writes CLI credential files (or `ZHIHU_COOKIE`). Missing binary → source created **disabled**. Homemade `JUEJIN` / `CSDN` rows are **disabled** on boot (no OSS connector).
+- **CN RSS seeders**: every startup ensures IT之家 / Solidot / 极客公园 / 爱范儿 by name if missing (RSS).
 - **Jobs**: fetch/push/cluster are mutex-guarded; overlapping runs return **409**. Manual: `POST /api/jobs/fetch`, `POST /api/jobs/push`, `POST /api/jobs/cluster`. Health: `GET /api/health`.
 - **Extensibility contracts**: connectors implement `SourceConnector` (`@Component` under `com.airadar.connector`); delivery implements `DeliveryChannel`. New type codes need a `SourceType` enum value. Details: `docs/extending-connectors.md`, `docs/extending-delivery.md`.
 - **OpenAPI**: springdoc at `/swagger-ui.html` and `/api-docs` (also proxied in Vite dev).
@@ -98,6 +99,7 @@ User-visible changes → update `CHANGELOG.md` (PR template checkbox).
 - Scripts: `dev`, `build`, `build:embed` (`RADAR_EMBED=1`), `lint` (oxlint), `test` (vitest).
 - `build:embed` `emptyOutDir: true` wipes `backend/src/main/resources/static/` — expected; do not hand-edit those baked assets.
 - i18n via `react-i18next`; primary language is a Settings concept (`summaryLanguage` zh/en), not a locale switch of the whole SPA.
+- **Source region modes** (localStorage): 国内模式 / 国外模式 / 全部 on Settings → Sources display picker.
 
 ## Do not commit
 

@@ -1,18 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type ImpactCard } from '../lib/api'
 import {
   Button,
-  ImmersiveDrawer,
   ListSkeleton,
   PageHeader,
   StateBox,
   useToast,
 } from '../components/ui'
-import { DecisionForm, type DecisionKind } from '../components/change/DecisionForm'
-import { RadarDeck } from '../components/today/RadarDeck'
+import { ChangeAttentionList } from '../components/today/ChangeAttentionList'
 import { PackPicker } from '../components/PackPicker'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
@@ -22,9 +19,29 @@ import { useDisplaySources } from '../hooks/useDisplaySources'
 import { useChangeSourceMap } from '../hooks/useChangeSourceMap'
 import { impactEventMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
+import { dateLocale } from '../i18n'
+
+function greetingKey(hour: number) {
+  if (hour < 12) return 'today.goodMorning'
+  if (hour < 18) return 'today.goodAfternoon'
+  return 'today.goodEvening'
+}
+
+function todayIsoDate(timeZone?: string) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || undefined,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+  } catch {
+    return new Date().toISOString().slice(0, 10)
+  }
+}
 
 export default function TodayPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const engagement = useEngagement()
@@ -32,8 +49,6 @@ export default function TodayPage() {
   const sources = useSources()
   const { displaySourceIds } = useDisplaySources()
   const changeSourceMap = useChangeSourceMap()
-  const [decideCard, setDecideCard] = useState<ImpactCard | null>(null)
-  const [decideKind, setDecideKind] = useState<DecisionKind>('watch')
 
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['intelligence-home'],
@@ -62,38 +77,12 @@ export default function TodayPage() {
     onError: (err) => pushToast('error', errorText(err, t)),
   })
 
-  const watchMut = useMutation({
+  const followMut = useMutation({
     mutationFn: (changeId: number) => api.putWatch(changeId, { capability: true, api: true }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['intelligence-home'] })
       await qc.invalidateQueries({ queryKey: ['watching'] })
-      pushToast('success', t('today.watched'))
-    },
-    onError: (err) => pushToast('error', errorText(err, t)),
-  })
-
-  const decisionMut = useMutation({
-    mutationFn: ({
-      changeId,
-      kind,
-      reason,
-      revisitAt,
-    }: {
-      changeId: number
-      kind: DecisionKind
-      reason: string
-      revisitAt: string
-    }) =>
-      api.postChangeDecision(changeId, {
-        kind,
-        reason: reason || undefined,
-        revisitAt: revisitAt ? `${revisitAt}T00:00:00Z` : undefined,
-      }),
-    onSuccess: async () => {
-      setDecideCard(null)
-      await qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-      await qc.invalidateQueries({ queryKey: ['decisions'] })
-      pushToast('success', t(engagement.decisionToastKey()))
+      pushToast('success', t('today.followed'))
     },
     onError: (err) => pushToast('error', errorText(err, t)),
   })
@@ -104,8 +93,9 @@ export default function TodayPage() {
   const filterCard = (card: ImpactCard) =>
     impactEventMatchesDisplay(card.eventId, changeSourceMap, displaySourceIds)
 
-  const major = (data?.majorChanges ?? data?.todayChanges ?? []).filter(filterCard).slice(0, 3)
-  const minor = (data?.minorSignals ?? []).filter(filterCard).slice(0, 5)
+  const major = (data?.majorChanges ?? data?.todayChanges ?? []).filter(filterCard).slice(0, 5)
+  const minor = (data?.minorSignals ?? []).filter(filterCard).slice(0, 8)
+  const following = major.filter((c) => c.watched)
   const revisit = (data?.decisionsToRevisit ?? [])
     .filter((d) => impactEventMatchesDisplay(d.changeId, changeSourceMap, displaySourceIds))
     .slice(0, 1)
@@ -114,11 +104,15 @@ export default function TodayPage() {
   )
   const majorCount = major.length
   const ready = major.length > 0 || minor.length > 0
-
-  const openDecide = (card: ImpactCard, kind: DecisionKind = 'watch') => {
-    setDecideKind(kind)
-    setDecideCard(card)
-  }
+  const busy = dismissMut.isPending || followMut.isPending
+  const locale = dateLocale(i18n.language)
+  const dateLabel = new Date().toLocaleDateString(locale, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+  const briefDate = todayIsoDate()
+  const hour = new Date().getHours()
 
   const runFetch = () => {
     fetchJob.mutate(undefined, {
@@ -126,19 +120,11 @@ export default function TodayPage() {
     })
   }
 
-  const onDeckCleared = useCallback(() => {
-    if (engagement.claimDeckCleared()) {
-      pushToast('success', t(engagement.deckClearToastKey()))
-    }
-  }, [engagement, pushToast, t])
-
-  const busy = dismissMut.isPending || watchMut.isPending || decisionMut.isPending
-
   return (
     <div>
       <PageHeader
-        title={t('today.radarTitle', { count: majorCount })}
-        subtitle={t('today.subtitle')}
+        title={t(greetingKey(hour))}
+        subtitle={dateLabel}
         actions={
           <Button onClick={runFetch} loading={isPending}>
             {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
@@ -213,36 +199,85 @@ export default function TodayPage() {
 
       {ready ? (
         <>
-          <RadarDeck
-            cards={major}
-            busy={busy}
-            onWatch={(c) => c.eventId && watchMut.mutate(c.eventId)}
-            onDismiss={(c) => c.eventId && dismissMut.mutate(c.eventId)}
-            onDecide={(c) => openDecide(c, 'watch')}
-            onInvestigate={(c) => openDecide(c, 'investigate')}
-            onCleared={onDeckCleared}
-          />
+          <p className="mb-4 text-base font-medium text-ink">
+            {t('today.attentionCount', { count: majorCount })}
+          </p>
 
-          {minor.length > 0 ? (
-            <details className="mb-6 rounded-lg border border-border bg-surface/50 px-4 py-3">
-              <summary className="cursor-pointer text-sm font-medium text-muted">
-                {t('today.minorSignals')}
-              </summary>
-              <ul className="mt-3 space-y-2">
-                {minor.map((card) => (
-                  <li key={card.id} className="text-sm">
-                    <Link to={`/changes/${card.eventId}`} className="text-accent hover:underline">
+          {major.length > 0 ? (
+            <ChangeAttentionList
+              cards={major}
+              busy={busy}
+              onFollow={(c) => c.eventId && followMut.mutate(c.eventId)}
+              onDismiss={(c) => c.eventId && dismissMut.mutate(c.eventId)}
+            />
+          ) : null}
+
+          <div className="mt-6">
+            <Link
+              to="/radar"
+              className="inline-flex min-h-10 items-center rounded-full border border-border bg-surface px-4 text-sm font-medium text-ink transition hover:border-accent/40 hover:text-accent"
+            >
+              {t('today.exploreLink')}
+            </Link>
+          </div>
+
+          {following.length > 0 ? (
+            <section className="mt-8">
+              <h2 className="font-mono text-[10px] uppercase tracking-wider text-faint">
+                {t('today.followingSection')}
+              </h2>
+              <ul className="mt-2 space-y-1.5">
+                {following.map((card) => (
+                  <li key={`follow-${card.eventId}`}>
+                    <Link
+                      to={`/changes/${card.changeId ?? card.eventId}`}
+                      className="text-sm text-accent hover:underline"
+                    >
                       {card.title}
                     </Link>
-                    {card.why ? <p className="text-xs text-muted line-clamp-2">{card.why}</p> : null}
                   </li>
                 ))}
               </ul>
-            </details>
+            </section>
           ) : null}
 
-          <p className="text-xs text-muted">
-            <Link to="/explore" className="text-accent hover:underline">
+          {minor.length > 0 ? (
+            <section className="mt-8 border-t border-border pt-6">
+              <h2 className="text-sm font-medium text-muted">
+                {t('today.moreSignals', { count: minor.length })}
+              </h2>
+              <ul className="mt-3 space-y-2">
+                {minor.map((card) => (
+                  <li key={card.id ?? card.eventId} className="text-sm">
+                    <Link
+                      to={`/changes/${card.eventId}`}
+                      state={{ from: '/' }}
+                      className="text-ink hover:text-accent"
+                    >
+                      {card.title}
+                    </Link>
+                    {card.why ? <p className="text-xs text-muted line-clamp-1">{card.why}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section className="mt-8 border-t border-border pt-6">
+            <h2 className="font-mono text-[10px] uppercase tracking-wider text-faint">
+              {t('today.dailyBrief')}
+            </h2>
+            <p className="mt-1 text-sm text-muted">{t('today.dailyBriefHint')}</p>
+            <Link
+              to={`/briefs/${briefDate}`}
+              className="mt-2 inline-block text-sm text-accent hover:underline"
+            >
+              {t('today.viewBrief')}
+            </Link>
+          </section>
+
+          <p className="mt-6 text-xs text-muted">
+            <Link to="/radar" className="text-accent hover:underline">
               {t('today.exploreLink')}
             </Link>
             {' · '}
@@ -252,24 +287,6 @@ export default function TodayPage() {
           </p>
         </>
       ) : null}
-
-      <ImmersiveDrawer
-        open={!!decideCard}
-        onClose={() => setDecideCard(null)}
-        title={t('decisions.record')}
-        subtitle={decideCard?.title}
-      >
-        {decideCard?.eventId ? (
-          <DecisionForm
-            defaultKind={decideKind}
-            loading={decisionMut.isPending}
-            onCancel={() => setDecideCard(null)}
-            onSubmit={(kind, reason, revisitAt) =>
-              decisionMut.mutate({ changeId: decideCard.eventId!, kind, reason, revisitAt })
-            }
-          />
-        ) : null}
-      </ImmersiveDrawer>
     </div>
   )
 }

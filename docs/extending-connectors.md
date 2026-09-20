@@ -36,16 +36,20 @@ public interface SourceConnector {
 | `TWITTER` | Apify actor | requires `APIFY_TOKEN` |
 | `WEB` | HTML + AI extract | `url`, `extractionPrompt` |
 | `EMAIL` | IMAP unread + AI extract | `EMAIL_INGEST_ENABLED` + IMAP_* |
-| `ZHIHU` | Local `zhihu` CLI (`feeds` + comments) | needs login Cookie; `cliPath` / `ZHIHU_CLI_PATH` |
+| `ZHIHU` | Open-source `zhihu` CLI | `cliPath`, paste `cookie` (or `ZHIHU_COOKIE` / `zhihu login`) |
+| `WEIBO` | Open-source [weibo-cli](https://github.com/jackwener/weibo-cli) | `cliPath`, paste `cookie` → `~/.config/weibo-cli/credential.json` |
+| `BILIBILI` | Open-source [bilibili-cli](https://github.com/public-clis/bilibili-cli) | `cliPath`, paste `cookie` → `~/.bilibili-cli/credential.json` |
 | `FIXTURE` | Local JSON | demos / offline |
 
 Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.enabled`), with optional `WEB_FETCH_PARALLELISM` (default 4).
 
-Empty databases are seeded from packs `ai-core` + `ai-cn` via `PackImportService` (filesystem `packs/` or classpath). Prefer editing pack JSON rather than hard-coding sources.
+Empty databases are seeded from pack `ai-cn` via `PackImportService` (filesystem `packs/` or classpath). Import `ai-core` from the UI when you want English AI sources. Prefer editing pack JSON rather than hard-coding sources.
 
-**Zhihu** is ensured on every boot (`SourceSeeder.ensureZhihu`): creates 「知乎推荐」 if missing. New sources are **enabled only when the CLI binary is present** (`ZHIHU_CLI_PATH` or `ZhihuConnector.DEFAULT_CLI`). A working custom `cliPath` is never overwritten; a missing path is repaired only when a preferred binary is ready. Runtime fetch also honors `ZHIHU_CLI_PATH`.
+**Zhihu / Weibo / Bilibili** are ensured on every boot: create the named source if missing; **enabled only when the preferred CLI binary is present**. A working custom `cliPath` is never overwritten. Paste Cookie in the Sources UI — AI Radar writes the open-source CLI credential file (or sets `ZHIHU_COOKIE`) so you do not configure each CLI project separately.
 
-The UI loads field schemas from `GET /api/connectors`.
+**Removed (no OSS)**: homemade `JUEJIN` / `CSDN` HTTP scrapers. Enum values remain for old DB rows; boot disables them.
+
+The UI loads field schemas from `GET /api/connectors`. Config field type `secret` renders a textarea + clipboard paste for Cookie one-click setup.
 
 ## Steps to add a connector
 
@@ -70,7 +74,7 @@ See `backend/src/main/java/com/airadar/connector/FixtureConnector.java`.
 Importable presets under `packs/sources/`:
 
 - `ai-core.json` — English AI blogs + Google News / GDELT / OSS Insight / Trending
-- `ai-cn.json` — WeChat bridges, 36氪, 即刻, V2EX, CN Google News, Zhihu
+- `ai-cn.json` — WeChat bridges, 36氪, 即刻, V2EX, CN Google News, Zhihu / Weibo / Bilibili (OSS CLI), IT之家, Solidot, 极客公园, 爱范儿
 - `ai-signals.json` — Product Hunt / Twitter / WEB / EMAIL samples (often disabled until tokens are set)
 
 ```bash

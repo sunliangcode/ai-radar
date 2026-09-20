@@ -10,26 +10,52 @@ export default function SettingsHubPage() {
   const { t } = useTranslation()
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings })
 
-  const cards = [
+  const sections: { label: string; cards: { to: string; title: string; desc: string; muted?: boolean }[] }[] = [
     {
-      to: '/settings/context',
-      title: t('settingsHub.context'),
-      desc: t('settingsHub.contextDesc'),
+      label: t('settingsHub.sectionPersonal'),
+      cards: [
+        {
+          to: '/settings/context',
+          title: t('settingsHub.context'),
+          desc: t('settingsHub.contextDesc'),
+        },
+        {
+          to: '/settings/preferences',
+          title: t('settingsHub.preferences'),
+          desc: t('settingsHub.preferencesDesc'),
+        },
+      ],
     },
     {
-      to: '/settings/sources',
-      title: t('settingsHub.sources'),
-      desc: t('settingsHub.sourcesDesc'),
+      label: t('settingsHub.sectionSources'),
+      cards: [
+        {
+          to: '/settings/sources',
+          title: t('settingsHub.sources'),
+          desc: t('settingsHub.sourcesDesc'),
+        },
+      ],
     },
     {
-      to: '/settings/preferences',
-      title: t('settingsHub.preferences'),
-      desc: t('settingsHub.preferencesDesc'),
+      label: t('settingsHub.sectionNotifications'),
+      cards: [
+        {
+          to: '/settings/preferences',
+          title: t('settingsHub.notifications'),
+          desc: t('settingsHub.notificationsDesc'),
+        },
+      ],
     },
     {
-      to: '/settings/system',
-      title: t('settingsHub.system'),
-      desc: t('settingsHub.systemDesc'),
+      label: t('settingsHub.sectionSystem'),
+      cards: [
+        {
+          to: '/settings/system',
+          title: t('settingsHub.systemAdvanced'),
+          desc: t('settingsHub.systemDesc'),
+          muted: true,
+        },
+      ],
     },
   ]
 
@@ -45,23 +71,32 @@ export default function SettingsHubPage() {
         </div>
       ) : null}
 
-      <div className="mb-6">
+      <div className="mb-8">
         <SystemHealthCard />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {cards.map((c) => (
-          <Link
-            key={c.to}
-            to={c.to}
-            className="group rounded-xl border border-border bg-surface p-5 transition hover:border-accent/50"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-medium text-ink">{c.title}</h3>
+      <div className="space-y-8">
+        {sections.map((section) => (
+          <section key={section.label}>
+            <h2 className="mb-3 font-mono text-[10px] uppercase tracking-wider text-faint">
+              {section.label}
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              {section.cards.map((c) => (
+                <Link
+                  key={`${section.label}-${c.to}-${c.title}`}
+                  to={c.to}
+                  className={`group rounded-xl border border-border bg-surface p-5 transition hover:border-accent/50 ${
+                    c.muted ? 'opacity-80' : ''
+                  }`}
+                >
+                  <h3 className="text-base font-medium text-ink">{c.title}</h3>
+                  <p className="mt-2 text-sm text-muted">{c.desc}</p>
+                  <p className="mt-4 text-sm text-accent group-hover:underline">→</p>
+                </Link>
+              ))}
             </div>
-            <p className="mt-2 text-sm text-muted">{c.desc}</p>
-            <p className="mt-4 text-sm text-accent group-hover:underline">→</p>
-          </Link>
+          </section>
         ))}
       </div>
     </div>

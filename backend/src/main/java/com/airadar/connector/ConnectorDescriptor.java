@@ -19,5 +19,10 @@ public record ConnectorDescriptor(
         public static ConfigField path(String key, String label, boolean required) {
             return new ConfigField(key, label, "path", required);
         }
+
+        /** Multi-line secret (Cookie paste). Stored in source config; UI uses textarea. */
+        public static ConfigField secret(String key, String label, boolean required) {
+            return new ConfigField(key, label, "secret", required);
+        }
     }
 }

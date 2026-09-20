@@ -52,7 +52,13 @@ function nextItemId(items: Item[], selectedId: number | null): number | null {
   return next?.id ?? null
 }
 
-export default function FeedPage() {
+export default function FeedPage({
+  forceUnread,
+  hideTitle,
+}: {
+  forceUnread?: boolean
+  hideTitle?: boolean
+} = {}) {
   const { t, i18n } = useTranslation()
   const locale = dateLocale(i18n.language)
   const listRef = useRef<HTMLDivElement>(null)
@@ -64,9 +70,9 @@ export default function FeedPage() {
   const [showInboxZero, setShowInboxZero] = useState(false)
   const prevUnread = useRef<number | null>(null)
 
-  const urlView = searchParams.get('view')
+  const layoutParam = searchParams.get('layout')
   const [exploreView, setExploreView] = useState<ExploreView>(() =>
-    urlView === 'focus' ? 'focus' : loadExploreView(),
+    layoutParam === 'focus' ? 'focus' : loadExploreView(),
   )
 
   const setView = useCallback(
@@ -76,8 +82,8 @@ export default function FeedPage() {
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev)
-          if (v === 'focus') next.set('view', 'focus')
-          else next.delete('view')
+          if (v === 'focus') next.set('layout', 'focus')
+          else next.delete('layout')
           return next
         },
         { replace: true },
@@ -87,8 +93,8 @@ export default function FeedPage() {
   )
 
   useEffect(() => {
-    if (urlView === 'focus' && exploreView !== 'focus') setExploreView('focus')
-  }, [urlView, exploreView])
+    if (layoutParam === 'focus' && exploreView !== 'focus') setExploreView('focus')
+  }, [layoutParam, exploreView])
 
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['feed'],
@@ -98,6 +104,11 @@ export default function FeedPage() {
   ])
 
   const list = useFeedList(!!progress?.running)
+
+  useEffect(() => {
+    if (forceUnread) list.setUnreadOnly(true)
+  }, [forceUnread, list.setUnreadOnly])
+
   const actions = useFeedActions(list.unreadOnly)
   const filteredSource = Boolean(list.sourceType)
   const focusMode = exploreView === 'focus'
@@ -137,6 +148,7 @@ export default function FeedPage() {
     onCloseDrawer: closeDrawer,
     onOpenExternal: actions.openExternalAndMarkRead,
     onToggleSaved: actions.toggleSaved,
+    onDismiss: actions.dismissItem,
     onMarkRead: actions.markItemSelectedRead,
     onFocusSearch: focusSearch,
   })
@@ -202,6 +214,8 @@ export default function FeedPage() {
             ? () => openDrawer(item.id)
             : () => actions.markReadOnOpen(item)
         }
+        onSwipeSave={() => actions.saveItem(item)}
+        onSwipeDismiss={() => actions.dismissItem(item)}
         meta={
           <>
             <span className="tabular-nums">
@@ -222,40 +236,22 @@ export default function FeedPage() {
           </>
         }
         actions={
-          zhihu ? (
-            <>
-              <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
-                {item.saved ? t('feed.unsave') : t('feed.save')}
-              </MagAction>
+          <>
+            <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
+              {item.saved ? t('feed.unsave') : t('feed.save')}
+            </MagAction>
+            <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
+              {t('feed.notInterested')}
+            </MagAction>
+          </>
+        }
+        secondaryActions={
+          <>
+            {zhihu ? (
               <MagAction onClick={() => openDrawer(item.id)} tone="accent">
                 {t('feed.expand')}
               </MagAction>
-            </>
-          ) : (
-            <>
-              <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
-                {item.saved ? t('feed.unsave') : t('feed.save')}
-              </MagAction>
-              <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
-                {t('feed.notInterested')}
-              </MagAction>
-            </>
-          )
-        }
-        secondaryActions={
-          zhihu ? (
-            <>
-              <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
-                {t('feed.notInterested')}
-              </MagAction>
-              {!item.read ? (
-                <MagAction onClick={() => actions.markItemSelectedRead(item)}>
-                  {t('feed.read')}
-                </MagAction>
-              ) : null}
-            </>
-          ) : (
-            <>
+            ) : (
               <MagAction
                 onClick={() => {
                   list.setSelectedId(item.id)
@@ -264,13 +260,13 @@ export default function FeedPage() {
               >
                 {t('feed.expand')}
               </MagAction>
-              {!item.read ? (
-                <MagAction onClick={() => actions.markItemSelectedRead(item)}>
-                  {t('feed.read')}
-                </MagAction>
-              ) : null}
-            </>
-          )
+            )}
+            {!item.read ? (
+              <MagAction onClick={() => actions.markItemSelectedRead(item)}>
+                {t('feed.read')}
+              </MagAction>
+            ) : null}
+          </>
         }
       />
     )
@@ -278,30 +274,51 @@ export default function FeedPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('feed.title')}
-        subtitle={t('feed.subtitle')}
-        actions={
-          <>
-            {list.hasSources ? (
-              <Button onClick={runFetch} loading={isPending}>
-                {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
+      {!hideTitle ? (
+        <PageHeader
+          title={t('radar.title')}
+          subtitle={t('radar.signalsSubtitle')}
+          actions={
+            <>
+              {list.hasSources ? (
+                <Button onClick={runFetch} loading={isPending}>
+                  {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
+                </Button>
+              ) : (
+                <Link to="/settings/sources" className={buttonVariants()}>
+                  {t('feed.addSource')}
+                </Link>
+              )}
+              <Button
+                variant="ghost"
+                onClick={() => actions.setConfirmMarkAllOpen(true)}
+                disabled={actions.markAll.isPending}
+              >
+                {t('feed.markAllRead')}
               </Button>
-            ) : (
-              <Link to="/settings/sources" className={buttonVariants()}>
-                {t('feed.addSource')}
-              </Link>
-            )}
-            <Button
-              variant="ghost"
-              onClick={() => actions.setConfirmMarkAllOpen(true)}
-              disabled={actions.markAll.isPending}
-            >
-              {t('feed.markAllRead')}
+            </>
+          }
+        />
+      ) : (
+        <div className="mb-4 flex flex-wrap justify-end gap-2">
+          {list.hasSources ? (
+            <Button onClick={runFetch} loading={isPending}>
+              {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
             </Button>
-          </>
-        }
-      />
+          ) : (
+            <Link to="/settings/sources" className={buttonVariants()}>
+              {t('feed.addSource')}
+            </Link>
+          )}
+          <Button
+            variant="ghost"
+            onClick={() => actions.setConfirmMarkAllOpen(true)}
+            disabled={actions.markAll.isPending}
+          >
+            {t('feed.markAllRead')}
+          </Button>
+        </div>
+      )}
 
       <ConfirmDialog
         open={actions.confirmMarkAllOpen}
@@ -477,6 +494,9 @@ export default function FeedPage() {
             </span>
             <span>
               <kbd>s</kbd> {t('feed.keySave')}
+            </span>
+            <span>
+              <kbd>x</kbd> {t('feed.keyDismiss')}
             </span>
             <span>
               <kbd>m</kbd> {t('feed.keyRead')}

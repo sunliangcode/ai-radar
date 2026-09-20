@@ -302,8 +302,12 @@ public class HeuristicAiService implements AiService {
             case HACKER_NEWS -> 5;
             case GITHUB, GITHUB_TRENDING, OSS_INSIGHT -> 6;
             case RSS, GOOGLE_NEWS, GDELT -> 4;
-            case REDDIT, V2EX, TELEGRAM -> 3;
+            case REDDIT, TELEGRAM -> 3;
+            case V2EX -> 6;
             case ZHIHU -> 8;
+            case BILIBILI -> 5;
+            case WEIBO -> 3;
+            case JUEJIN, CSDN -> 0; // legacy rows; connectors removed
             case PRODUCT_HUNT, TWITTER, WEB -> 4;
             case EMAIL -> 3;
             case FIXTURE -> 2;

@@ -1,6 +1,10 @@
 # AI Radar 前端页面功能梳理
 
-> 快照日期：2026-09-16。基于 `frontend/src` 路由与页面实现，供历史对照；现行规格以 `docs/`、`CHANGELOG.md` 为准。
+> **过时快照（2026-09-16）**。2.0 IA 收缩后以 `docs/ai-radar-2.0-domain.md`、`CHANGELOG.md`、现行路由为准。
+>
+> 现行主导航：**Today · Radar · Decisions · Chat · Settings**。Changes / Watching / Briefs / Context 不再作为一级入口（软重定向保留深链）。
+
+以下为收缩前的历史对照，请勿当作产品规格。
 
 ## 1. 整体结构
 

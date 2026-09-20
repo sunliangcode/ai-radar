@@ -5,6 +5,11 @@ import {
   loadDisplaySourceIds,
   normalizeDisplaySourceIds,
   saveDisplaySourceIds,
+  prefersDomesticBrowse,
+  domesticSourceIds,
+  foreignSourceIds,
+  isDisplaySourceInitialized,
+  DISPLAY_SOURCE_IDS_KEY,
 } from './displaySources'
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
@@ -63,5 +68,39 @@ describe('display + item filter', () => {
     expect(loadDisplaySourceIds(storage)).toEqual([])
     saveDisplaySourceIds(null, storage)
     expect(loadDisplaySourceIds(storage)).toBe(null)
+  })
+})
+
+describe('domestic browse helpers', () => {
+  it('detects zh locales', () => {
+    expect(prefersDomesticBrowse('zh-CN', 'en-US')).toBe(true)
+    expect(prefersDomesticBrowse('en', 'en-US')).toBe(false)
+    expect(prefersDomesticBrowse(undefined, 'zh-TW')).toBe(true)
+  })
+
+  it('picks domestic source ids', () => {
+    expect(
+      domesticSourceIds([
+        { id: 1, type: 'ZHIHU', enabled: true },
+        { id: 2, type: 'HACKER_NEWS', enabled: true },
+        { id: 3, type: 'WEIBO', enabled: false },
+        { id: 4, type: 'RSS', enabled: true },
+      ]),
+    ).toEqual([1, 4])
+  })
+
+  it('picks foreign source ids', () => {
+    expect(
+      foreignSourceIds([
+        { id: 1, type: 'ZHIHU', enabled: true },
+        { id: 2, type: 'HACKER_NEWS', enabled: true },
+        { id: 3, type: 'GITHUB', enabled: true },
+      ]),
+    ).toEqual([2, 3])
+  })
+
+  it('treats legacy allowlist as initialized', () => {
+    const storage = memoryStorage({ [DISPLAY_SOURCE_IDS_KEY]: '[1,2]' })
+    expect(isDisplaySourceInitialized(storage)).toBe(true)
   })
 })

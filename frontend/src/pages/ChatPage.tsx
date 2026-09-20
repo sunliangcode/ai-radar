@@ -140,11 +140,10 @@ export default function ChatPage() {
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  const suggestions = [
-    t('chat.suggestToday'),
-    t('chat.suggestImpact'),
-    t('chat.suggestAction'),
-  ]
+  const suggestions =
+    pendingSeed != null
+      ? [t('chat.suggestWhy'), t('chat.suggestCompare'), t('chat.suggestAction')]
+      : [t('chat.suggestToday'), t('chat.suggestImpact'), t('chat.suggestAction')]
 
   return (
     <div className="flex min-h-[70vh] flex-col">
@@ -188,7 +187,8 @@ export default function ChatPage() {
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {messages.length === 0 ? (
             <StateBox>
-              <p className="text-sm text-muted">{t('chat.empty')}</p>
+              <p className="text-sm font-medium text-ink">{t('chat.emptyTitle')}</p>
+              <p className="mt-1 text-sm text-muted">{t('chat.empty')}</p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {suggestions.map((s) => (
                   <button
@@ -201,6 +201,9 @@ export default function ChatPage() {
                   </button>
                 ))}
               </div>
+              {pendingSeed == null ? (
+                <p className="mt-4 text-xs text-faint">{t('chat.emptyHint')}</p>
+              ) : null}
             </StateBox>
           ) : (
             messages.map((m, i) => (

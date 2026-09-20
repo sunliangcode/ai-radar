@@ -16,5 +16,9 @@ public enum SourceType {
     TWITTER,
     WEB,
     EMAIL,
-    ZHIHU
+    ZHIHU,
+    JUEJIN,
+    WEIBO,
+    BILIBILI,
+    CSDN
 }

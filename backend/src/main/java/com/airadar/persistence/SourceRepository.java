@@ -17,6 +17,8 @@ public interface SourceRepository extends JpaRepository<SourceEntity, Long> {
 
     Optional<SourceEntity> findFirstByType(SourceType type);
 
+    Optional<SourceEntity> findFirstByName(String name);
+
     long count();
 
     /** Narrow update — avoids rewriting config_json / name / type on every fetch. */

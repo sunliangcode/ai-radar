@@ -6,16 +6,36 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Domestic open-source only**: removed homemade `JUEJIN` / `CSDN` HTTP scrapers; `WEIBO` / `BILIBILI` now wrap [weibo-cli](https://github.com/jackwener/weibo-cli) / [bilibili-cli](https://github.com/public-clis/bilibili-cli); paste Cookie in source config (writes CLI credential files) — no per-project setup
+- **Source region modes**: 国内模式 / 国外模式 / 全部 on Sources display picker
+- **IA contraction (2.0)**: primary nav is Today · Radar · Decisions · Chat · Settings. Changes / Watching / Context leave the sidebar (soft redirects keep deep links). Explore becomes **Radar** (`/radar`); default tab is browse waterfall (Signals), Changes secondary
+- **Today**: vertical Change Attention list (Explore / Ask AI / Follow / Not now) instead of swipe Radar Deck; Daily Brief as artifact link; greeting + “N changes worth your attention”
+- **Intelligence home**: `MAJOR_CAP` raised to 5; home cards include `watched` for Follow state
+- **Decisions / Chat / Settings**: Needs-review framing; Chat positioned as Change interpreter; Settings hub grouped Personal / Sources / Notifications / Advanced
+- **Tagline**: Know what changed. Know why it matters. Decide what to do.
+
+### Changed
+
 - **Settings**：Hub 恢复「系统 / AI 监控」入口（四卡片 + 状态条链到监控）；通知页默认仍简洁，经「详细配置」展开只读时区与「仅有内容才推」；兴趣与忽略仍只在 Context 编辑，保存时同步到评分用的 `interestProfile` 与 dislike 关键词
 - **Settings 极简收敛**（前次）：Hub 收成核心入口 + 可折叠状态条；偏好页去掉兴趣描述与关键词编辑
 
 ### Added
 
-- **Radar Chat** (`/chat`): multi-turn chat with the configured Ollama/OpenAI model; injects at most 2 related Changes per turn (seed via `?changeId=` from change detail); SSE streaming; session in localStorage
+- **CN tech RSS**: IT之家 / Solidot / 极客公园 / 爱范儿 — pack + boot-ensure by name
+- **CN-first boot**: empty DB seeds `ai-cn` only (import `ai-core` via UI); zh locale first visit auto-applies「国内模式」display filter
+- **Sources display**: region mode presets; browse chips sort CN types first
+- **Today attention cards**: feed-like layout (index, larger title, pill CTAs)
+- **Radar browse-first**: default waterfall feed; MagCards + always-visible 收藏/不感兴趣; toolbar collapses 30d/all behind「更多」; default range 24h; `x` dismisses and advances; **swipe right=save / left=skip** on touch (save is sticky, not toggle)
+- **CN-first docs**: README.zh documents domestic sources and browse path- **Radar Chat** (`/chat`): multi-turn chat with the configured Ollama/OpenAI model; injects at most 2 related Changes per turn (seed via `?changeId=` from change detail); SSE streaming; session in localStorage
 - `POST /api/chat` (SSE) and `POST /api/chat/sync`; prompt `chat_radar.md`
+
+### Removed
+
+- Homemade Juejin / CSDN HTTP connectors (no maintained open-source CLI); existing DB rows are disabled on boot
 
 ### Fixed
 
+- Zhihu fetch: CLI/auth/JSON failures surface as source errors in FetchProgress (with `zhihu login` hint) instead of silent `0` items
 - Local Ollama (Qwen3.5 thinking models): chat/pipeline calls use native `/api/chat` with `think:false` so streamed `content` is not empty (OpenAI-compat was filling only `reasoning`)
 
 ### Changed
