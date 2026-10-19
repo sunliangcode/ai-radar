@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Docs**: [`mcp/README.md`](mcp/README.md) / [`mcp/README.zh.md`](mcp/README.zh.md) — package quickstart (EN/ZH); full tool reference remains [docs/mcp.md](docs/mcp.md)
 - **Ops CLI**: `./bin/ai-radar` / `cli/ai-radar.mjs` — health, home, sources, fetch/push/cluster/impact, pack import, check/backup bridges ([docs/cli.md](docs/cli.md))
 - **Agent skills**: root [SKILL.md](SKILL.md) plus [skills/](skills/) copies for Claude Code / Codex / Gemini CLI ([docs/agents.md](docs/agents.md))
 - **Docs**: deep CLI / MCP / API / agents / development references; README “Choose how to run it” entry matrix

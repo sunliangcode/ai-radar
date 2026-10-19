@@ -207,4 +207,5 @@ Helpers live in [`shared/errors.mjs`](../shared/errors.mjs) (re-exported as `mcp
 
 ## Related
 
+- Package quickstart: [mcp/README.md](../mcp/README.md) · [mcp/README.zh.md](../mcp/README.zh.md)
 - [CLI](cli.md) · [API](api.md) · [Agents](agents.md) · [Installation](installation.md)
