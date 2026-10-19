@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **CLI/MCP**: `fetch` / `push` / `cluster` / `impact` (and MCP `run_*` jobs) no longer abort at the default 8s client timeout — job POSTs wait for the sync pipeline unless `AI_RADAR_TIMEOUT_MS` is set; docs note abort ≠ cancel and retry → 409
+
+### Changed
+
+- **Node floor**: require **20.19+** (`.nvmrc`, `engines.node`, install/doctor) so oxlint’s optional native bindings install under CI `npm ci` (oxlint 1.82+ needs `^20.19.0 || >=22.12.0`)
+
 ### Added
 
 - **Ops CLI**: `./bin/ai-radar` / `cli/ai-radar.mjs` — health, home, sources, fetch/push/cluster/impact, pack import, check/backup bridges ([docs/cli.md](docs/cli.md))

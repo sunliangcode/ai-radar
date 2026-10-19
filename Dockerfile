@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Frontend Node major must match root .nvmrc / package engines (>=20.12).
+# Frontend Node major must match root .nvmrc / package engines (>=20.19).
 
 FROM node:20-alpine AS frontend
 WORKDIR /app/frontend

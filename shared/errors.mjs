@@ -94,8 +94,9 @@ export function formatToolError(err, opts = {}) {
       error: 'request_timeout',
       hint: `Request to ${base} timed out.`,
       fix: [
-        'Raise AI_RADAR_TIMEOUT_MS (default 8000) or set 0 to disable',
-        'Check backend load: ./bin/ai-radar doctor  or  ./scripts/status.sh',
+        'Raise AI_RADAR_TIMEOUT_MS (reads default 8000; job POSTs default none) or set 0 to disable',
+        'Client abort does not stop a server job — wait, then retry (overlapping POST → 409)',
+        'Check AI Monitor / GET /api/jobs/fetch/progress, or ./bin/ai-radar doctor / ./scripts/status.sh',
       ],
     }
   }

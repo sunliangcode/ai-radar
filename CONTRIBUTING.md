@@ -37,12 +37,12 @@ Notes under `aim/` are historical iteration only — prefer updating `CHANGELOG.
 
 ## Setup
 
-Requires **Java 21**, **Node 20.12+** (see root `.nvmrc`; Vite 8 needs `util.styleText`), and optionally an OpenAI-compatible API key.
+Requires **Java 21**, **Node 20.19+** (see root `.nvmrc`; oxlint + Vite 8), and optionally an OpenAI-compatible API key.
 
 **First hour**
 
 ```bash
-nvm use                 # or install Node 20.12+
+nvm use                 # or install Node 20.19+
 ./bin/ai-radar doctor   # prereqs + whether backend is up
 make check              # CI-parity before you push
 ```

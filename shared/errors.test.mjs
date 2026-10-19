@@ -59,6 +59,8 @@ test('formatToolError request timeout suggests AI_RADAR_TIMEOUT_MS', () => {
   const out = formatToolError(err, { base: 'http://127.0.0.1:8080' })
   assert.equal(out.error, 'request_timeout')
   assert.ok(out.fix.some((f) => /AI_RADAR_TIMEOUT_MS/.test(f)))
+  assert.ok(out.fix.some((f) => /does not stop a server job/i.test(f)))
+  assert.ok(out.fix.some((f) => /409|fetch\/progress|AI Monitor/i.test(f)))
 })
 
 test('isConnRefused detects ENOTFOUND', () => {
@@ -82,4 +84,5 @@ test('explainCliError timeout suggests AI_RADAR_TIMEOUT_MS', () => {
   const { exit, lines } = explainCliError(err, { base: 'http://127.0.0.1:8080' })
   assert.equal(exit, 1)
   assert.ok(lines.some((l) => /AI_RADAR_TIMEOUT_MS/.test(l)))
+  assert.ok(lines.some((l) => /does not stop a server job/i.test(l)))
 })

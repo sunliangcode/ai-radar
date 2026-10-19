@@ -13,7 +13,7 @@ cd mcp
 npm install
 ```
 
-Requires **Node 20.12+**. The backend must be reachable (default `http://127.0.0.1:8080`).
+Requires **Node 20.19+**. The backend must be reachable (default `http://127.0.0.1:8080`).
 
 Verify syntax:
 
@@ -37,7 +37,7 @@ npx ai-radar-mcp
 | `AI_RADAR_BASE_URL` | `http://127.0.0.1:8080` | Backend base URL |
 | `LOCAL_TOKEN` | empty | Sent as `X-Local-Token` when backend requires it |
 | `ALLOW_WRITES` | `false` | If `true`, registers `run_fetch` / `run_push` / `run_cluster` |
-| `AI_RADAR_TIMEOUT_MS` | `8000` | Per-request HTTP timeout (same as CLI; `0` / negative / non-numeric disables; empty/unset uses default) |
+| `AI_RADAR_TIMEOUT_MS` | reads `8000`; jobs none | Same as CLI: short GETs default **8000** ms; `run_fetch` / `run_push` / `run_cluster` default to **no** client timeout. Set explicitly to force a limit on all calls. `0` / negative / non-numeric disables; empty/unset uses the per-call default |
 
 With writes disabled, write tool names are **not registered** (and are rejected if called).
 
@@ -185,8 +185,9 @@ Tool failures return **JSON** (not a bare stack string) with `error`, `hint`, an
   "error": "request_timeout",
   "hint": "Request to http://127.0.0.1:8080 timed out.",
   "fix": [
-    "Raise AI_RADAR_TIMEOUT_MS (default 8000) or set 0 to disable",
-    "Check backend load: ./bin/ai-radar doctor  or  ./scripts/status.sh"
+    "Raise AI_RADAR_TIMEOUT_MS (reads default 8000; job POSTs default none) or set 0 to disable",
+    "Client abort does not stop a server job — wait, then retry (overlapping POST → 409)",
+    "Check AI Monitor / GET /api/jobs/fetch/progress, or ./bin/ai-radar doctor / ./scripts/status.sh"
   ]
 }
 ```
@@ -194,7 +195,7 @@ Tool failures return **JSON** (not a bare stack string) with `error`, `hint`, an
 | `error` | Cause | Fix |
 | --- | --- | --- |
 | `backend_unreachable` | Backend down / bad base URL | `./install.sh`; `./bin/ai-radar doctor`; check `AI_RADAR_BASE_URL` |
-| `request_timeout` | AbortSignal timeout | Raise `AI_RADAR_TIMEOUT_MS` or set `0` to disable |
+| `request_timeout` | AbortSignal timeout | Raise / clear `AI_RADAR_TIMEOUT_MS` (jobs default to no timeout); abort does not cancel server job |
 | `writes_disabled` | Write tool with `ALLOW_WRITES=false` | Enable writes only with user consent, or use CLI |
 | `job_conflict` | HTTP 409 mutex | Wait; AI Monitor / `./bin/ai-radar doctor` |
 | `unauthorized` | 401/403 | Set `LOCAL_TOKEN` |

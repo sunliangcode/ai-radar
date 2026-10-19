@@ -1,6 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { apiBaseUrl, requestTimeoutSignal } from './http.mjs'
+import {
+  apiBaseUrl,
+  DEFAULT_JOB_TIMEOUT_MS,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  requestTimeoutSignal,
+} from './http.mjs'
 
 test('apiBaseUrl trims and drops trailing slashes', () => {
   assert.equal(apiBaseUrl('  http://127.0.0.1:8080/  '), 'http://127.0.0.1:8080')
@@ -79,6 +84,19 @@ test('requestTimeoutSignal unset env uses fallbackMs', () => {
     const s = requestTimeoutSignal(100)
     assert.ok(s)
     assert.equal(typeof s.aborted, 'boolean')
+  } finally {
+    if (prev == null) delete process.env.AI_RADAR_TIMEOUT_MS
+    else process.env.AI_RADAR_TIMEOUT_MS = prev
+  }
+})
+
+test('DEFAULT_JOB_TIMEOUT_MS disables AbortSignal when env unset', () => {
+  const prev = process.env.AI_RADAR_TIMEOUT_MS
+  delete process.env.AI_RADAR_TIMEOUT_MS
+  try {
+    assert.equal(DEFAULT_JOB_TIMEOUT_MS, 0)
+    assert.equal(DEFAULT_REQUEST_TIMEOUT_MS, 8000)
+    assert.equal(requestTimeoutSignal(DEFAULT_JOB_TIMEOUT_MS), undefined)
   } finally {
     if (prev == null) delete process.env.AI_RADAR_TIMEOUT_MS
     else process.env.AI_RADAR_TIMEOUT_MS = prev

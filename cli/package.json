@@ -19,6 +19,6 @@
     "ai-radar": "./ai-radar.mjs"
   },
   "engines": {
-    "node": ">=20.12.0"
+    "node": ">=20.19.0"
   }
 }

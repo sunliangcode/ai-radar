@@ -4,7 +4,8 @@
  * Env:
  *   AI_RADAR_BASE_URL=http://127.0.0.1:8080
  *   LOCAL_TOKEN=... (optional)
- *   AI_RADAR_TIMEOUT_MS=8000 (0/negative/non-numeric disables; empty→default)
+ *   AI_RADAR_TIMEOUT_MS — reads default 8000; job POSTs (run_fetch/push/cluster) default none;
+ *     set to force a limit on all calls including jobs; 0/negative/non-numeric disables; empty→default
  *   ALLOW_WRITES=true (optional; enables fetch/push/cluster tools)
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
@@ -17,7 +18,12 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { formatToolError } from './errors.mjs'
-import { apiBaseUrl, requestTimeoutSignal } from '../shared/http.mjs'
+import {
+  apiBaseUrl,
+  DEFAULT_JOB_TIMEOUT_MS,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  requestTimeoutSignal,
+} from '../shared/http.mjs'
 import {
   formatBuiltinConnectorExpect,
   formatBuiltinDeliveryExpect,
@@ -31,13 +37,17 @@ const pkgVersion = JSON.parse(
 ).version
 
 async function api(path, init = {}) {
-  const headers = { ...(init.headers || {}) }
+  const { timeoutMs, signal: initSignal, headers: initHeaders, ...fetchInit } = init
+  const headers = { ...(initHeaders || {}) }
   if (TOKEN) headers['X-Local-Token'] = TOKEN
-  if (init.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
-  const signal = init.signal || requestTimeoutSignal()
+  if (fetchInit.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
+  const signal =
+    initSignal !== undefined
+      ? initSignal
+      : requestTimeoutSignal(timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS)
   let res
   try {
-    res = await fetch(`${BASE}${path}`, { ...init, headers, signal })
+    res = await fetch(`${BASE}${path}`, { ...fetchInit, headers, signal })
   } catch (err) {
     err.status = 0
     throw err
@@ -221,13 +231,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break
       }
       case 'run_fetch':
-        data = await api('/api/jobs/fetch', { method: 'POST' })
+        data = await api('/api/jobs/fetch', { method: 'POST', timeoutMs: DEFAULT_JOB_TIMEOUT_MS })
         break
       case 'run_push':
-        data = await api('/api/jobs/push', { method: 'POST' })
+        data = await api('/api/jobs/push', { method: 'POST', timeoutMs: DEFAULT_JOB_TIMEOUT_MS })
         break
       case 'run_cluster':
-        data = await api('/api/jobs/cluster', { method: 'POST' })
+        data = await api('/api/jobs/cluster', {
+          method: 'POST',
+          timeoutMs: DEFAULT_JOB_TIMEOUT_MS,
+        })
         break
       default:
         return {

@@ -32,7 +32,7 @@ Backup: `make backup` / `./bin/ai-radar backup` (auto-finds either DB path; `AI_
 ## Prerequisites
 
 - **Java 21**
-- **Node 20.12+** (Vite 8 / `util.styleText`; CLI uses built-in `fetch`). Pin with root [`.nvmrc`](../.nvmrc) (`nvm use`).
+- **Node 20.19+** (oxlint native bindings / Vite 8; CLI uses built-in `fetch`). Pin with root [`.nvmrc`](../.nvmrc) (`nvm use`).
 - Optional: **Python 3.10+** (Argos), local **Ollama** (default LLM)
 
 ---

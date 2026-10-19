@@ -13,7 +13,12 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import { explainCliError } from '../shared/errors.mjs'
-import { apiBaseUrl, requestTimeoutSignal } from '../shared/http.mjs'
+import {
+  apiBaseUrl,
+  DEFAULT_JOB_TIMEOUT_MS,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  requestTimeoutSignal,
+} from '../shared/http.mjs'
 import { validatePackFile } from '../shared/pack.mjs'
 import { versionAlignCheck } from '../shared/version-align.mjs'
 import { llmModeCheck } from '../shared/llm-mode.mjs'
@@ -34,13 +39,17 @@ const REPO_ROOT = resolve(__dirname, '..')
 const CLI_VERSION = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8')).version
 
 async function api(path, init = {}) {
-  const headers = { ...(init.headers || {}) }
+  const { timeoutMs, signal: initSignal, headers: initHeaders, ...fetchInit } = init
+  const headers = { ...(initHeaders || {}) }
   if (TOKEN) headers['X-Local-Token'] = TOKEN
-  if (init.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
-  const signal = init.signal || requestTimeoutSignal()
+  if (fetchInit.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
+  const signal =
+    initSignal !== undefined
+      ? initSignal
+      : requestTimeoutSignal(timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS)
   let res
   try {
-    res = await fetch(`${BASE}${path}`, { ...init, headers, signal })
+    res = await fetch(`${BASE}${path}`, { ...fetchInit, headers, signal })
   } catch (err) {
     err.status = err.status || 0
     throw err
@@ -96,7 +105,7 @@ Commands:
 Environment:
   AI_RADAR_BASE_URL   Default http://127.0.0.1:8080
   LOCAL_TOKEN         Optional; sent as X-Local-Token
-  AI_RADAR_TIMEOUT_MS Per-request HTTP timeout ms (default 8000; 0/negative/non-numeric disables; empty→default)
+  AI_RADAR_TIMEOUT_MS Per-request HTTP timeout ms (reads default 8000; job POSTs default none; set to force all incl. jobs; 0/negative/non-numeric disables; empty→default)
   AI_RADAR_DB         Optional; SQLite path for backup (default data/radar.db)
   BACKUP_KEEP         Optional; how many backups to retain (default 14; invalid → 14)
 
@@ -213,7 +222,7 @@ function nodeVersionOk() {
   const parts = String(process.versions.node || '0').split('.').map((x) => Number(x) || 0)
   const maj = parts[0] || 0
   const min = parts[1] || 0
-  return maj > 20 || (maj === 20 && min >= 12)
+  return maj > 20 || (maj === 20 && min >= 19)
 }
 
 function javaVersionHint() {
@@ -244,9 +253,9 @@ async function runDoctor() {
     level: nodeOk ? 'ok' : 'error',
     detail: nodeOk
       ? `Node ${process.versions.node}`
-      : `Node ${process.versions.node} — need 20.12+ (Vite 8 / util.styleText)`,
+      : `Node ${process.versions.node} — need 20.19+ (oxlint / Vite 8)`,
   })
-  if (!nodeOk) next.push('Install Node 20.12+ (nvm / official pkg)')
+  if (!nodeOk) next.push('Install Node 20.19+ (nvm / official pkg)')
 
   const java = javaVersionHint()
   checks.push({
@@ -444,19 +453,25 @@ async function main() {
       case 'fetch': {
         const type = parseFetchType(argv.slice(1))
         const q = type ? `?sourceType=${encodeURIComponent(type)}` : ''
-        printJson(await api(`/api/jobs/fetch${q}`, { method: 'POST' }))
+        printJson(
+          await api(`/api/jobs/fetch${q}`, { method: 'POST', timeoutMs: DEFAULT_JOB_TIMEOUT_MS }),
+        )
         break
       }
       case 'push': {
-        printJson(await api('/api/jobs/push', { method: 'POST' }))
+        printJson(await api('/api/jobs/push', { method: 'POST', timeoutMs: DEFAULT_JOB_TIMEOUT_MS }))
         break
       }
       case 'cluster': {
-        printJson(await api('/api/jobs/cluster', { method: 'POST' }))
+        printJson(
+          await api('/api/jobs/cluster', { method: 'POST', timeoutMs: DEFAULT_JOB_TIMEOUT_MS }),
+        )
         break
       }
       case 'impact': {
-        printJson(await api('/api/jobs/impact', { method: 'POST' }))
+        printJson(
+          await api('/api/jobs/impact', { method: 'POST', timeoutMs: DEFAULT_JOB_TIMEOUT_MS }),
+        )
         break
       }
       case 'pack': {

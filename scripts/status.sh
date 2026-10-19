@@ -120,7 +120,7 @@ if [[ -n "$BACKEND_BODY" ]] && command -v node >/dev/null 2>&1; then
     fi
   fi
 elif [[ -n "$BACKEND_BODY" ]]; then
-  soft "spi catalogs" "node not found — skipping SPI catalog check (install Node 20.12+)"
+  soft "spi catalogs" "node not found — skipping SPI catalog check (install Node 20.19+)"
 fi
 
 # --- pid files ---

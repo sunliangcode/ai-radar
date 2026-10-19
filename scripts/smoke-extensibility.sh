@@ -70,7 +70,7 @@ if command -v node >/dev/null 2>&1; then
     echo "WARN: delivery channels catalog failed shared/spi-catalog check"
   fi
 elif command -v python3 >/dev/null 2>&1; then
-  echo "WARN: node not found — skipping SPI catalog check (install Node 20.12+)"
+  echo "WARN: node not found — skipping SPI catalog check (install Node 20.19+)"
 fi
 
 say "ensure fixture source"

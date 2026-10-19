@@ -44,13 +44,13 @@ test('MCP server metadata version matches mcp/package.json', () => {
   if (m[1]) assert.equal(m[1], expected)
 })
 
-test('frontend/cli/mcp declare engines.node >=20.12.0', () => {
+test('frontend/cli/mcp declare engines.node >=20.19.0', () => {
   for (const rel of ['frontend/package.json', 'cli/package.json', 'mcp/package.json']) {
     const eng = JSON.parse(readFileSync(join(root, rel), 'utf8')).engines?.node
-    assert.equal(eng, '>=20.12.0', `${rel} engines.node`)
+    assert.equal(eng, '>=20.19.0', `${rel} engines.node`)
   }
   const nvm = readFileSync(join(root, '.nvmrc'), 'utf8').trim()
-  assert.match(nvm, /^20(\.12)?$/, `.nvmrc should pin Node 20.12+ (got ${nvm})`)
+  assert.match(nvm, /^20(\.19)?$/, `.nvmrc should pin Node 20.19+ (got ${nvm})`)
 })
 
 test('radar.api.version in application.yml matches package.json', () => {

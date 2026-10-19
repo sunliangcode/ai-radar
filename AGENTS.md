@@ -24,7 +24,7 @@ Runtime data lives in `data/` (repo root, used by `install.sh`) and `backend/dat
 
 ## Commands
 
-Prereqs: **Java 21**, **Node 20.12+** (Vite 8 / `util.styleText`). Optional: Python 3.10+ (translate), local Ollama (default LLM).
+Prereqs: **Java 21**, **Node 20.19+** (oxlint native bindings / Vite 8). Optional: Python 3.10+ (translate), local Ollama (default LLM).
 
 ```bash
 # Backend

@@ -54,7 +54,7 @@ ai-radar health
 
 | Component | Required when |
 | --- | --- |
-| Node **20.12+** | Always (CLI uses built-in `fetch`) |
+| Node **20.19+** | Always (CLI uses built-in `fetch`) |
 | Running backend on `:8080` | All HTTP commands (`health`, `fetch`, …) |
 | Bash | `check` / `backup` subcommands only |
 
@@ -68,7 +68,7 @@ The CLI package has **no npm dependencies**. MCP (`mcp/`) is separate and still 
 | --- | --- | --- |
 | `AI_RADAR_BASE_URL` | `http://127.0.0.1:8080` | Backend base URL (no trailing slash required) |
 | `LOCAL_TOKEN` | empty | If set, sent as header `X-Local-Token` |
-| `AI_RADAR_TIMEOUT_MS` | `8000` | Per-request HTTP timeout (AbortSignal); `0` / negative / non-numeric disables; empty/unset uses default |
+| `AI_RADAR_TIMEOUT_MS` | reads `8000`; jobs none | AbortSignal timeout. Short GETs default **8000** ms; `fetch` / `push` / `cluster` / `impact` default to **no** client timeout. Set explicitly to force a limit on **all** calls (including jobs). `0` / negative / non-numeric disables; empty/unset uses the per-call default |
 | `AI_RADAR_DB` | `data/radar.db` (repo root) | SQLite path for `backup` only. If unset and root DB missing, falls back to `backend/data/radar.db` |
 | `BACKUP_KEEP` | `14` | How many `data/backups/radar-*.db` files `backup` retains (whitespace trimmed; non-numeric / <1 → 14) |
 
@@ -136,7 +136,7 @@ make health-llm
 
 ### `fetch`
 
-`POST /api/jobs/fetch` — run the fetch pipeline.
+`POST /api/jobs/fetch` — run the fetch pipeline **synchronously**. The HTTP response returns only after fetch → score → summarize → cluster → brief finishes. Optional `--type` filters enabled sources by `SourceType` (e.g. `RSS`); it does not skip scoring/summarize.
 
 ```bash
 ./bin/ai-radar fetch
@@ -144,9 +144,13 @@ make health-llm
 ./bin/ai-radar fetch --type=GITHUB
 ```
 
+Job POSTs use **no** client AbortSignal by default (so a multi-minute run is normal). Set `AI_RADAR_TIMEOUT_MS` only if you want a hard client deadline. Aborting the client does **not** cancel the server job (mutex stays held).
+
 Overlapping fetch/push/cluster jobs return **HTTP 409**; the CLI exits with code **3**.
 
 ### `push` / `cluster` / `impact`
+
+Same long-job timeout default as `fetch` (no client timeout unless `AI_RADAR_TIMEOUT_MS` is set).
 
 ```bash
 ./bin/ai-radar push       # POST /api/jobs/push
@@ -192,7 +196,7 @@ See [sources.md — 15-minute pack walkthrough](sources.md#15-minute-pack-walkth
 
 ### `doctor`
 
-Structured JSON health for onboarding and agents — **no curl required**. Top-level fields include `cliVersion`, `base`, `checks[]`, `next[]`. Checks Node ≥ 20.12, Java 21 (warn), demo pack + built-in `packs/sources/*.json` schema, then `GET /api/health` (backend `version`, translate, LLM mode). When the backend is up, also reports `versionAlign` (CLI SemVer vs `health.version`), `llm` (`ai` / `heuristic` / `degraded`), soft-warns `modelPresent` when `GET /api/health/llm` is ok but the configured model is missing from `models[]`, and soft-checks SPI catalogs (`connectors` / `deliveryChannels`: sorted, unique, no surrounding whitespace on ids/names/keys, `FIXTURE`/`path`, `RSS`/`feedUrl`, `DAILY_HOT`/`route`, `WEB`/`url`, `TELEGRAM`/`channels`, `HACKER_NEWS`/`query`, `GOOGLE_NEWS`/`query`, `GDELT`/`query`, `REDDIT`/`subreddits`, `V2EX`/`nodes`, `GITHUB`/`query`, `TWITTER`/`users`, `OSS_INSIGHT`/`keywords`, `GITHUB_TRENDING`/`since`, `PRODUCT_HUNT`/`maxItems`, `EMAIL`/`maxMessages`, `ZHIHU`/`cliPath`, `WEIBO`/`cliPath`, `BILIBILI`/`cliPath` / `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`, field types `text`/`path`/`secret`/`textarea`). Exit `1` when any check has `level: "error"` (warn-only mismatches do not fail).
+Structured JSON health for onboarding and agents — **no curl required**. Top-level fields include `cliVersion`, `base`, `checks[]`, `next[]`. Checks Node ≥ 20.19, Java 21 (warn), demo pack + built-in `packs/sources/*.json` schema, then `GET /api/health` (backend `version`, translate, LLM mode). When the backend is up, also reports `versionAlign` (CLI SemVer vs `health.version`), `llm` (`ai` / `heuristic` / `degraded`), soft-warns `modelPresent` when `GET /api/health/llm` is ok but the configured model is missing from `models[]`, and soft-checks SPI catalogs (`connectors` / `deliveryChannels`: sorted, unique, no surrounding whitespace on ids/names/keys, `FIXTURE`/`path`, `RSS`/`feedUrl`, `DAILY_HOT`/`route`, `WEB`/`url`, `TELEGRAM`/`channels`, `HACKER_NEWS`/`query`, `GOOGLE_NEWS`/`query`, `GDELT`/`query`, `REDDIT`/`subreddits`, `V2EX`/`nodes`, `GITHUB`/`query`, `TWITTER`/`users`, `OSS_INSIGHT`/`keywords`, `GITHUB_TRENDING`/`since`, `PRODUCT_HUNT`/`maxItems`, `EMAIL`/`maxMessages`, `ZHIHU`/`cliPath`, `WEIBO`/`cliPath`, `BILIBILI`/`cliPath` / `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`, field types `text`/`path`/`secret`/`textarea`). Exit `1` when any check has `level: "error"` (warn-only mismatches do not fail).
 
 ```bash
 ./bin/ai-radar doctor | jq .
@@ -258,14 +262,14 @@ The CLI prints **actionable** multi-line hints (not a bare `fetch failed`):
 | --- | --- |
 | `Cannot reach backend at …` | Start backend (`./install.sh` or `cd backend && ./mvnw spring-boot:run`), then `./scripts/status.sh` |
 | `Unauthorized (401/403)` | Set `LOCAL_TOKEN` to match `backend/.env` |
-| Exit code 3 / `Conflict (409)` | Wait for in-flight job; check Settings → System / AI Monitor |
+| Exit code 3 / `Conflict (409)` | Wait for in-flight job; check Settings → System / AI Monitor. Often follows a timed-out client while the server job still runs |
 | `Not found (404)` | Check `AI_RADAR_BASE_URL` |
 | `Unknown command` | `./bin/ai-radar help` |
-| `check` fails Node path | Use Node 20.12+; run from repo after `frontend` deps installed |
+| `check` fails Node path | Use Node 20.19+; run from repo after `frontend` deps installed |
 | doctor `versionAlign` warn | CLI SemVer ≠ `health.version` — `git pull` + `./install.sh` / rebuild |
 | doctor `llm` heuristic/degraded | Configure LLM / Ollama; `./bin/ai-radar health-llm` |
 | backup: database not found | Script auto-falls back to `backend/data/radar.db`; override with `AI_RADAR_DB` if needed |
-| Request timed out | Raise `AI_RADAR_TIMEOUT_MS` (default 8000) or set `0` to disable |
+| Request timed out | For short GETs: raise `AI_RADAR_TIMEOUT_MS` or set `0`. Job POSTs default to no timeout — if you set a short env value, abort does not stop the server; wait then retry (or clear env). Progress: AI Monitor / `GET /api/jobs/fetch/progress` |
 | `health-llm` / doctor `modelPresent` warn | Pull `OPENAI_MODEL` or pick an id from `models[]` |
 
 Offline smoke (used by `./scripts/check.sh` / CI): point at a closed port and confirm the “Cannot reach backend” hint appears.

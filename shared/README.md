@@ -5,7 +5,7 @@ Zero-dependency Node helpers used by the **CLI** and **MCP** sidecar (and CI inv
 | Module | Role |
 | --- | --- |
 | `errors.mjs` | Actionable CLI/MCP error messages (`request_timeout`, unreachable, …) |
-| `http.mjs` | `apiBaseUrl` (trim / trailing slash) + `AI_RADAR_TIMEOUT_MS` AbortSignal (`0` / invalid disables; empty/unset/whitespace → default) |
+| `http.mjs` | `apiBaseUrl` + `requestTimeoutSignal` / `DEFAULT_REQUEST_TIMEOUT_MS` (8000) / `DEFAULT_JOB_TIMEOUT_MS` (0); env `AI_RADAR_TIMEOUT_MS` overrides (`0` / invalid disables; empty/unset/whitespace → per-call fallback) |
 | `pack.mjs` | Pack JSON validate + `SOURCE_TYPES` / `LEGACY_SOURCE_TYPES` (soft-warns data-driven from `BUILTIN_CONNECTOR_PAIRS`; CI via `pack-builtin-fields-sync.test.mjs`) |
 | `version-align.mjs` | Doctor CLI↔API SemVer check |
 | `llm-mode.mjs` | Doctor LLM mode (`ai` / `heuristic` / `degraded`) |

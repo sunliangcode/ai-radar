@@ -24,7 +24,7 @@ java_major_version() {
   fi
 }
 
-# Node is only needed to build the UI; Vite 8 requires >= 20.12.
+# Node is only needed to build the UI; oxlint + Vite 8 require >= 20.19.
 node_supported() {
   local raw major minor
   raw="$(node --version 2>/dev/null || echo '')"
@@ -35,7 +35,7 @@ node_supported() {
   minor="${minor%%.*}"
   [[ "$major" =~ ^[0-9]+$ ]] || return 1
   (( major > 20 )) && return 0
-  (( major == 20 && ${minor:-0} >= 12 ))
+  (( major == 20 && ${minor:-0} >= 19 ))
 }
 
 if ! command -v java >/dev/null 2>&1; then
@@ -50,10 +50,10 @@ if [[ ! "$JAVA_MAJOR" =~ ^[0-9]+$ ]] || (( JAVA_MAJOR < 21 )); then
 fi
 
 if ! command -v npm >/dev/null 2>&1; then
-  fail "npm not found. The web UI cannot be built without it — install Node 20.12+ (see docs/installation.md), then re-run ./install.sh."
+  fail "npm not found. The web UI cannot be built without it — install Node 20.19+ (see docs/installation.md), then re-run ./install.sh."
 fi
 if ! node_supported; then
-  fail "Node $(node --version 2>/dev/null || echo 'not found') is too old. Vite 8 needs Node 20.12+."
+  fail "Node $(node --version 2>/dev/null || echo 'not found') is too old. Need Node 20.19+ (oxlint / Vite 8)."
 fi
 echo "Node: $(node --version)"
 

@@ -3,7 +3,7 @@ English | [中文](README.zh.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/sunliangcode/ai-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/sunliangcode/ai-radar/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
-![Node 20.12+](https://img.shields.io/badge/Node-20.12%2B-brightgreen)
+![Node 20.19+](https://img.shields.io/badge/Node-20.19%2B-brightgreen)
 ![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3-green)
 
 # AI Radar
