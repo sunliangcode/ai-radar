@@ -229,7 +229,7 @@ function leftoverPayload(slice: string, fields: ExtractedField[]): string | null
     if (/^#\s/.test(t)) continue
     if (/^Write exactly/i.test(t) || /^Score each item/i.test(t)) continue
     if (/^Prefer assign/i.test(t) || /^If confidence/i.test(t) || /^eventId must/i.test(t)) continue
-    if (/^[{}\[\],]$/.test(t) || /^"[a-zA-Z]+"\s*:/.test(t)) continue
+    if (/^[[\]{},]$/.test(t) || /^"[a-zA-Z]+"\s*:/.test(t)) continue
     if (fieldText.includes(t)) continue
     // Payload-shaped lines only: JSON blobs or "- key: value" bullets
     if (t.startsWith('{') || t.startsWith('[') || /^-\s+[\w]+\s*:/.test(t)) {

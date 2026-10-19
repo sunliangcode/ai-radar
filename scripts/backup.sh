@@ -2,17 +2,32 @@
 # WAL-safe SQLite backup of the AI Radar database.
 # Usage: ./scripts/backup.sh [output-dir]
 #   default output: data/backups/radar-YYYYmmdd-HHMMSS.db
-#   keeps the 14 most recent backups.
+#   keeps the last BACKUP_KEEP (default 14) backups.
+#   AI_RADAR_DB overrides DB path (e.g. backend/data/radar.db when Maven CWD differs).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DB="${AI_RADAR_DB:-$ROOT/data/radar.db}"
 OUT_DIR="${1:-$ROOT/data/backups}"
 KEEP="${BACKUP_KEEP:-14}"
+# Trim so " 14 " is valid; whitespace-only still falls back below.
+KEEP="${KEEP#"${KEEP%%[![:space:]]*}"}"
+KEEP="${KEEP%"${KEEP##*[![:space:]]}"}"
+if ! [[ "$KEEP" =~ ^[0-9]+$ ]] || [[ "$KEEP" -lt 1 ]]; then
+  echo "NOTE: BACKUP_KEEP='$KEEP' invalid — using 14" >&2
+  KEEP=14
+fi
+
+# When AI_RADAR_DB is unset and install.sh never wrote root data/, try Maven CWD path.
+if [[ -z "${AI_RADAR_DB:-}" && ! -f "$DB" && -f "$ROOT/backend/data/radar.db" ]]; then
+  DB="$ROOT/backend/data/radar.db"
+  echo "NOTE: using Maven DB path $DB (set AI_RADAR_DB to override)" >&2
+fi
 
 if [[ ! -f "$DB" ]]; then
   echo "ERROR: database not found: $DB" >&2
   echo "Start the app first (./install.sh) or set AI_RADAR_DB." >&2
+  echo "Note: Maven from backend/ writes backend/data/radar.db — e.g. AI_RADAR_DB=backend/data/radar.db" >&2
   exit 1
 fi
 

@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type ChatCitedChange, type ChatMessage } from '../lib/api'
 import { Button, Chip, ConfirmDialog, EmptyState, Input, PageHeader } from '../components/ui'
 import { errorText } from '../lib/errors'
+import { isAriaModalOpen, prefersReducedMotion } from '../lib/a11y'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { cn, focusRingClass, textLinkClass } from '../lib/cn'
 
 const STORAGE_KEY = 'radar.chat.session.v1'
@@ -35,6 +37,7 @@ function saveSession(session: StoredSession) {
 
 export default function ChatPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const seedParam = searchParams.get('changeId')
   const seedChangeId = seedParam && Number.isFinite(Number(seedParam)) ? Number(seedParam) : undefined
@@ -51,16 +54,49 @@ export default function ChatPage() {
   const pendingSeed =
     seedChangeId != null && !usedSeeds.includes(seedChangeId) ? seedChangeId : undefined
   const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const errorDismissRef = useRef<HTMLButtonElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  const goBack = useCallback(() => {
+    navigate('/')
+  }, [navigate])
+  useEscapeBack(goBack, !streaming && !confirmClear && !input.trim())
 
   useEffect(() => {
     saveSession({ messages, citedChangeIds, lastCited })
   }, [messages, citedChangeIds, lastCited])
 
   useEffect(() => {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    // After Shell focuses #main on route change, reclaim focus for typing.
+    const id = window.setTimeout(() => {
+      if (!confirmClear) inputRef.current?.focus()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [confirmClear])
+
+  useEffect(() => {
+    const reduce = prefersReducedMotion()
     bottomRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' })
   }, [messages, streaming])
+
+  // Esc stops an in-flight reply (parity with Stop button)
+  useEffect(() => {
+    if (!streaming) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (isAriaModalOpen()) return
+      e.preventDefault()
+      abortRef.current?.abort()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [streaming])
+
+  useEffect(() => {
+    if (!error) return
+    errorDismissRef.current?.focus({ preventScroll: true })
+  }, [error])
 
   async function send(text: string) {
     const content = text.trim()
@@ -137,6 +173,8 @@ export default function ChatPage() {
     } finally {
       setStreaming(false)
       abortRef.current = null
+      // Keep typing flow: reclaim input after stream/abort (Shell may have stolen focus)
+      queueMicrotask(() => inputRef.current?.focus())
     }
   }
 
@@ -171,6 +209,7 @@ export default function ChatPage() {
         onCancel={() => setConfirmClear(false)}
       />
       <PageHeader
+        titleId="chat-page-heading"
         title={t('chat.title')}
         subtitle={t('chat.subtitle')}
         actions={
@@ -205,22 +244,32 @@ export default function ChatPage() {
       ) : null}
 
       {lastCited.length > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted">{t('chat.cited')}</span>
-          {lastCited.map((c) => (
-            <Link
-              key={c.id}
-              to={`/changes/${c.id}`}
-              className={cn(
-                'inline-flex min-h-9 items-center rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink hover:border-accent',
-                focusRingClass(),
-              )}
-              title={c.summary}
-            >
-              #{c.id} {c.title?.slice(0, 36) || t('chat.untitled')}
-              {c.tier ? ` · ${c.tier}` : ''}
-            </Link>
-          ))}
+        <div className="mb-3 flex flex-wrap items-center gap-2" role="group" aria-label={t('chat.cited')}>
+          <span className="text-xs text-muted" id="chat-cited-label">
+            {t('chat.cited')}
+          </span>
+          <ul className="flex flex-wrap gap-2" aria-labelledby="chat-cited-label">
+            {lastCited.map((c) => {
+              const title = c.title?.slice(0, 36) || t('chat.untitled')
+              const label = [`#${c.id}`, title, c.tier, c.summary].filter(Boolean).join(' · ')
+              return (
+                <li key={c.id}>
+                  <Link
+                    to={`/changes/${c.id}`}
+                    aria-label={label}
+                    className={cn(
+                      'inline-flex min-h-9 items-center rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink hover:border-accent',
+                      focusRingClass(),
+                    )}
+                    title={c.summary}
+                  >
+                    #{c.id} {title}
+                    {c.tier ? ` · ${c.tier}` : ''}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
         </div>
       ) : null}
 
@@ -260,7 +309,7 @@ export default function ChatPage() {
             />
           ) : (
             messages.map((m, i) => (
-              <div
+              <article
                 key={`${m.role}-${i}`}
                 data-role={m.role}
                 aria-label={m.role === 'user' ? t('chat.roleUser') : t('chat.roleAssistant')}
@@ -271,7 +320,7 @@ export default function ChatPage() {
                 }`}
               >
                 {m.content || (streaming && i === messages.length - 1 ? '…' : '')}
-              </div>
+              </article>
             ))
           )}
           <div ref={bottomRef} />
@@ -284,8 +333,13 @@ export default function ChatPage() {
           >
             <p className="min-w-0 flex-1">{error}</p>
             <button
+              ref={errorDismissRef}
               type="button"
-              onClick={() => setError(null)}
+              onClick={() => {
+                setError(null)
+                queueMicrotask(() => inputRef.current?.focus())
+              }}
+              aria-label={t('common.dismiss')}
               className={cn(
                 'inline-flex min-h-9 shrink-0 items-center rounded-sm px-2 text-xs text-muted hover:text-ink',
                 focusRingClass(),
@@ -305,9 +359,19 @@ export default function ChatPage() {
           }}
         >
           <Input
+            ref={inputRef}
             className="min-w-0 flex-1"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Escape') return
+              e.preventDefault()
+              if (input) {
+                setInput('')
+                return
+              }
+              if (!streaming && !confirmClear) navigate('/')
+            }}
             placeholder={t('chat.placeholder')}
             disabled={streaming}
             aria-label={t('chat.placeholder')}
@@ -317,6 +381,7 @@ export default function ChatPage() {
               type="button"
               variant="ghost"
               onClick={() => abortRef.current?.abort()}
+              title={`${t('chat.stop')} (Esc)`}
               aria-label={t('chat.stop')}
             >
               {t('chat.stop')}

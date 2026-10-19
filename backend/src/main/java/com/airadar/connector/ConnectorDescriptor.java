@@ -24,5 +24,10 @@ public record ConnectorDescriptor(
         public static ConfigField secret(String key, String label, boolean required) {
             return new ConfigField(key, label, "secret", required);
         }
+
+        /** Multi-line plain text (prompts, long notes). UI uses textarea. */
+        public static ConfigField textarea(String key, String label, boolean required) {
+            return new ConfigField(key, label, "textarea", required);
+        }
     }
 }

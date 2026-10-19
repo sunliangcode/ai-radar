@@ -45,6 +45,15 @@ public class FeishuDelivery implements DeliveryChannel {
     }
 
     @Override
+    public DeliveryDescriptor descriptor() {
+        return DeliveryDescriptor.of(
+                "feishu",
+                "Feishu",
+                List.of("Settings → Preferences (scan bind)", "FEISHU_WEBHOOK_URL")
+        );
+    }
+
+    @Override
     public boolean isEnabled() {
         var s = settingsService.effective();
         return s.feishuImBound() || notBlank(s.feishuWebhookUrl());

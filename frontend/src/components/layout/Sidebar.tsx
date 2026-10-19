@@ -91,7 +91,7 @@ export function Sidebar({
         </div>
       </div>
       <nav
-        className="-mx-1 flex gap-1 overflow-x-auto scroll-smooth snap-x snap-mandatory px-1 md:mx-0 md:flex-col md:overflow-visible md:snap-none md:px-0"
+        className="-mx-1 flex gap-1 overflow-x-auto scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory px-1 md:mx-0 md:flex-col md:overflow-visible md:snap-none md:px-0"
         aria-label={t('nav.main')}
       >
         {primaryNav.map((item) => {
@@ -182,6 +182,9 @@ export function Sidebar({
                   key={`m-${type}`}
                   to={`/radar?view=signals&sourceType=${encodeURIComponent(type)}`}
                   aria-current={active ? 'page' : undefined}
+                  aria-label={
+                    count > 0 ? `${type}, ${t('feed.unreadInline', { count })}` : type
+                  }
                   className={cn(
                     'snap-start flex min-h-9 shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] transition motion-reduce:transition-none',
                     focusRing,
@@ -192,7 +195,9 @@ export function Sidebar({
                 >
                   {type}
                   {count > 0 ? (
-                    <span className="ml-1 font-mono text-[10px] text-moss">{count}</span>
+                    <span className="ml-1 font-mono text-[10px] text-moss" aria-hidden>
+                      {count}
+                    </span>
                   ) : null}
                 </Link>
               )
@@ -211,6 +216,9 @@ export function Sidebar({
                     key={type}
                     to={`/radar?view=signals&sourceType=${encodeURIComponent(type)}`}
                     aria-current={active ? 'page' : undefined}
+                    aria-label={
+                      count > 0 ? `${type}, ${t('feed.unreadInline', { count })}` : type
+                    }
                     className={cn(
                       'flex min-h-9 items-center gap-2 rounded px-2.5 py-1 text-xs transition motion-reduce:transition-none',
                       focusRing,
@@ -223,7 +231,9 @@ export function Sidebar({
                   >
                     <span className="flex-1 truncate">{type}</span>
                     {count > 0 ? (
-                      <span className="font-mono text-[10px] text-moss">{count}</span>
+                      <span className="font-mono text-[10px] text-moss" aria-hidden>
+                        {count}
+                      </span>
                     ) : null}
                   </Link>
                 )

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { api, type Item } from '../lib/api'
 import { errorText } from '../lib/errors'
+import { prefersReducedMotion } from '../lib/a11y'
 import { formatPushResult, type PushResultBody } from '../lib/formatPushResult'
 import { useMarkItemRead } from '../hooks/useMarkItemRead'
 import { useDisplaySources } from '../hooks/useDisplaySources'
@@ -191,7 +192,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }, [open, items, idx, onClose, openItemExternal, runAndMaybeClose])
 
   useEffect(() => {
-    listRef.current?.querySelector(`[data-idx="${idx}"]`)?.scrollIntoView({ block: 'nearest' })
+    listRef.current?.querySelector(`[data-idx="${idx}"]`)?.scrollIntoView({
+      block: 'nearest',
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    })
   }, [idx])
 
   if (!open) return null
@@ -209,6 +213,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         role="dialog"
         aria-modal="true"
         aria-label={t('nav.search')}
+        aria-busy={searchQuery.isFetching || undefined}
         className="w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -253,9 +258,18 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           aria-label={t('nav.search')}
           aria-busy={searchQuery.isFetching || undefined}
         >
+          <p className="sr-only" aria-live="polite" aria-atomic="true">
+            {searchQuery.isFetching
+              ? t('common.loading')
+              : t('palette.resultCount', { count: items.length })}
+          </p>
           {searchQuery.isFetching && items.length === 0 && q.trim().length > 1 ? (
             <p className="px-4 py-6 text-sm text-muted" role="status">
               {t('common.loading')}
+            </p>
+          ) : searchQuery.isError && q.trim().length > 1 ? (
+            <p className="px-4 py-6 text-sm text-ember" role="alert">
+              {t('common.loadFailed', { message: errorText(searchQuery.error, t) })}
             </p>
           ) : items.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted" role="status">

@@ -3,6 +3,7 @@ English | [中文](README.zh.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/sunliangcode/ai-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/sunliangcode/ai-radar/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
+![Node 20.12+](https://img.shields.io/badge/Node-20.12%2B-brightgreen)
 ![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3-green)
 
 # AI Radar
@@ -69,9 +70,12 @@ cd ai-radar
 Open [http://localhost:8080](http://localhost:8080).
 
 ```bash
-./scripts/status.sh    # health snapshot
-./scripts/backup.sh    # WAL-safe DB backup → data/backups/
+./scripts/status.sh    # health snapshot (human)
+./bin/ai-radar doctor  # prereq + health (JSON)
+./bin/ai-radar health  # JSON /api/health only
+./scripts/backup.sh    # WAL-safe DB backup → data/backups/ (AI_RADAR_DB / BACKUP_KEEP)
 ./stop.sh              # stop background processes from install.sh
+make help              # contributor shortcuts (check / status / health / …)
 ```
 
 **Option B — Docker**
@@ -96,17 +100,29 @@ cd frontend && npm install && npm run dev
 
 Environment variables, delivery channels, and more: [docs/installation.md](docs/installation.md).
 
+## Choose how to run it
+
+| Entry | Status | One-liner | Doc |
+|-------|--------|-----------|-----|
+| CLI | **Core** | Ops (`./bin/ai-radar doctor` · connectors · pack · fetch · …) | [CLI Reference](docs/cli.md) |
+| HTTP API | **Core** | Spring REST + OpenAPI / Swagger | [api.md](docs/api.md) |
+| Cursor Skill | **Core** | Agent runs local ops and intelligence queries | [SKILL.md](SKILL.md) |
+| Claude / Codex / Gemini | **Core** | Platform-specific skill copies | [skills/](skills/) |
+| MCP | **Core** | stdio: `get_health`, `probe_llm`, home, events, sources, connectors, delivery; optional writes | [mcp.md](docs/mcp.md) |
+| Web App | **Core** | Full SPA (`:8080` or Vite `:5173`) | [installation.md](docs/installation.md) |
+
 ## Documentation
 
 - [Docs index](docs/README.md)
 - [Installation & operations](docs/installation.md)
+- [CLI](docs/cli.md) · [Agents](docs/agents.md) · [Development](docs/development.md)
 - [Sources & packs](docs/sources.md)
 - [API](docs/api.md)
 - [Architecture / domain](docs/ai-radar-2.0-domain.md)
-- [Delivery channels](docs/extending-delivery.md)
+- [Extensibility overview](docs/extensibility.md) · [Connectors](docs/extending-connectors.md) · [Delivery](docs/extending-delivery.md)
+- [Release checklist](docs/release.md)
 - [MCP](docs/mcp.md)
-- [Connector development](docs/extending-connectors.md)
-- [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Support](SUPPORT.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [Cite](CITATION.cff)
 
 ## License
 

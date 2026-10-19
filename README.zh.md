@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/sunliangcode/ai-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/sunliangcode/ai-radar/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
+![Node 20.12+](https://img.shields.io/badge/Node-20.12%2B-brightgreen)
 ![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3-green)
 
 # AI Radar
@@ -69,9 +70,12 @@ cd ai-radar
 打开 [http://localhost:8080](http://localhost:8080)。
 
 ```bash
-./scripts/status.sh    # 健康状态快照
-./scripts/backup.sh    # WAL 安全备份 → data/backups/
+./scripts/status.sh    # 健康状态快照（人类可读）
+./bin/ai-radar doctor  # 前置检查 + 健康（JSON）
+./bin/ai-radar health  # 仅 JSON /api/health
+./scripts/backup.sh    # WAL 安全备份 → data/backups/（AI_RADAR_DB / BACKUP_KEEP）
 ./stop.sh              # 停止 install.sh 拉起的后台进程
+make help              # 贡献者快捷命令（check / status / health / …）
 ```
 
 **方式 B — Docker**
@@ -96,17 +100,29 @@ cd frontend && npm install && npm run dev
 
 环境变量、推送渠道等详见：[docs/installation.md](docs/installation.md)。
 
+## 选择入口
+
+| 入口 | 状态 | 一句话 | 文档 |
+|-------|--------|-----------|-----|
+| CLI | **Core** | 运维（`./bin/ai-radar doctor` · connectors · pack · fetch · …） | [CLI 参考](docs/cli.md) |
+| HTTP API | **Core** | Spring REST + OpenAPI / Swagger | [api.md](docs/api.md) |
+| Cursor Skill | **Core** | Agent 本地运维与情报查询 | [SKILL.md](SKILL.md) |
+| Claude / Codex / Gemini | **Core** | 各平台 skill 副本 | [skills/](skills/) |
+| MCP | **Core** | stdio：`get_health`、`probe_llm`、home、events、sources、connectors、delivery；可选写入 | [mcp.md](docs/mcp.md) |
+| Web App | **Core** | 完整 SPA（`:8080` 或 Vite `:5173`） | [installation.md](docs/installation.md) |
+
 ## 文档
 
 - [文档目录](docs/README.md)
 - [安装与运维](docs/installation.md)
+- [CLI](docs/cli.md) · [Agents](docs/agents.md) · [Development](docs/development.md)
 - [数据源与 Pack](docs/sources.md)
 - [API](docs/api.md)
 - [架构 / 领域模型](docs/ai-radar-2.0-domain.md)
-- [投递渠道](docs/extending-delivery.md)
+- [扩展总览](docs/extensibility.md) · [连接器](docs/extending-connectors.md) · [投递](docs/extending-delivery.md)
+- [发布清单](docs/release.md)
 - [MCP](docs/mcp.md)
-- [连接器开发](docs/extending-connectors.md)
-- [贡献指南](CONTRIBUTING.md) · [安全策略](SECURITY.md) · [变更日志](CHANGELOG.md)
+- [贡献指南](CONTRIBUTING.md) · [行为准则](CODE_OF_CONDUCT.md) · [支持](SUPPORT.md) · [安全](SECURITY.md) · [变更日志](CHANGELOG.md) · [引用](CITATION.cff)
 
 ## License
 

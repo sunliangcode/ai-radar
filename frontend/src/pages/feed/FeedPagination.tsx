@@ -22,10 +22,10 @@ export function FeedPagination({
       className="sticky bottom-0 z-10 mt-3 flex items-center justify-between bg-bg/95 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm motion-reduce:backdrop-blur-none supports-[backdrop-filter]:bg-bg/80 motion-reduce:supports-[backdrop-filter]:bg-bg"
       aria-label={t('feed.pagination')}
     >
-      <span className="font-mono text-xs text-muted" aria-live="polite">
+      <span className="font-mono text-xs text-muted" aria-live="polite" aria-atomic="true">
         {t('feed.pageInfo', { page, totalPages })}
       </span>
-      <div className="flex gap-2">
+      <div className="flex gap-2" role="group" aria-label={t('feed.pagination')}>
         <Button
           variant="ghost"
           disabled={page <= 1}

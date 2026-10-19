@@ -1,9 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api, type UserContext } from '../lib/api'
+import { api, type Settings, type UserContext } from '../lib/api'
 import { Button, Field, FormSaveBar, Input, ListSkeleton, PageHeader, QueryErrorState, Textarea, useToast } from '../components/ui'
 import { errorText } from '../lib/errors'
+import { prefersReducedMotion } from '../lib/a11y'
+import { useEscapeBack } from '../hooks/useEscapeBack'
+import { useSaveSettings, useSettings } from '../hooks/useSettings'
+import { BasicsSection } from './settings/BasicsSection'
+import { NotifySection } from './settings/NotifySection'
 import { cn, focusRingClass } from '../lib/cn'
 
 function listToText(values?: string[]) {
@@ -28,20 +34,69 @@ function isSparsePayload(payload: UserContext['payload'] | null) {
 
 export default function ContextsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const ctx = useQuery({ queryKey: ['contexts'], queryFn: api.getContext })
+  const settings = useSettings()
+  const saveSettings = useSaveSettings()
+  const [settingsDraft, setSettingsDraft] = useState<Partial<Settings> | null>(null)
+  const settingsForm = settingsDraft ?? settings.data ?? {}
+  const settingsDirty = settingsDraft != null
   const [payload, setPayload] = useState<UserContext['payload'] | null>(null)
   const [rawText, setRawText] = useState('')
   const [githubUrl, setGithubUrl] = useState('')
   const [baseline, setBaseline] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const hydratedRef = useRef(false)
+  const understoodRef = useRef<HTMLHeadingElement>(null)
   const currentKey = useMemo(
     () => JSON.stringify({ payload, rawText }),
     [payload, rawText],
   )
   const isDirty = baseline != null && currentKey !== baseline
+
+  const goBack = useCallback(() => {
+    navigate('/settings')
+  }, [navigate])
+  useEscapeBack(goBack, !isDirty && !settingsDirty && Boolean(payload))
+
+  useEffect(() => {
+    if (!payload || !settings.data || settings.isError) return
+    if (window.location.hash !== '#notify') return
+    const el = document.getElementById('notify')
+    if (!el) return
+    const reduce = prefersReducedMotion()
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+    document.getElementById('notify-heading')?.focus({ preventScroll: true })
+  }, [payload, settings.data, settings.isError])
+
+  const patchSettings = (p: Partial<Settings>) =>
+    setSettingsDraft((prev) => ({ ...(prev ?? settings.data ?? {}), ...p }))
+
+  function discardSettings() {
+    setSettingsDraft(null)
+  }
+
+  function submitSettings() {
+    saveSettings.mutate(
+      {
+        summaryLanguage: settingsForm.summaryLanguage,
+        pushCron: settingsForm.pushCron,
+        timezone: settingsForm.timezone,
+        pushOnlyWhenItems: settingsForm.pushOnlyWhenItems,
+        smtpTo: settingsForm.smtpTo,
+      },
+      {
+        onSuccess: () => {
+          setSettingsDraft(null)
+          queueMicrotask(() =>
+            document.getElementById('settings-basics-heading')?.focus({ preventScroll: true }),
+          )
+        },
+      },
+    )
+  }
 
   useEffect(() => {
     if (!ctx.data?.payload || hydratedRef.current) return
@@ -69,6 +124,9 @@ export default function ContextsPage() {
       setRawText(data.rawText ?? rawText)
       setBaseline(JSON.stringify({ payload: data.payload, rawText: data.rawText ?? rawText }))
       pushToast('success', t('contexts.saved'))
+      queueMicrotask(() =>
+        document.getElementById('contexts-page-heading')?.focus({ preventScroll: true }),
+      )
     },
     onError: (e) => pushToast('error', errorText(e, t)),
   })
@@ -78,6 +136,14 @@ export default function ContextsPage() {
     onSuccess: (draft) => {
       setPayload(draft.payload)
       pushToast('success', t('contexts.extracted'))
+      const reduce = prefersReducedMotion()
+      window.requestAnimationFrame(() => {
+        understoodRef.current?.focus({ preventScroll: true })
+        understoodRef.current?.scrollIntoView({
+          block: 'nearest',
+          behavior: reduce ? 'auto' : 'smooth',
+        })
+      })
     },
     onError: (e) => pushToast('error', errorText(e, t)),
   })
@@ -89,6 +155,14 @@ export default function ContextsPage() {
       if (draft.rawText) setRawText(draft.rawText)
       setAdvancedOpen(true)
       pushToast('success', t('contexts.imported'))
+      const reduce = prefersReducedMotion()
+      window.requestAnimationFrame(() => {
+        understoodRef.current?.focus({ preventScroll: true })
+        understoodRef.current?.scrollIntoView({
+          block: 'nearest',
+          behavior: reduce ? 'auto' : 'smooth',
+        })
+      })
     },
     onError: (e) => pushToast('error', errorText(e, t)),
   })
@@ -114,13 +188,15 @@ export default function ContextsPage() {
   return (
     <div className="space-y-10">
       <PageHeader
+        titleId="contexts-page-heading"
         title={t('contexts.title')}
         subtitle={t('contexts.subtitle')}
-        back={{ label: t('common.backToList'), to: '/settings' }}
+        back={{ label: t('common.backToList'), onClick: goBack }}
       />
 
       <div
         className="space-y-6"
+        aria-labelledby="contexts-page-heading"
         aria-busy={save.isPending || extract.isPending || importGithub.isPending || undefined}
       >
         <section aria-labelledby="context-intro-heading">
@@ -146,6 +222,7 @@ export default function ContextsPage() {
                   variant="ghost"
                   loading={extract.isPending}
                   disabled={!rawText.trim() || extract.isPending}
+                  aria-label={t('contexts.extract')}
                   onClick={() => extract.mutate()}
                 >
                   {t('contexts.extract')}
@@ -153,8 +230,15 @@ export default function ContextsPage() {
               </div>
             </div>
 
-            <div className="border-t border-border pt-4">
-              <h4 className="mb-1 text-sm font-medium text-ink">{t('contexts.understoodTitle')}</h4>
+            <div className="border-t border-border pt-4" aria-labelledby="context-understood-heading">
+              <h4
+                id="context-understood-heading"
+                ref={understoodRef}
+                tabIndex={-1}
+                className="mb-1 text-sm font-medium text-ink outline-none"
+              >
+                {t('contexts.understoodTitle')}
+              </h4>
               <p className="mb-3 text-xs text-muted">{t('contexts.understoodHint')}</p>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label={t('contexts.role')}>
@@ -203,6 +287,7 @@ export default function ContextsPage() {
                 onClick={() => setAdvancedOpen((o) => !o)}
                 aria-expanded={advancedOpen}
                 aria-controls="context-advanced-fields"
+                aria-label={advancedOpen ? t('contexts.hideMore') : t('contexts.showMore')}
               >
                 {advancedOpen ? t('contexts.hideMore') : t('contexts.showMore')}
               </button>
@@ -270,6 +355,7 @@ export default function ContextsPage() {
                       variant="ghost"
                       loading={importGithub.isPending}
                       disabled={!githubUrl.trim() || importGithub.isPending}
+                      aria-label={t('contexts.importGithub')}
                       onClick={() => importGithub.mutate()}
                     >
                       {t('contexts.importGithub')}
@@ -287,6 +373,39 @@ export default function ContextsPage() {
             />
           </div>
         </section>
+
+        {settings.isLoading ? (
+          <ListSkeleton rows={2} />
+        ) : settings.isError ? (
+          <QueryErrorState
+            message={t('common.loadFailed', { message: errorText(settings.error, t) })}
+            onRetry={() => void settings.refetch()}
+          />
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              submitSettings()
+            }}
+            aria-labelledby="settings-basics-heading"
+            aria-busy={saveSettings.isPending || undefined}
+            className="grid max-w-3xl gap-4"
+          >
+            <BasicsSection form={settingsForm} patch={patchSettings} />
+            <NotifySection
+              form={settingsForm}
+              patch={patchSettings}
+              emailTransportReady={settings.data?.emailTransportReady}
+              feishuBound={settings.data?.feishuBound}
+            />
+            <FormSaveBar
+              dirty={settingsDirty}
+              saving={saveSettings.isPending}
+              onDiscard={discardSettings}
+              onSave={submitSettings}
+            />
+          </form>
+        )}
       </div>
     </div>
   )

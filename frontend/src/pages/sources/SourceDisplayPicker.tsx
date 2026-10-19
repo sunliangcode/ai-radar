@@ -73,6 +73,11 @@ export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
             disabled={domesticIds.length === 0}
             title={domesticIds.length === 0 ? t('sources.regionDomesticEmpty') : undefined}
             aria-pressed={regionMode === 'domestic'}
+            aria-label={
+              domesticIds.length === 0
+                ? t('sources.regionDomesticEmpty')
+                : t('sources.regionDomestic')
+            }
             onClick={() => applyMode('domestic')}
           >
             {t('sources.regionDomestic')}
@@ -83,6 +88,9 @@ export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
             disabled={foreignIds.length === 0}
             title={foreignIds.length === 0 ? t('sources.regionForeignEmpty') : undefined}
             aria-pressed={regionMode === 'foreign'}
+            aria-label={
+              foreignIds.length === 0 ? t('sources.regionForeignEmpty') : t('sources.regionForeign')
+            }
             onClick={() => applyMode('foreign')}
           >
             {t('sources.regionForeign')}
@@ -92,6 +100,7 @@ export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
             className={modeButtonClass(regionMode === 'all')}
             disabled={allSelected && regionMode === 'all'}
             aria-pressed={regionMode === 'all'}
+            aria-label={t('sources.regionAll')}
             onClick={() => applyMode('all')}
           >
             {t('sources.regionAll')}
@@ -105,6 +114,13 @@ export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
           >
             {t('sources.displaySelectNone')}
           </button>
+          <span className="sr-only" aria-live="polite" aria-atomic="true">
+            {regionMode === 'domestic'
+              ? t('sources.regionDomestic')
+              : regionMode === 'foreign'
+                ? t('sources.regionForeign')
+                : t('sources.regionAll')}
+          </span>
         </div>
       </div>
 
@@ -123,7 +139,11 @@ export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
           }}
         />
         <span className="flex-1 text-sm font-medium text-ink">{t('sources.displayMaster')}</span>
-        <span className="font-mono text-[10px] tabular-nums text-muted">
+        <span
+          className="font-mono text-[10px] tabular-nums text-muted"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {t('sources.displayCount', { selected: selectedCount, total: enabledCount })}
         </span>
       </label>

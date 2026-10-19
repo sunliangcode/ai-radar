@@ -1,15 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { PageHeader, QueryErrorState } from '../components/ui'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { SystemHealthCard } from './settings/SystemHealthCard'
 import { cn, focusRingClass } from '../lib/cn'
 
 export default function SettingsHubPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings })
+
+  const goBack = useCallback(() => {
+    navigate('/')
+  }, [navigate])
+  useEscapeBack(goBack)
 
   const sections: { label: string; cards: { to: string; title: string; desc: string; muted?: boolean }[] }[] = [
     {
@@ -19,11 +27,6 @@ export default function SettingsHubPage() {
           to: '/settings/context',
           title: t('settingsHub.context'),
           desc: t('settingsHub.contextDesc'),
-        },
-        {
-          to: '/settings/preferences',
-          title: t('settingsHub.preferences'),
-          desc: t('settingsHub.preferencesDesc'),
         },
         {
           to: '/actions',
@@ -47,7 +50,7 @@ export default function SettingsHubPage() {
       label: t('settingsHub.sectionNotifications'),
       cards: [
         {
-          to: '/settings/preferences#notify',
+          to: '/settings/context#notify',
           title: t('settingsHub.notifications'),
           desc: t('settingsHub.notificationsDesc'),
         },
@@ -68,7 +71,11 @@ export default function SettingsHubPage() {
 
   return (
     <div aria-busy={settings.isFetching || undefined}>
-      <PageHeader title={t('settingsHub.title')} subtitle={t('settingsHub.subtitle')} />
+      <PageHeader
+        titleId="settings-hub-heading"
+        title={t('settingsHub.title')}
+        subtitle={t('settingsHub.subtitle')}
+      />
 
       {settings.isError ? (
         <div className="mb-6">
@@ -83,7 +90,7 @@ export default function SettingsHubPage() {
         <SystemHealthCard />
       </div>
 
-      <div className="space-y-8">
+      <nav className="space-y-8" aria-labelledby="settings-hub-heading">
         {sections.map((section, si) => {
           const headingId = `settings-hub-section-${si}`
           return (
@@ -117,7 +124,7 @@ export default function SettingsHubPage() {
             </section>
           )
         })}
-      </div>
+      </nav>
     </div>
   )
 }

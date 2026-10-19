@@ -20,8 +20,10 @@ data/
 *.db
 *.db-journal
 
-# Translate sidecar venv
+# Translate sidecar
 translate-service/.venv/
+**/__pycache__/
+*.pyc
 
 # Secrets
 backend/.env

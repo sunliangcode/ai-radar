@@ -39,6 +39,7 @@ export function ChangeAttentionCard({
     <article
       className="group relative overflow-hidden rounded-2xl bg-surface px-5 py-6 shadow-[0_1px_0_0_var(--color-border)] ring-1 ring-border/80 transition hover:ring-accent/35 motion-reduce:transition-none"
       aria-busy={busy || undefined}
+      aria-labelledby={`attention-title-${changeId ?? card.id ?? index}`}
     >
       <div className="flex items-baseline justify-between gap-3">
         <p className={cn('font-mono text-[11px] tracking-wider uppercase', tierTone(card.tier))}>
@@ -47,7 +48,10 @@ export function ChangeAttentionCard({
         </p>
       </div>
 
-      <h3 className="mt-3 text-[1.35rem] font-semibold leading-snug tracking-tight text-ink">
+      <h3
+        id={`attention-title-${changeId ?? card.id ?? index}`}
+        className="mt-3 text-[1.35rem] font-semibold leading-snug tracking-tight text-ink"
+      >
         <Link
           to={`/changes/${changeId}`}
           state={{ from: '/' }}
@@ -76,12 +80,14 @@ export function ChangeAttentionCard({
         <Link
           to={`/changes/${changeId}`}
           state={{ from: '/' }}
+          aria-label={`${t('today.exploreChange')}: ${card.title}`}
           className="inline-flex min-h-10 items-center rounded-full bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           {t('today.exploreChange')}
         </Link>
         <Link
           to={`/chat?changeId=${changeId}`}
+          aria-label={`${t('today.askAi')}: ${card.title}`}
           className="inline-flex min-h-10 items-center rounded-full border border-border px-4 text-sm text-ink hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           {t('today.askAi')}
@@ -90,6 +96,8 @@ export function ChangeAttentionCard({
           variant="ghost"
           className="min-h-10 rounded-full"
           disabled={busy || card.watched}
+          aria-pressed={card.watched || undefined}
+          aria-label={`${card.watched ? t('today.following') : t('today.follow')}: ${card.title}`}
           onClick={() => onFollow(card)}
         >
           {card.watched ? t('today.following') : t('today.follow')}
@@ -98,6 +106,7 @@ export function ChangeAttentionCard({
           variant="ghost"
           className="min-h-10 rounded-full text-muted"
           disabled={busy}
+          aria-label={`${t('today.dismiss')}: ${card.title}`}
           onClick={() => onDismiss(card)}
         >
           {t('today.dismiss')}

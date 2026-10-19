@@ -46,6 +46,7 @@ export function HeroFocusCard({
             <button
               type="button"
               onClick={onOpen}
+              aria-label={title}
               className={cn(
                 'rounded-sm text-left transition-colors motion-reduce:transition-none hover:text-accent',
                 focusRingClass(),
@@ -64,7 +65,7 @@ export function HeroFocusCard({
       ) : null}
       {why ? <p className="mt-3 text-sm leading-relaxed text-ink/90">{why}</p> : null}
       {evidence ? <p className="mt-2 text-xs leading-relaxed text-muted">{evidence}</p> : null}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label={title}>
         {onOpen ? (
           <MagAction onClick={onOpen} tone="moss" title={t('today.heroOpen')}>
             {t('today.heroOpen')}

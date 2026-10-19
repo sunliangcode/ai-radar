@@ -1,14 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { EmptyState, FormSaveBar, ListSkeleton, PageHeader, QueryErrorState, ScoreBar, useToast } from '../components/ui'
 import { errorText } from '../lib/errors'
 import { cn, focusRingClass, textLinkClass } from '../lib/cn'
 import { useConnectors } from '../hooks/useConnectors'
+import { findConnectorById } from '../lib/connectors'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { SourceConfigFieldInput } from './sources/SourceConfigFieldInput'
 import { buildSourceConfig } from './sources/buildSourceConfig'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 function configToFieldValues(config: Record<string, unknown> | undefined): Record<string, string> {
   const out: Record<string, string> = {}
@@ -26,6 +29,7 @@ export default function SourceDetailPage() {
   const { t } = useTranslation()
   const { push: pushToast } = useToast()
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const { id } = useParams()
   const sourceId = Number(id)
   const connectors = useConnectors()
@@ -34,9 +38,10 @@ export default function SourceDetailPage() {
     queryFn: () => api.source(sourceId),
     enabled: Number.isFinite(sourceId),
   })
+  useDocumentTitle({ title: q.data?.name ?? null })
 
   const descriptor = useMemo(
-    () => connectors.data?.find((d) => d.id === q.data?.type),
+    () => findConnectorById(connectors.data, q.data?.type),
     [connectors.data, q.data?.type],
   )
 
@@ -58,9 +63,16 @@ export default function SourceDetailPage() {
       void qc.invalidateQueries({ queryKey: ['source', sourceId] })
       void qc.invalidateQueries({ queryKey: ['sources'] })
       pushToast('success', t('sources.updated'))
+      queueMicrotask(() => document.getElementById('source-detail-heading')?.focus({ preventScroll: true }))
     },
     onError: (e) => pushToast('error', errorText(e, t)),
   })
+
+  const isDirty = Object.keys(overrides).length > 0
+  const goBack = useCallback(() => {
+    navigate('/settings/sources')
+  }, [navigate])
+  useEscapeBack(goBack, !isDirty && Boolean(q.data))
 
   if (q.isLoading) return <ListSkeleton rows={4} />
   if (q.isError) {
@@ -93,7 +105,6 @@ export default function SourceDetailPage() {
   const s = q.data
   const fields = descriptor?.configFields ?? []
   const isOssCli = s.type === 'ZHIHU' || s.type === 'WEIBO' || s.type === 'BILIBILI'
-  const isDirty = Object.keys(overrides).length > 0
 
   function saveConfig() {
     const config = buildSourceConfig(descriptor, fieldValues)
@@ -103,6 +114,7 @@ export default function SourceDetailPage() {
   return (
     <div aria-busy={patch.isPending || undefined}>
       <PageHeader
+        titleId="source-detail-heading"
         title={s.name}
         subtitle={`${s.type} · ${s.enabled ? t('sources.statusEnabled') : t('sources.statusDisabled')}`}
         back={{ label: t('common.backToList'), to: '/settings/sources' }}
@@ -155,6 +167,7 @@ export default function SourceDetailPage() {
             primary={
               <Link
                 to="/radar"
+                aria-label={t('nav.radar')}
                 className={cn(
                   'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
                   focusRingClass(),
@@ -166,6 +179,7 @@ export default function SourceDetailPage() {
             secondary={
               <Link
                 to="/settings/sources"
+                aria-label={t('common.backToList')}
                 className={cn(
                   'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
                   focusRingClass(),
@@ -188,6 +202,9 @@ export default function SourceDetailPage() {
                       href={item.canonicalUrl}
                       target="_blank"
                       rel="noreferrer"
+                      aria-label={
+                        item.summary ? `${item.title} · ${item.summary}` : item.title
+                      }
                       className={`inline-flex min-h-9 items-center font-medium text-ink transition duration-150 motion-reduce:transition-none ${textLinkClass()}`}
                     >
                       {item.title}

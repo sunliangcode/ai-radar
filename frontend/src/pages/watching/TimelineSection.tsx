@@ -40,6 +40,7 @@ export function TimelineSection({
         {!loading && !error && groups.length > TIMELINE_PREVIEW ? (
           <button
             type="button"
+            id="watching-timeline-toggle"
             onClick={onToggleShowAll}
             className={cn('inline-flex min-h-9 items-center text-xs', textLinkClass())}
             aria-expanded={showAll}
@@ -49,6 +50,11 @@ export function TimelineSection({
           </button>
         ) : null}
       </div>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {!loading && !error
+          ? t('watching.timelineShown', { count: visibleGroups.length, total: groups.length })
+          : ''}
+      </p>
       {loading ? <ListSkeleton rows={2} /> : null}
       {error ? (
         <QueryErrorState
@@ -59,9 +65,14 @@ export function TimelineSection({
       {!loading && !error && groups.length > 0 ? (
         <div id="watching-timeline-list" className="space-y-3">
           {visibleGroups.map((g) => (
-            <article key={g.eventId} className="rounded-xl border border-border bg-surface px-4 py-3">
+            <article
+              key={g.eventId}
+              className="rounded-xl border border-border bg-surface px-4 py-3"
+              aria-labelledby={`watching-timeline-title-${g.eventId}`}
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <Link
+                  id={`watching-timeline-title-${g.eventId}`}
                   to={`/changes/${g.eventId}`}
                   state={{ from: '/watching' }}
                   className={cn(

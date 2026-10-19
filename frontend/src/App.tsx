@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PrefsProvider, EmptyState, ListSkeleton, ToastProvider } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -10,6 +10,9 @@ import { DisplaySourcesProvider } from './hooks/useDisplaySources'
 import { useSources } from './hooks/useSources'
 import { useDisplaySources } from './hooks/useDisplaySources'
 import { useUnreadCounts } from './hooks/useUnreadCounts'
+import { useDocumentTitle } from './hooks/useDocumentTitle'
+import { useEscapeBack } from './hooks/useEscapeBack'
+import { prefersReducedMotion } from './lib/a11y'
 import { cn, focusRingClass } from './lib/cn'
 
 // Route-level code splitting: each page is a separate chunk so the shell and
@@ -20,7 +23,6 @@ const ChatPage = lazy(() => import('./pages/ChatPage'))
 const ContextsPage = lazy(() => import('./pages/ContextsPage'))
 const RadarPage = lazy(() => import('./pages/RadarPage'))
 const DecisionsPage = lazy(() => import('./pages/DecisionsPage'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const SettingsHubPage = lazy(() => import('./pages/SettingsHubPage'))
 const SourceDetailPage = lazy(() => import('./pages/SourceDetailPage'))
 const SourcesPage = lazy(() => import('./pages/SourcesPage'))
@@ -31,6 +33,12 @@ const ActionsPage = lazy(() => import('./pages/ActionsPage'))
 
 function NotFoundPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const goHome = useCallback(() => {
+    navigate('/')
+  }, [navigate])
+  useEscapeBack(goHome)
+
   return (
     <EmptyState
       title={t('common.notFound')}
@@ -38,6 +46,7 @@ function NotFoundPage() {
       primary={
         <Link
           to="/"
+          aria-label={t('common.backToToday')}
           className={cn(
             'inline-flex min-h-10 items-center rounded-md text-sm font-medium text-accent hover:underline',
             focusRingClass(),
@@ -57,13 +66,20 @@ function PageFallback() {
 function Shell() {
   const { t } = useTranslation()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [routeAnnounce, setRouteAnnounce] = useState('')
   const location = useLocation()
   const mainRef = useRef<HTMLElement>(null)
+  useDocumentTitle()
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     mainRef.current?.focus({ preventScroll: true })
-  }, [location.pathname])
+    // Announce after title hook / detail pages update document.title.
+    const id = window.setTimeout(() => {
+      setRouteAnnounce(document.title)
+    }, 50)
+    return () => window.clearTimeout(id)
+  }, [location.pathname, location.search])
 
   const unread = useUnreadCounts()
   const sources = useSources()
@@ -106,10 +122,21 @@ function Shell() {
     <div className="min-h-dvh md:grid md:grid-cols-[230px_1fr] bg-bg text-ink">
       <a
         href="#main-content"
+        onClick={(e) => {
+          e.preventDefault()
+          mainRef.current?.focus({ preventScroll: false })
+          mainRef.current?.scrollIntoView({
+            block: 'start',
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+          })
+        }}
         className="sr-only focus:not-sr-only focus:absolute focus:left-[max(1rem,env(safe-area-inset-left))] focus:top-[max(1rem,env(safe-area-inset-top))] focus:z-[70] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg focus:ring-2 focus:ring-accent/40 focus:outline-none"
       >
         {t('common.skipToContent')}
       </a>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {routeAnnounce}
+      </div>
       <Sidebar
         totalUnread={totalUnread}
         unreadByType={unread.data ?? {}}
@@ -138,8 +165,8 @@ function Shell() {
                 <Route path="/settings/context" element={<ContextsPage />} />
                 <Route path="/settings/sources" element={<SourcesPage />} />
                 <Route path="/settings/sources/:id" element={<SourceDetailPage />} />
-                <Route path="/settings/preferences" element={<SettingsPage />} />
-                <Route path="/settings/llm" element={<Navigate to="/settings/preferences" replace />} />
+                <Route path="/settings/preferences" element={<ContextPrefsRedirect />} />
+                <Route path="/settings/llm" element={<ContextPrefsRedirect />} />
                 <Route path="/changes/:id" element={<ChangeDetailPage />} />
                 <Route path="/briefs/:date" element={<BriefDetailPage />} />
                 {/* Soft redirects — IA contraction keeps deep links alive */}
@@ -163,6 +190,11 @@ function Shell() {
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   )
+}
+
+function ContextPrefsRedirect() {
+  const { hash } = useLocation()
+  return <Navigate to={{ pathname: '/settings/context', hash }} replace />
 }
 
 function EventRedirect() {

@@ -43,6 +43,10 @@ server:
   port: 8080
 
 radar:
+  # SemVer for OpenAPI + GET /api/health.version — keep in sync with package.json
+  # (shared/version-sync.test.mjs + CITATION.cff).
+  api:
+    version: 0.1.0
   score-threshold: 60
   max-items: 30
   lookback-hours: 48
@@ -135,6 +139,8 @@ springdoc:
     path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
 
 logging:
   level:

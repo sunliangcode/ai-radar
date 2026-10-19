@@ -204,19 +204,35 @@ if [[ "$ready" -eq 1 ]]; then
 try:
     d = json.load(sys.stdin)
 except Exception:
-    print("unknown\t\t")
+    print("unknown\t\t\t")
 else:
-    print("\t".join([("ok" if d.get("ok") else "fail"), str(d.get("baseUrl") or ""), str(d.get("error") or "")]))' 2>/dev/null || true)"
+    present = d.get("modelPresent")
+    present_s = "" if present is None else ("1" if present else "0")
+    print("\t".join([
+        ("ok" if d.get("ok") else "fail"),
+        str(d.get("baseUrl") or ""),
+        str(d.get("error") or ""),
+        present_s,
+        str(d.get("model") or ""),
+        str(d.get("hint") or ""),
+    ]))' 2>/dev/null || true)"
   fi
   if [[ -n "$llm_report" ]]; then
-    IFS=$'\t' read -r llm_state llm_url llm_err <<<"$llm_report"
+    IFS=$'\t' read -r llm_state llm_url llm_err llm_present llm_model llm_hint <<<"$llm_report"
     if [[ "$llm_state" == "ok" ]]; then
       echo "AI model: reachable at ${llm_url:-configured endpoint}"
+      if [[ "$llm_present" == "0" ]]; then
+        echo "WARNING: configured model '${llm_model:-?}' is not in the endpoint model list."
+        [[ -n "$llm_hint" ]] && echo "  Hint: $llm_hint"
+        echo "  Fix: ollama pull ${llm_model:-\$OPENAI_MODEL}  (or change OPENAI_MODEL / Settings → AI model)"
+        echo "  Re-check: ./bin/ai-radar health-llm"
+      fi
     else
       echo "WARNING: AI model is NOT reachable — scoring and summaries will use built-in rules."
       echo "  Endpoint: ${llm_url:-not configured}"
       [[ -n "$llm_err" ]] && echo "  Reason:   $llm_err"
       echo "  Fix: start Ollama (ollama serve && ollama pull \${OPENAI_MODEL}) or set OPENAI_API_KEY/OPENAI_BASE_URL in backend/.env"
+      echo "  Re-check: ./bin/ai-radar health-llm   (or: make health-llm / MCP probe_llm)"
     fi
     echo
   fi
@@ -227,6 +243,7 @@ Next steps
   2. Settings -> Context: describe your role and stack (this is what makes items relevant)
   3. Settings -> AI model: use "Test connection" to confirm the LLM responds
   4. Today -> "Update now": fetches signals and recomputes impact automatically
+  5. Ops CLI (no npm install): ./bin/ai-radar doctor | health-llm | connectors | delivery-channels | home | fetch
      (re-run ./install.sh later to just refresh; ./scripts/status.sh checks everything)
 
 NEXT
@@ -241,7 +258,7 @@ else
 
 Flyway baseline changed (common after git pull). Pre-release there is no in-place upgrade:
   1. ./stop.sh
-  2. Optional: ./scripts/backup.sh   (uses data/radar.db if present)
+  2. Optional: ./scripts/backup.sh   (auto-finds data/ or backend/data/ radar.db)
   3. rm -f backend/data/radar.db backend/data/radar.db-wal backend/data/radar.db-shm
      rm -f data/radar.db data/radar.db-wal data/radar.db-shm
   4. ./install.sh
@@ -253,5 +270,6 @@ FLYWAY
   echo "  Re-check later: ./scripts/status.sh"
 fi
 echo "Translate sidecar: http://127.0.0.1:8765/health (see THIRD_PARTY_NOTICES.md)"
-echo "Status anytime: ./scripts/status.sh"
+echo "Status anytime: ./scripts/status.sh   ·   ./bin/ai-radar doctor"
 echo "Tips: subsequent ./install.sh skips pip if venv+model exist; SKIP_TRANSLATE=1 for fastest start."
+echo "Docs: docs/cli.md · docs/extensibility.md · docs/release.md"

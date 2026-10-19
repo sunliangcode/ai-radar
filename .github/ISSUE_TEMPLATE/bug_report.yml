@@ -67,6 +67,24 @@ body:
       required: true
 
   - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (recommended)
+      description: Paste doctor/health/status output (redact secrets). Prefer doctor (cliVersion, versionAlign, llm, modelPresent, SPI connectors/deliveryChannels, backend version when up).
+      placeholder: |
+        ./bin/ai-radar doctor   # look for versionAlign / llm / SPI catalog warns
+        # or
+        ./scripts/status.sh     # also soft-checks connector/delivery catalogs
+        ./bin/ai-radar health   # includes API version + llm.mode
+        ./bin/ai-radar health-llm   # or MCP probe_llm (check modelPresent / hint)
+        ./bin/ai-radar connectors | jq 'length'   # SPI catalog size
+        ./bin/ai-radar delivery-channels | jq 'length'
+        make check             # if you suspect a build/regression
+        # Slow CLI/MCP? AI_RADAR_TIMEOUT_MS=30000 or 0  (request_timeout)
+        # Backup prune: BACKUP_KEEP=14 (invalid → 14)
+      render: text
+
+  - type: textarea
     id: logs
     attributes:
       label: Relevant logs (optional)

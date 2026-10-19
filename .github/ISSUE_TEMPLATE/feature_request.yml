@@ -6,7 +6,26 @@ body:
   - type: markdown
     attributes:
       value: |
-        Contributions welcome across connectors, delivery, UI, MCP, packs, and docs. See `CONTRIBUTING.md`.
+        Contributions welcome across connectors, delivery, UI, MCP, packs, and docs.
+        See [CONTRIBUTING.md](https://github.com/sunliangcode/ai-radar/blob/main/CONTRIBUTING.md)
+        and [docs/extensibility.md](https://github.com/sunliangcode/ai-radar/blob/main/docs/extensibility.md).
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Where does this fit? Helps route reviews.
+      options:
+        - Connector / source pack
+        - Delivery channel
+        - Pipeline / scoring / events
+        - Web UI
+        - Ops CLI
+        - MCP / agents
+        - Docs / install / Docker
+        - Other
+    validations:
+      required: true
 
   - type: textarea
     id: problem
@@ -20,7 +39,7 @@ body:
     id: proposal
     attributes:
       label: Proposed solution
-      description: What would you like to see?
+      description: What would you like to see? For SPI work, link extending-connectors.md / extending-delivery.md if relevant.
     validations:
       required: true
 

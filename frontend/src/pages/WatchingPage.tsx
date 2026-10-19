@@ -67,14 +67,24 @@ export default function WatchingPage() {
   const visibleGroups = showAllTimeline ? groups : groups.slice(0, TIMELINE_PREVIEW)
 
   return (
-    <div>
+    <div
+      aria-busy={
+        changes.isFetching ||
+        saved.isFetching ||
+        timeline.isFetching ||
+        patchItem.isPending ||
+        undefined
+      }
+    >
       <PageHeader
+        titleId="watching-page-heading"
         title={t('watching.title')}
         subtitle={t('watching.subtitle')}
         actions={
           <Link
             to="/actions"
             className={`inline-flex min-h-9 items-center text-sm ${textLinkClass('moss')}`}
+            aria-label={t('watching.openActions')}
           >
             {t('watching.openActions')}
           </Link>

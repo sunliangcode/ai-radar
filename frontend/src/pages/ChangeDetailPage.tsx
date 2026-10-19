@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
@@ -16,10 +16,12 @@ import {
   isZhihuSource,
 } from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { changeMatchesDisplay, itemMatchesDisplay } from '../lib/sourceFilter'
 import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
 import { cn, focusRingClass, textLinkClass } from '../lib/cn'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 type LocationState = { from?: string }
 
@@ -36,19 +38,22 @@ export default function ChangeDetailPage() {
     queryFn: () => api.change(changeId),
     enabled: Number.isFinite(changeId),
   })
+  useDocumentTitle({ title: q.data?.title ?? null })
   const locale = dateLocale(i18n.language)
 
   const fromState = (location.state as LocationState | null)?.from
   const fallbackFrom = fromState ?? '/radar?view=changes'
   const canGoBack = Boolean(fromState) && window.history.length > 1
 
-  const goBack = () => {
+  const goBack = useCallback(() => {
     if (canGoBack) {
       navigate(-1)
       return
     }
     navigate(fallbackFrom, { replace: !fromState })
-  }
+  }, [canGoBack, fallbackFrom, fromState, navigate])
+
+  useEscapeBack(goBack, readerItemId == null)
 
   const visibleItems = useMemo(
     () => (q.data?.items ?? []).filter((item) => itemMatchesDisplay(item, displaySourceIds)),
@@ -110,6 +115,7 @@ export default function ChangeDetailPage() {
   return (
     <div aria-busy={q.isFetching || undefined}>
       <PageHeader
+        titleId="change-detail-heading"
         title={c.title}
         subtitle={t('changes.detailSubtitle', {
           type: t(`changes.type.${c.changeType ?? 'unknown'}`, { defaultValue: c.changeType ?? 'unknown' }),
@@ -119,6 +125,7 @@ export default function ChangeDetailPage() {
         actions={
           <Link
             to={`/chat?changeId=${c.id}`}
+            aria-label={t('chat.askAbout')}
             className={cn(
               'inline-flex min-h-9 items-center rounded-md border border-border bg-surface px-2.5 py-1 text-xs text-accent hover:bg-accent-soft',
               focusRingClass(),
@@ -144,8 +151,14 @@ export default function ChangeDetailPage() {
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-border bg-surface/70 p-4 md:col-span-2">
-          <h2 className="mb-2 font-serif text-lg">{t('changes.summary')}</h2>
+        <div
+          className="rounded-xl border border-border bg-surface/70 p-4 md:col-span-2"
+          role="region"
+          aria-labelledby="change-summary-heading"
+        >
+          <h2 id="change-summary-heading" className="mb-2 font-serif text-lg">
+            {t('changes.summary')}
+          </h2>
           <p className="text-sm leading-relaxed text-muted">{c.summary || t('changes.noSummary')}</p>
           {c.why ? (
             <p className="mt-4 text-sm text-ink">

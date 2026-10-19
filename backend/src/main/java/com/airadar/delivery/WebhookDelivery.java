@@ -38,6 +38,11 @@ public class WebhookDelivery implements DeliveryChannel {
     }
 
     @Override
+    public DeliveryDescriptor descriptor() {
+        return DeliveryDescriptor.of("webhook", "Generic Webhook", List.of("WEBHOOK_URL"));
+    }
+
+    @Override
     public boolean isEnabled() {
         String url = settingsService.effective().webhookUrl();
         return url != null && !url.isBlank();

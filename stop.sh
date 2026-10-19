@@ -100,3 +100,4 @@ if [[ "$stopped" -eq 1 ]]; then
 else
   echo "Nothing to stop."
 fi
+echo "Restart: ./install.sh   ·   check: ./bin/ai-radar doctor   ·   backup: ./bin/ai-radar backup (BACKUP_KEEP)"

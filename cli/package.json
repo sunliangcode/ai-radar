@@ -1,0 +1,24 @@
+{
+  "name": "ai-radar-cli",
+  "version": "0.1.0",
+  "description": "Ops CLI for AI Radar (doctor, health, health-llm, SPI catalogs, packs, jobs)",
+  "private": true,
+  "license": "MIT",
+  "keywords": ["ai-radar", "cli", "ops", "self-hosted"],
+  "homepage": "https://github.com/sunliangcode/ai-radar#readme",
+  "bugs": {
+    "url": "https://github.com/sunliangcode/ai-radar/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sunliangcode/ai-radar.git",
+    "directory": "cli"
+  },
+  "type": "module",
+  "bin": {
+    "ai-radar": "./ai-radar.mjs"
+  },
+  "engines": {
+    "node": ">=20.12.0"
+  }
+}

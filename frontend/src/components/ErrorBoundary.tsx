@@ -36,9 +36,11 @@ function ErrorFallback({ error, onReset }: { error: Error; onReset: () => void }
   return (
     <div
       role="alert"
+      aria-labelledby="error-boundary-heading"
       className="rounded-lg border border-ember/40 bg-surface px-5 py-8 text-center text-sm"
     >
       <h1
+        id="error-boundary-heading"
         ref={headingRef}
         tabIndex={-1}
         className="text-lg font-medium text-ink outline-none"
@@ -50,9 +52,12 @@ function ErrorFallback({ error, onReset }: { error: Error; onReset: () => void }
         {error.message || String(error)}
       </pre>
       <div className="mt-4 flex flex-wrap justify-center gap-3" role="group" aria-label={t('common.crashTitle')}>
-        <Button onClick={onReset}>{t('common.retry')}</Button>
+        <Button onClick={onReset} aria-label={t('common.retry')}>
+          {t('common.retry')}
+        </Button>
         <Button
           variant="ghost"
+          aria-label={t('common.backToToday')}
           onClick={() => {
             onReset()
             window.location.assign('/')
@@ -60,7 +65,7 @@ function ErrorFallback({ error, onReset }: { error: Error; onReset: () => void }
         >
           {t('common.backToToday')}
         </Button>
-        <Button variant="ghost" onClick={() => window.location.reload()}>
+        <Button variant="ghost" aria-label={t('common.reload')} onClick={() => window.location.reload()}>
           {t('common.reload')}
         </Button>
       </div>

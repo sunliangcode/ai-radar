@@ -1,13 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type Source } from '../lib/api'
 import { Button, EmptyState, ListSkeleton, PageHeader, QueryErrorState, useToast } from '../components/ui'
 import { PackPicker } from '../components/PackPicker'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { useSources } from '../hooks/useSources'
 import { useConnectors } from '../hooks/useConnectors'
+import { findConnectorById } from '../lib/connectors'
 import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
 import { SourceCreateForm } from './sources/SourceCreateForm'
@@ -16,6 +19,7 @@ import { SourceDisplayPicker } from './sources/SourceDisplayPicker'
 
 export default function SourcesPage() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const sources = useSources()
@@ -27,15 +31,21 @@ export default function SourcesPage() {
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const locale = dateLocale(i18n.language)
 
+  const goBack = useCallback(() => {
+    navigate('/settings')
+  }, [navigate])
+  // Create form owns Esc while open; otherwise return to Settings hub
+  useEscapeBack(goBack, !open)
+
   const descriptors = useMemo(() => connectors.data ?? [], [connectors.data])
-  const rssDescriptor = useMemo(() => descriptors.find((d) => d.id === 'RSS'), [descriptors])
+  const rssDescriptor = useMemo(() => findConnectorById(descriptors, 'RSS'), [descriptors])
   const otherDescriptors = useMemo(
-    () => descriptors.filter((d) => d.id !== 'RSS'),
+    () => descriptors.filter((d) => d.id.trim().toUpperCase() !== 'RSS'),
     [descriptors],
   )
   const selected = useMemo(() => {
     if (!showMoreTypes && rssDescriptor) return rssDescriptor
-    return descriptors.find((d) => d.id === type) ?? descriptors[0] ?? rssDescriptor
+    return findConnectorById(descriptors, type) ?? descriptors[0] ?? rssDescriptor
   }, [descriptors, rssDescriptor, showMoreTypes, type])
 
   const create = useMutation({
@@ -48,6 +58,8 @@ export default function SourcesPage() {
       setShowMoreTypes(false)
       setType('RSS')
       pushToast('success', t('sources.created'))
+      // Return focus to Add after form unmounts (next paint)
+      queueMicrotask(() => document.getElementById('sources-add-btn')?.focus())
     },
     onError: (e) => pushToast('error', errorText(e, t)),
   })
@@ -112,15 +124,24 @@ export default function SourcesPage() {
   return (
     <div aria-busy={isPending || create.isPending || sources.isFetching || undefined}>
       <PageHeader
+        titleId="sources-page-heading"
         title={t('sources.title')}
         subtitle={t('sources.subtitle')}
-        back={{ label: t('common.backToList'), to: '/settings' }}
+        back={{ label: t('common.backToList'), onClick: goBack }}
         actions={
           <>
-            <Button variant="ghost" onClick={() => fetchJob.mutate()} loading={isPending} disabled={isPending}>
+            <Button
+              id="sources-fetch-btn"
+              variant="ghost"
+              onClick={() => fetchJob.mutate()}
+              loading={isPending}
+              disabled={isPending}
+              aria-label={phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
+            >
               {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
             </Button>
             <Button
+              id="sources-add-btn"
               onClick={() => {
                 if (open) {
                   setOpen(false)
@@ -131,6 +152,7 @@ export default function SourcesPage() {
               disabled={isPending}
               aria-expanded={open}
               aria-controls={open ? 'source-create-form' : undefined}
+              aria-label={open ? t('common.cancel') : t('sources.addRss')}
             >
               {open ? t('common.cancel') : t('sources.addRss')}
             </Button>
@@ -141,7 +163,10 @@ export default function SourcesPage() {
       <FetchProgressSection
         phase={phase}
         progress={progress}
-        onDismiss={() => void dismiss()}
+        onDismiss={() => {
+          void dismiss()
+          queueMicrotask(() => document.getElementById('sources-fetch-btn')?.focus())
+        }}
         retrying={retryFailed.isPending}
         onRetryFailed={(types) => retryFailed.mutate(types)}
       />
@@ -161,7 +186,10 @@ export default function SourcesPage() {
           onTypeChange={onTypeChange}
           onShowMoreTypes={() => setShowMoreTypes(true)}
           onFieldChange={(key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }))}
-          onCancel={() => setOpen(false)}
+          onCancel={() => {
+            setOpen(false)
+            queueMicrotask(() => document.getElementById('sources-add-btn')?.focus())
+          }}
           onSubmit={(config, sourceType) =>
             create.mutate({ name, type: sourceType, enabled: true, config })
           }

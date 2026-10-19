@@ -1,16 +1,18 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { BriefEntryCard } from '../components/brief/BriefEntryCard'
 import { PageHeader, ScorePill, ListSkeleton, QueryErrorState, EmptyState } from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { itemMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { dateLocale } from '../i18n'
 import { parseBriefMarkdown } from '../lib/parseBriefMarkdown'
 import { cn, focusRingClass } from '../lib/cn'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 function briefDateParts(date: string, locale: string) {
   const d = new Date(`${date}T00:00:00`)
@@ -29,6 +31,7 @@ function briefDateParts(date: string, locale: string) {
 export default function BriefDetailPage() {
   const { t, i18n } = useTranslation()
   const locale = dateLocale(i18n.language)
+  const navigate = useNavigate()
   const { date = '' } = useParams()
   const { displaySourceIds } = useDisplaySources()
   const q = useQuery({
@@ -36,6 +39,17 @@ export default function BriefDetailPage() {
     queryFn: () => api.brief(date),
     enabled: Boolean(date),
   })
+  const titleDate = q.data
+    ? briefDateParts(q.data.date, locale).titleDate
+    : null
+  useDocumentTitle({
+    title: titleDate ? t('briefs.detailTitle', { date: titleDate }) : null,
+  })
+
+  const goBack = useCallback(() => {
+    navigate('/briefs')
+  }, [navigate])
+  useEscapeBack(goBack)
 
   const parsed = useMemo(
     () => (q.data ? parseBriefMarkdown(q.data.markdown) : null),
@@ -107,9 +121,10 @@ export default function BriefDetailPage() {
   return (
     <div className="mx-auto max-w-3xl" aria-busy={q.isFetching || undefined}>
       <PageHeader
+        titleId="brief-detail-heading"
         title={t('briefs.detailTitle', { date: parts.titleDate })}
         subtitle={parts.weekday}
-        back={{ label: t('briefs.backToArchive'), to: '/briefs' }}
+        back={{ label: t('briefs.backToArchive'), onClick: goBack }}
       />
 
       <header
@@ -117,9 +132,12 @@ export default function BriefDetailPage() {
           'brief-detail-hero mb-6 flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 md:p-5',
           'brief-card--featured',
         )}
-        aria-label={parts.titleDate}
+        aria-labelledby="brief-detail-hero-label"
       >
-        <div className="flex min-w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-bg px-3 py-2 text-center">
+        <span id="brief-detail-hero-label" className="sr-only">
+          {parts.titleDate}
+        </span>
+        <div className="flex min-w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-bg px-3 py-2 text-center" aria-hidden>
           <span className="text-3xl font-semibold leading-none tabular-nums text-ink">{parts.day}</span>
           <span className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted">
             {parts.month}
@@ -130,7 +148,7 @@ export default function BriefDetailPage() {
             {t('nav.briefs')}
           </p>
           <p className="mt-1 text-sm text-muted">{parts.weekday}</p>
-          <p className="mt-2 text-sm text-ink">
+          <p className="mt-2 text-sm text-ink" aria-live="polite">
             {hasCurated
               ? t('briefs.curatedCount', { count: curatedCount })
               : t('briefs.emptyDay')}
@@ -209,28 +227,33 @@ export default function BriefDetailPage() {
             </span>
           </h2>
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
-            {extraItems.slice(0, 20).map((item) => (
-              <li key={item.id}>
-                <a
-                  href={item.canonicalUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex min-h-11 items-start gap-3 px-4 py-3 transition hover:bg-bg/80 focus-visible:outline-none focus-visible:bg-bg/80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 motion-reduce:transition-none"
-                >
-                  <ScorePill score={item.score} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-snug text-ink">
-                      {item.titleDisplay || item.title}
-                    </p>
-                    {item.summary ? (
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">
-                        {item.summary}
-                      </p>
-                    ) : null}
-                  </div>
-                </a>
-              </li>
-            ))}
+            {extraItems.slice(0, 20).map((item) => {
+              const displayTitle = item.titleDisplay || item.title
+              const label = item.summary
+                ? `${displayTitle} · ${item.summary}`
+                : displayTitle
+              return (
+                <li key={item.id}>
+                  <a
+                    href={item.canonicalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={label}
+                    className="flex min-h-11 items-start gap-3 px-4 py-3 transition hover:bg-bg/80 focus-visible:outline-none focus-visible:bg-bg/80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 motion-reduce:transition-none"
+                  >
+                    <ScorePill score={item.score} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium leading-snug text-ink">{displayTitle}</p>
+                      {item.summary ? (
+                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted">
+                          {item.summary}
+                        </p>
+                      ) : null}
+                    </div>
+                  </a>
+                </li>
+              )
+            })}
           </ul>
         </section>
       ) : null}

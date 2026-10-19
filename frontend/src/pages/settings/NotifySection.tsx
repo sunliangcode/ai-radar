@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { api, type Settings } from '../../lib/api'
 import { errorText } from '../../lib/errors'
 import { formatPushResult, type PushResultBody } from '../../lib/formatPushResult'
+import { isAriaModalOpen } from '../../lib/a11y'
 import { Button, Card, Field, Input, Select, useToast } from '../../components/ui'
 import { cn, textLinkClass } from '../../lib/cn'
 
@@ -41,6 +42,26 @@ export function NotifySection({
   const { push } = useToast()
   const [bindSessionId, setBindSessionId] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const bindBtnRef = useRef<HTMLButtonElement>(null)
+  const cancelBindRef = useRef<HTMLButtonElement>(null)
+
+  const cancelBind = () => {
+    setBindSessionId(null)
+    queueMicrotask(() => bindBtnRef.current?.focus({ preventScroll: true }))
+  }
+
+  useEffect(() => {
+    if (!bindSessionId) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (isAriaModalOpen()) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      cancelBind()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [bindSessionId])
 
   const pushNow = useMutation({
     mutationFn: api.pushJob,
@@ -108,13 +129,25 @@ export function NotifySection({
   const qrUrl = bindStatus.data?.qrUrl ?? startBind.data?.qrUrl
   const binding = Boolean(bindSessionId) || startBind.isPending
 
+  useEffect(() => {
+    if (!qrUrl) return
+    cancelBindRef.current?.focus({ preventScroll: true })
+  }, [qrUrl])
+
   return (
     <Card id="notify" className="scroll-mt-20" aria-labelledby="notify-heading">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 id="notify-heading" className="font-serif text-lg">
+        <h3 id="notify-heading" tabIndex={-1} className="font-serif text-lg outline-none">
           {t('settings.notifySection')}
         </h3>
-        <Button type="button" variant="ghost" loading={pushNow.isPending} onClick={() => pushNow.mutate()}>
+        <Button
+          type="button"
+          variant="ghost"
+          loading={pushNow.isPending}
+          disabled={pushNow.isPending}
+          aria-label={pushNow.isPending ? t('common.pushing') : t('common.pushNow')}
+          onClick={() => pushNow.mutate()}
+        >
           {pushNow.isPending ? t('common.pushing') : t('common.pushNow')}
         </Button>
       </div>
@@ -147,6 +180,7 @@ export function NotifySection({
                 type="button"
                 variant="ghost"
                 loading={unbind.isPending}
+                aria-label={t('settings.feishuUnbind')}
                 onClick={() => unbind.mutate()}
               >
                 {t('settings.feishuUnbind')}
@@ -156,7 +190,14 @@ export function NotifySection({
             <div className="space-y-3" aria-busy={binding || undefined}>
               <p className="text-sm text-muted">{t('settings.feishuBindHint')}</p>
               {!binding ? (
-                <Button type="button" loading={startBind.isPending} onClick={() => startBind.mutate()}>
+                <Button
+                  ref={bindBtnRef}
+                  id="feishu-bind-btn"
+                  type="button"
+                  loading={startBind.isPending}
+                  aria-label={t('settings.feishuBind')}
+                  onClick={() => startBind.mutate()}
+                >
                   {t('settings.feishuBind')}
                 </Button>
               ) : null}
@@ -180,10 +221,13 @@ export function NotifySection({
                       {t('settings.feishuOpenLink')}
                     </a>
                     <Button
+                      ref={cancelBindRef}
                       type="button"
                       variant="ghost"
                       className="mt-2"
-                      onClick={() => setBindSessionId(null)}
+                      aria-label={t('common.cancel')}
+                      title={`${t('common.cancel')} (Esc)`}
+                      onClick={cancelBind}
                     >
                       {t('common.cancel')}
                     </Button>
@@ -201,6 +245,7 @@ export function NotifySection({
         <Field label={t('settings.pushTime')} hint={t('settings.pushTimeHint')}>
           <Select
             value={hour === 'custom' ? 'custom' : String(hour)}
+            aria-label={t('settings.pushTime')}
             onChange={(e) => {
               const v = e.target.value
               if (v === 'custom') return
@@ -226,6 +271,7 @@ export function NotifySection({
             onClick={() => setAdvancedOpen((o) => !o)}
             aria-expanded={advancedOpen}
             aria-controls="notify-advanced"
+            aria-label={advancedOpen ? t('settings.hideAdvanced') : t('settings.showAdvanced')}
           >
             {advancedOpen ? t('settings.hideAdvanced') : t('settings.showAdvanced')}
           </button>

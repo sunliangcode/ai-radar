@@ -45,6 +45,7 @@ public class RadarProperties {
     private String rsshubBase = "https://rsshub.umzzz.com";
     private final Delivery delivery = new Delivery();
     private final Translate translate = new Translate();
+    private final Api api = new Api();
 
     public int getScoreThreshold() {
         return scoreThreshold;
@@ -266,6 +267,23 @@ public class RadarProperties {
 
     public Translate getTranslate() {
         return translate;
+    }
+
+    public Api getApi() {
+        return api;
+    }
+
+    /** OpenAPI / public API metadata (see {@code OpenApiConfig}). */
+    public static class Api {
+        private String version = "0.1.0";
+
+        public String getVersion() {
+            return version;
+        }
+
+        public void setVersion(String version) {
+            this.version = version;
+        }
     }
 
     public static class Translate {

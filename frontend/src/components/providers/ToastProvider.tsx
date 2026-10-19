@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isAriaModalOpen, prefersReducedMotion } from '../../lib/a11y'
 
 /* Toast */
 
@@ -26,9 +27,7 @@ const ToastContext = createContext<{
 let toastSeq = 0
 
 function toastDuration(kind: ToastKind, hasAction: boolean) {
-  const reduce =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const reduce = prefersReducedMotion()
   const base = kind === 'error' ? 5000 : hasAction ? 6000 : 2500
   return reduce ? Math.round(base * 1.6) : base
 }
@@ -65,7 +64,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       // Let modals / palette own Escape first.
-      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return
+      if (isAriaModalOpen()) return
       const top = items[items.length - 1]
       if (!top) return
       e.preventDefault()

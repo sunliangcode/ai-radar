@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+title: AI Radar
+message: If you use this software, please cite it as below.
+type: software
+authors:
+  - name: AI Radar contributors
+repository-code: https://github.com/sunliangcode/ai-radar
+url: https://github.com/sunliangcode/ai-radar
+abstract: >-
+  Personal AI intelligence pipeline (fetch → score → events → impact → Today)
+  for a single self-hosted instance. Java 21 / Spring Boot 3 + React SPA,
+  with ops CLI, MCP sidecar, and pluggable connectors/delivery.
+license: MIT
+version: 0.1.0
+date-released: "2026-09-08"

@@ -52,6 +52,7 @@ public class DeliveryService {
             EventRepository eventRepository,
             EventItemRepository eventItemRepository
     ) {
+        DeliveryChannelIndex.requireUnique(channels);
         this.channels = channels;
         this.newsItemRepository = newsItemRepository;
         this.entityMapper = entityMapper;

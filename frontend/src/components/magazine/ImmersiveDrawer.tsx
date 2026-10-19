@@ -89,6 +89,7 @@ export function ImmersiveDrawer({
                   target="_blank"
                   rel="noreferrer"
                   onClick={onTitleNavigate}
+                  aria-label={typeof title === 'string' ? title : t('magazine.drawerFallback')}
                   className={cn(
                     'block rounded-sm text-base font-semibold leading-snug text-ink transition-colors motion-reduce:transition-none hover:text-accent',
                     focusRingClass('none'),

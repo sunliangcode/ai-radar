@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type BriefSummary } from '../lib/api'
 import {
@@ -13,6 +14,7 @@ import {
 } from '../components/ui'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { errorText } from '../lib/errors'
 import { formatPushResult, type PushResultBody } from '../lib/formatPushResult'
 import { dateLocale } from '../i18n'
@@ -134,6 +136,7 @@ function BriefCard({
  */
 export default function BriefsPage() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const locale = dateLocale(i18n.language)
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
@@ -144,6 +147,11 @@ export default function BriefsPage() {
     ['briefs'],
   ])
 
+  const goBack = useCallback(() => {
+    navigate('/')
+  }, [navigate])
+  useEscapeBack(goBack, phase === 'idle')
+
   const pushNow = useMutation({
     mutationFn: api.pushJob,
     onSuccess: (body) => {
@@ -151,6 +159,9 @@ export default function BriefsPage() {
       const result = body as PushResultBody
       const failed = (result.results ?? []).some((r) => r.success === false && !r.skipped)
       pushToast(failed ? 'error' : 'success', formatPushResult(result, t))
+      queueMicrotask(() =>
+        document.getElementById('briefs-page-heading')?.focus({ preventScroll: true }),
+      )
     },
     onError: (e) => pushToast('error', t('common.loadFailed', { message: errorText(e, t) })),
   })
@@ -162,6 +173,7 @@ export default function BriefsPage() {
   return (
     <div aria-busy={isPending || pushNow.isPending || undefined}>
       <PageHeader
+        titleId="briefs-page-heading"
         title={t('briefs.title')}
         subtitle={t('briefs.subtitle')}
         actions={
@@ -176,7 +188,13 @@ export default function BriefsPage() {
             >
               {pushNow.isPending ? t('common.pushing') : t('briefs.pushToday')}
             </Button>
-            <Button onClick={() => fetchJob.mutate()} loading={isPending} disabled={isPending}>
+            <Button
+              id="briefs-generate-btn"
+              onClick={() => fetchJob.mutate()}
+              loading={isPending}
+              disabled={isPending}
+              aria-label={phase === 'running' ? t('common.fetching') : t('briefs.generate')}
+            >
               {phase === 'running' ? t('common.fetching') : t('briefs.generate')}
             </Button>
           </>
@@ -186,7 +204,10 @@ export default function BriefsPage() {
       <FetchProgressSection
         phase={phase}
         progress={progress}
-        onDismiss={() => void dismiss()}
+        onDismiss={() => {
+          void dismiss()
+          queueMicrotask(() => document.getElementById('briefs-generate-btn')?.focus())
+        }}
         retrying={retryFailed.isPending}
         onRetryFailed={(types) => retryFailed.mutate(types)}
       />
@@ -223,6 +244,9 @@ export default function BriefsPage() {
 
       {list.length > 0 ? (
         <div className="space-y-6" aria-busy={briefs.isFetching || undefined}>
+          <p className="sr-only" aria-live="polite" aria-atomic="true">
+            {t('briefs.resultCount', { count: list.length })}
+          </p>
           {latest ? (
             <section aria-label={t('briefs.latest')}>
               <BriefCard

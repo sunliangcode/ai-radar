@@ -30,7 +30,7 @@ export function MonitorStatsCard({
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-border px-3 py-2">
           <p className="text-xs text-muted">{t('settings.monitorTps')}</p>
-          <p className="mt-1 font-mono text-lg text-ink" aria-live="polite">
+          <p className="mt-1 font-mono text-lg text-ink" aria-live="polite" aria-atomic="true">
             {formatTps(mon.lastTokensPerSec)}
             <span className="ml-1 text-xs text-muted">tok/s</span>
           </p>

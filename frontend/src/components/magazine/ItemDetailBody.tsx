@@ -1,10 +1,47 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import { errorText } from '../../lib/errors'
 import { cn, textLinkClass } from '../../lib/cn'
 import { Button } from '../ui'
+
+function ItemDetailError({
+  lead,
+  message,
+  onRetry,
+}: {
+  lead?: string | null
+  message: string
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  const retryRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    retryRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  return (
+    <>
+      {lead ? <p className="mb-4 text-sm leading-relaxed text-ink/90">{lead}</p> : null}
+      <div role="alert" className="rounded-lg border border-dashed border-border bg-surface px-3 py-4">
+        <p className="text-xs text-ember">
+          {t('feed.detailError')} {message}
+        </p>
+        <Button
+          ref={retryRef}
+          variant="ghost"
+          className="mt-2"
+          aria-label={t('common.retry')}
+          onClick={onRetry}
+        >
+          {t('common.retry')}
+        </Button>
+      </div>
+    </>
+  )
+}
 
 /** Lazy-loaded item body for the immersive drawer (Zhihu HTML or plain text). */
 export function ItemDetailBody({
@@ -37,21 +74,11 @@ export function ItemDetailBody({
 
   if (detail.isError) {
     return (
-      <>
-        {lead ? <p className="mb-4 text-sm leading-relaxed text-ink/90">{lead}</p> : null}
-        <div role="alert" className="rounded-lg border border-dashed border-border bg-surface px-3 py-4">
-          <p className="text-xs text-ember">
-            {t('feed.detailError')} {errorText(detail.error, t)}
-          </p>
-          <Button
-            variant="ghost"
-            className="mt-2"
-            onClick={() => void detail.refetch()}
-          >
-            {t('common.retry')}
-          </Button>
-        </div>
-      </>
+      <ItemDetailError
+        lead={lead}
+        message={errorText(detail.error, t)}
+        onRetry={() => void detail.refetch()}
+      />
     )
   }
 
@@ -111,6 +138,9 @@ export function ItemDetailBody({
                 </li>
               ))}
             </ul>
+            <p className="sr-only" aria-live="polite" aria-atomic="true">
+              {t('feed.commentsShown', { shown: visibleComments.length, total: comments.length })}
+            </p>
             {comments.length > 3 ? (
               <button
                 type="button"

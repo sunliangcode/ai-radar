@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useFocusTrap } from '../layout/useFocusTrap'
 import { Button } from './Button'
 
@@ -24,9 +25,11 @@ export function ConfirmDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { t } = useTranslation()
   const cancelRef = useRef<HTMLButtonElement>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
   const titleId = useId()
   const descId = useId()
   // Destructive confirms focus Cancel first (safer default); others focus Confirm.
@@ -42,12 +45,16 @@ export function ConfirmDialog({
   })
 
   useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
+    if (open) {
+      returnFocusRef.current = document.activeElement as HTMLElement | null
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = prev
+      }
     }
+    returnFocusRef.current?.focus?.({ preventScroll: true })
+    returnFocusRef.current = null
   }, [open])
 
   if (!open) return null
@@ -76,6 +83,11 @@ export function ConfirmDialog({
         {description ? (
           <p id={descId} className="mt-2 text-sm leading-relaxed text-muted">
             {description}
+          </p>
+        ) : null}
+        {pending ? (
+          <p className="sr-only" aria-live="assertive" aria-atomic="true">
+            {t('common.saving')}
           </p>
         ) : null}
         <div className="mt-5 flex justify-end gap-2" role="group" aria-label={title}>

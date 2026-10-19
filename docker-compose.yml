@@ -25,6 +25,13 @@ services:
     environment:
       PORT: "6688"
     restart: unless-stopped
+    healthcheck:
+      # Root JSON catalog — confirms the sidecar accepted traffic (DAILY_HOT connector).
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6688/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   ai-radar:
     build: .
@@ -46,7 +53,7 @@ services:
       argos-translate:
         condition: service_healthy
       daily-hot:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]

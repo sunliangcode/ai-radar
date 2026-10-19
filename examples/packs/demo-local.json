@@ -1,0 +1,8 @@
+[
+  {
+    "type": "FIXTURE",
+    "name": "Demo Local Fixture",
+    "defaultEnabled": true,
+    "config": { "path": "fixtures/demo-events.json" }
+  }
+]

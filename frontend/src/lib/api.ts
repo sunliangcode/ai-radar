@@ -11,12 +11,25 @@ export class ApiError extends Error {
   }
 }
 
+/** Trim stored LAN token so clipboard whitespace matches the backend guard. */
+export function normalizeLocalToken(raw: string | null | undefined): string {
+  return (raw ?? '').trim()
+}
+
+function readLocalToken(): string {
+  try {
+    return normalizeLocalToken(localStorage.getItem('localToken'))
+  } catch {
+    return ''
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
   if (init?.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
-  const token = localStorage.getItem('localToken')
+  const token = readLocalToken()
   if (token) {
     headers.set('X-Local-Token', token)
   }
@@ -468,6 +481,14 @@ export type ConnectorDescriptor = {
   configFields: ConnectorConfigField[]
 }
 
+/** GET /api/delivery/channels */
+export type DeliveryChannelInfo = {
+  id: string
+  displayName: string
+  settingsKeys: string[]
+  enabled: boolean
+}
+
 export type TranslateHealth = {
   enabled: boolean
   baseUrl: string
@@ -505,6 +526,8 @@ export type LlmProbe = {
 export type Health = {
   status: string
   db: string
+  /** SemVer from `radar.api.version` (aligned with package.json). */
+  version?: string
   translate?: TranslateHealth
   llm?: LlmHealth
   error?: string
@@ -596,6 +619,7 @@ export const api = {
   deleteSource: (id: number) =>
     request<void>(`/api/sources/${id}`, { method: 'DELETE' }),
   connectors: () => request<ConnectorDescriptor[]>('/api/connectors'),
+  deliveryChannels: () => request<DeliveryChannelInfo[]>('/api/delivery/channels'),
   briefs: () => request<BriefSummary[]>('/api/briefs'),
   brief: (date: string) => request<BriefDetail>(`/api/briefs/${date}`),
   settings: () => request<Settings>('/api/settings'),
@@ -609,7 +633,7 @@ export const api = {
     request<{ ok: boolean; feishuBound: boolean }>('/api/delivery/feishu/bind', { method: 'DELETE' }),
   aiMonitor: () => request<AiMonitor>('/api/ai/monitor'),
   aiMonitorStreamUrl: () => {
-    const token = localStorage.getItem('localToken')
+    const token = readLocalToken()
     const base = `${BASE}/api/ai/monitor/stream`
     return token ? `${base}?token=${encodeURIComponent(token)}` : base
   },
@@ -675,7 +699,7 @@ export const api = {
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     })
-    const token = localStorage.getItem('localToken')
+    const token = readLocalToken()
     if (token) headers.set('X-Local-Token', token)
 
     let res: Response

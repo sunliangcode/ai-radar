@@ -1,5 +1,6 @@
-import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
+import { useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { prefersReducedMotion } from '../../lib/a11y'
 import { cn } from '../../lib/cn'
 import { ScorePill } from '../score/ScorePill'
 import { coverShortLabel, coverSourceClass } from './magCover'
@@ -80,11 +81,15 @@ export function MagCard({
   className?: string
 }) {
   const { t } = useTranslation()
+  const titleId = useId()
+  const unreadId = useId()
+  const leadId = useId()
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
   const axis = useRef<'h' | 'v' | null>(null)
   const [dx, setDx] = useState(0)
   const [swiping, setSwiping] = useState(false)
+  const [swipeAnnounce, setSwipeAnnounce] = useState('')
   const suppressClick = useRef(false)
 
   const activate = (e?: MouseEvent | KeyboardEvent) => {
@@ -102,10 +107,7 @@ export function MagCard({
 
   const onTouchStart = (e: TouchEvent) => {
     if (!onSwipeSave && !onSwipeDismiss) return
-    if (
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
+    if (prefersReducedMotion()) {
       return
     }
     const touch = e.touches[0]
@@ -145,8 +147,13 @@ export function MagCard({
   const finishSwipe = () => {
     if (Math.abs(dx) >= SWIPE_TRIGGER) {
       suppressClick.current = true
-      if (dx > 0) onSwipeSave?.()
-      else onSwipeDismiss?.()
+      if (dx > 0) {
+        onSwipeSave?.()
+        setSwipeAnnounce(t('magazine.swipeSaved'))
+      } else {
+        onSwipeDismiss?.()
+        setSwipeAnnounce(t('magazine.swipeDismissed'))
+      }
     }
     startX.current = null
     startY.current = null
@@ -164,6 +171,7 @@ export function MagCard({
   const showChip = !hideSourceChip && Boolean(label)
   const saveHint = dx > 28
   const dismissHint = dx < -28
+  const describedBy = [unread ? unreadId : null, lead ? leadId : null].filter(Boolean).join(' ') || undefined
 
   return (
     <article
@@ -200,10 +208,14 @@ export function MagCard({
       onTouchCancel={finishSwipe}
       role="button"
       tabIndex={selected ? 0 : -1}
-      aria-label={unread ? `${title} · ${t('common.unread')}` : title}
+      aria-labelledby={titleId}
+      aria-describedby={describedBy}
       aria-pressed={selected || undefined}
       aria-current={selected ? 'true' : undefined}
     >
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {swipeAnnounce}
+      </p>
       {saveHint || dismissHint ? (
         <div
           className={cn(
@@ -229,7 +241,9 @@ export function MagCard({
             {unread ? (
               <>
                 <span className="mag-unread-dot" aria-hidden />
-                <span className="sr-only">{t('common.unread')}</span>
+                <span id={unreadId} className="sr-only">
+                  {t('common.unread')}
+                </span>
               </>
             ) : null}
             {score != null ? <ScorePill score={score} /> : null}
@@ -237,6 +251,7 @@ export function MagCard({
         </div>
 
         <h3
+          id={titleId}
           className={cn(
             'mt-2.5 text-[15px] font-semibold leading-snug line-clamp-4 tracking-tight',
             unread === false ? 'text-ink/70' : 'text-ink',
@@ -250,7 +265,7 @@ export function MagCard({
           </p>
         ) : null}
         {lead ? (
-          <p className="mt-2 text-[13px] leading-relaxed text-ink/75 line-clamp-3" title={lead}>
+          <p id={leadId} className="mt-2 text-[13px] leading-relaxed text-ink/75 line-clamp-3" title={lead}>
             {lead}
           </p>
         ) : null}

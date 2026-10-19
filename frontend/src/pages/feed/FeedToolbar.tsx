@@ -61,7 +61,8 @@ export function FeedToolbar({
             value={inputQ}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') {
+              if (e.key === 'Escape' && inputQ) {
+                e.preventDefault()
                 onClearSearch()
               }
             }}
@@ -121,14 +122,14 @@ export function FeedToolbar({
             <Focus size={14} aria-hidden />
           </button>
         </div>
-        <span className="font-mono text-xs text-muted" aria-live="polite">
+        <span className="font-mono text-xs text-muted" aria-live="polite" aria-atomic="true">
           {searchMode ? t('feed.searchingFor', { q }) : t('feed.count', { count: total })}
           {unreadCount > 0 && !unreadOnly ? ` · ${t('feed.unreadInline', { count: unreadCount })}` : ''}
         </span>
       </div>
 
       <div
-        className={`flex gap-1.5 overflow-x-auto pb-0.5 thin-scroll ${searchMode ? 'pointer-events-none opacity-45' : ''}`}
+        className={`flex gap-1.5 overflow-x-auto pb-0.5 thin-scroll motion-reduce:scroll-auto ${searchMode ? 'pointer-events-none opacity-45' : ''}`}
         role="group"
         aria-label={t('feed.filtersLabel')}
         aria-disabled={searchMode || undefined}
@@ -140,6 +141,7 @@ export function FeedToolbar({
             shape="pill"
             active={range === r}
             disabled={searchMode}
+            aria-label={t(`feed.range.${r}`)}
             onClick={() => onRangeChange(r)}
             className="shrink-0"
           >
@@ -151,6 +153,7 @@ export function FeedToolbar({
           disabled={searchMode}
           onClick={() => setShowMoreTime((v) => !v)}
           aria-expanded={showMoreTime}
+          aria-label={showMoreTime ? t('feed.lessTime') : t('feed.moreTime')}
           className={`inline-flex min-h-9 shrink-0 items-center gap-0.5 rounded-full px-2 py-1 text-xs text-muted hover:bg-border hover:text-ink disabled:opacity-40 ${focusRingClass()}`}
         >
           {showMoreTime ? t('feed.lessTime') : t('feed.moreTime')}
@@ -164,6 +167,7 @@ export function FeedToolbar({
           shape="pill"
           active={unreadOnly}
           disabled={searchMode}
+          aria-label={t('feed.unreadOnly')}
           onClick={onToggleUnreadOnly}
           className="shrink-0"
         >
@@ -174,6 +178,7 @@ export function FeedToolbar({
           shape="pill"
           active={!sourceType}
           disabled={searchMode}
+          aria-label={t('feed.allSources')}
           onClick={() => onSourceTypeChange('')}
           className="shrink-0"
         >
@@ -185,6 +190,7 @@ export function FeedToolbar({
             shape="pill"
             active={sourceType === c}
             disabled={searchMode}
+            aria-label={t(`sourceType.${c}`, { defaultValue: c })}
             onClick={() => onSourceTypeChange(c)}
             className="shrink-0"
           >
@@ -194,7 +200,9 @@ export function FeedToolbar({
       </div>
 
       {searchMode ? (
-        <p className="text-xs text-muted">{t('feed.searchFiltersDisabled')}</p>
+        <p className="text-xs text-muted" role="status" aria-live="polite">
+          {t('feed.searchFiltersDisabled')}
+        </p>
       ) : null}
     </div>
   )

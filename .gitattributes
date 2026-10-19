@@ -1,0 +1,25 @@
+# Normalize text; keep shell / CLI wrappers as LF for Linux/macOS clones.
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.mjs text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.java text eol=lf
+*.xml text eol=lf
+*.properties text eol=lf
+*.json text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.css text eol=lf
+bin/ai-radar text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.jar binary
+*.db binary

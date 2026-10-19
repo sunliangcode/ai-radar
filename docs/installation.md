@@ -24,9 +24,35 @@ Backup the SQLite database (WAL-safe; keeps the last 14 copies under `data/backu
 
 ```bash
 ./scripts/backup.sh
+# or: ./bin/ai-radar backup
+# If root data/radar.db is missing, backup auto-uses backend/data/radar.db
+# (or set AI_RADAR_DB=backend/data/radar.db explicitly).
 # restore: stop the backend, then
 #   cp data/backups/radar-YYYYmmdd-HHMMSS.db data/radar.db
 ```
+
+### Ops CLI, MCP, and agent skills
+
+`./install.sh` and `./scripts/status.sh` print CLI hints when the backend is up. After start:
+
+```bash
+./bin/ai-radar doctor          # prereq + health JSON (prefer this first)
+./bin/ai-radar health          # GET /api/health (version, DB, translate, LLM)
+./bin/ai-radar health-llm      # live LLM probe (or: make health-llm / MCP probe_llm)
+./bin/ai-radar home            # intelligence home JSON
+./bin/ai-radar fetch           # POST /api/jobs/fetch
+```
+
+Full CLI reference: [cli.md](cli.md). Release cuts: [release.md](release.md).
+
+MCP sidecar (agents / IDE) — see [mcp.md](mcp.md) (`get_health` / `probe_llm` and more):
+
+```bash
+cd mcp && npm install
+# configure Cursor / Claude Desktop — see mcp.md
+```
+
+Cursor skill: root [SKILL.md](../SKILL.md). Platform copies: [skills/](../skills/). Guide: [agents.md](agents.md).
 
 Optional retention: Settings → Advanced → **Keep items for N days** (default `0` = forever). Items older than N days that are not saved and not linked to an event are deleted after each scheduled fetch (and via `POST /api/jobs/cleanup`).
 
@@ -113,7 +139,10 @@ cd ../backend && ./mvnw spring-boot:run
 cp backend/.env.example backend/.env   # edit as needed
 docker compose up -d --build
 # starts argos-translate (:8765) + daily-hot (:6688) + ai-radar (:8080)
+# ai-radar waits for healthy argos-translate + daily-hot (compose healthchecks)
+# Image HEALTHCHECK probes GET /api/health (same as compose)
 # DAILY_HOT sources stay disabled until daily-hot is up; then enable in Settings → Sources
+# Dockerfile frontend stage uses Node 20 (matches .nvmrc)
 curl -s http://localhost:8080/api/health
 curl -s http://localhost:8765/health
 ```
@@ -123,8 +152,8 @@ curl -s http://localhost:8765/health
 ```bash
 ./install.sh   # venv + Argos model + embed UI + start sidecar + backend (waits for /api/health)
 ./stop.sh      # stop data/ai-radar.pid + data/argos-translate.pid (+ free :8080/:8765)
-./scripts/status.sh   # health snapshot: backend, translate, PID files, ports
-./scripts/check.sh    # local CI-parity tests (backend + frontend + mcp)
+./scripts/status.sh   # health snapshot: backend, translate, SPI catalogs, PID files, ports (:8080/:8765/:6688)
+./scripts/check.sh    # local CI-parity tests (backend + frontend + mcp + cli)
 ```
 
 First Argos `pip install` can take several minutes (ctranslate2 / spaCy wheels). Later runs skip pip/model when already present. For a faster cold start without titles: `SKIP_TRANSLATE=1 ./install.sh`.
@@ -132,8 +161,11 @@ First Argos `pip install` can take several minutes (ctranslate2 / spaCy wheels).
 ## Trigger jobs manually
 
 ```bash
+./bin/ai-radar fetch
+./bin/ai-radar push    # needs a delivery channel
+# or curl:
 curl -s -X POST http://localhost:8080/api/jobs/fetch | jq .
-curl -s -X POST http://localhost:8080/api/jobs/push | jq .   # needs a delivery channel
+curl -s -X POST http://localhost:8080/api/jobs/push | jq .
 curl -s http://localhost:8080/api/items | jq .
 ```
 
@@ -163,18 +195,36 @@ See also: [extending-delivery.md](extending-delivery.md).
 ```text
 backend/     Spring Boot API + jobs + delivery + static SPA
 frontend/    React + Vite + Tailwind
-mcp/         Read-only MCP sidecar
+cli/         Ops CLI (ai-radar); bin/ai-radar wrapper
+mcp/         MCP stdio sidecar
 packs/       Source pack manifests
 docs/        Documentation
+SKILL.md / skills/   Agent skills
 aim/         historical iteration notes
 Dockerfile / docker-compose.yml / install.sh / stop.sh
 ```
 
+## FAQ
+
+**`doctor` warns `versionAlign` (CLI vs API SemVer)** — checkout and running jar/SPA are out of sync. `git pull`, then `./install.sh` (or rebuild backend + `frontend` `build:embed`). Warn-only; exit code stays 0 unless another check is `error`.
+
+**`doctor` warns `llm` heuristic/degraded** — scoring is not on a live model. Start Ollama (or set `OPENAI_*`), then `./bin/ai-radar health-llm`. Warn-only.
+
+**`health-llm` / `probe_llm` / doctor shows `modelPresent: false` (or doctor warn)** — endpoint is up but `OPENAI_MODEL` is not in `models[]`. Pull the model (e.g. `ollama pull …`) or change the model name in Settings / `.env`. An empty `models[]` skips this check (`modelPresent: true`).
+
+**`doctor` / `status.sh` warns on SPI catalogs** — connector or delivery catalog unsorted, missing `FIXTURE`/`path`, `RSS`/`feedUrl`, `DAILY_HOT`/`route`, `WEB`/`url`, `TELEGRAM`/`channels`, `HACKER_NEWS`/`query`, `GOOGLE_NEWS`/`query`, `GDELT`/`query`, `REDDIT`/`subreddits`, `V2EX`/`nodes`, `GITHUB`/`query`, `TWITTER`/`users`, `OSS_INSIGHT`/`keywords`, `GITHUB_TRENDING`/`since`, `PRODUCT_HUNT`/`maxItems`, `EMAIL`/`maxMessages`, `ZHIHU`/`cliPath`, `WEIBO`/`cliPath`, `BILIBILI`/`cliPath`, `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`, or unexpected field types. Confirm with `./bin/ai-radar connectors` / `delivery-channels` and [docs/extensibility.md](extensibility.md). Warn-only.
+
+**`GET /api/health` (and `/api/health/llm`) work without `LOCAL_TOKEN`** — intentional for compose/probes / Settings LLM test. Other read-only GETs are also open; mutating routes and `/api/settings` still require the token when set.
+
+**CLI/MCP `request_timeout` / slow calls** — raise `AI_RADAR_TIMEOUT_MS` (default `8000`; empty/unset → default) or set `0` / negative / non-numeric to disable AbortSignal timeouts. See [cli.md](cli.md) / [mcp.md](mcp.md).
+
+**`BACKUP_KEEP` pruning** — `./bin/ai-radar backup` keeps the newest N files under `data/backups/` (default `14`). Values are trimmed; non-numeric or `<1` fall back to `14`.
+
 ## Tests
 
 ```bash
-cd backend && ./mvnw test
-cd frontend && npm run build
+make check
+# or: cd backend && ./mvnw test ; cd frontend && npm run build
 ```
 
 Extensibility smoke: `scripts/smoke-extensibility.sh`.
@@ -200,6 +250,31 @@ cd ai-radar
 ```
 
 `stop.sh` 读取 `data/ai-radar.pid` 与 `data/argos-translate.pid`（若仍有进程占用 `8080` / `8765` 也会一并释放）。
+
+备份 SQLite（WAL 安全；保留最近 14 份于 `data/backups/`）：
+
+```bash
+./scripts/backup.sh
+# 或: ./bin/ai-radar backup
+# 若根目录无 data/radar.db，会自动改用 backend/data/radar.db
+# （也可显式设置 AI_RADAR_DB=backend/data/radar.db）。
+# 恢复：先停后端，再
+#   cp data/backups/radar-YYYYmmdd-HHMMSS.db data/radar.db
+```
+
+### 运维 CLI、MCP 与 Agent Skill
+
+后端就绪后：
+
+```bash
+./bin/ai-radar doctor          # 环境自检 + health JSON（优先）
+./bin/ai-radar health          # GET /api/health（含 version）
+./bin/ai-radar health-llm      # 在线 LLM 探测（或 make health-llm / MCP probe_llm）
+./bin/ai-radar home
+./bin/ai-radar fetch
+```
+
+CLI 全文：[cli.md](cli.md)。MCP：[mcp.md](mcp.md)（含 `get_health` / `probe_llm`）。Cursor Skill：[SKILL.md](../SKILL.md)；平台副本：[skills/](../skills/)；说明：[agents.md](agents.md)。
 
 ### 配置
 
@@ -255,6 +330,7 @@ cd ../backend && ./mvnw spring-boot:run
 cp backend/.env.example backend/.env
 docker compose up -d --build
 # 启动 argos-translate (:8765) + daily-hot (:6688) + ai-radar (:8080)
+# ai-radar 会等待 argos-translate / daily-hot 健康检查通过
 # DailyHot 热榜源默认关闭；边车就绪后在「情报源」里启用
 curl -s http://localhost:8080/api/health
 curl -s http://localhost:8765/health
@@ -263,6 +339,9 @@ curl -s http://localhost:8765/health
 ### 手动触发
 
 ```bash
+./bin/ai-radar fetch
+./bin/ai-radar push
+# 或 curl：
 curl -s -X POST http://localhost:8080/api/jobs/fetch | jq .
 curl -s -X POST http://localhost:8080/api/jobs/push | jq .
 curl -s http://localhost:8080/api/items | jq .
@@ -287,11 +366,28 @@ curl -s http://localhost:8080/api/items | jq .
 
 扩展投递： [extending-delivery.md](extending-delivery.md)。
 
+### 常见问题
+
+**`doctor` 提示 `versionAlign`（CLI 与 API 版本不一致）** — 仓库与正在运行的 jar/SPA 不同步。`git pull` 后执行 `./install.sh`（或重编后端 + `frontend` `build:embed`）。仅为 warn，除非另有 `error` 检查，退出码仍为 0。
+
+**`doctor` 提示 `llm` heuristic/degraded** — 评分未走在线模型。启动 Ollama（或配置 `OPENAI_*`），再跑 `./bin/ai-radar health-llm`。仅为 warn。
+
+**`health-llm` / `probe_llm` / doctor 显示 `modelPresent: false`（或 doctor warn）** — 端点可达但 `OPENAI_MODEL` 不在 `models[]`。拉取模型（如 `ollama pull …`）或在设置 / `.env` 改模型名。空 `models[]` 会跳过此项检查（`modelPresent: true`）。
+
+**`doctor` / `status.sh` 提示 SPI 目录异常** — 连接器或投递目录未排序、缺少 `FIXTURE`/`path`, `RSS`/`feedUrl`, `DAILY_HOT`/`route`, `WEB`/`url`, `TELEGRAM`/`channels`, `HACKER_NEWS`/`query`, `GOOGLE_NEWS`/`query`, `GDELT`/`query`, `REDDIT`/`subreddits`, `V2EX`/`nodes`, `GITHUB`/`query`, `TWITTER`/`users`, `OSS_INSIGHT`/`keywords`, `GITHUB_TRENDING`/`since`, `PRODUCT_HUNT`/`maxItems`, `EMAIL`/`maxMessages`, `ZHIHU`/`cliPath`, `WEIBO`/`cliPath`, `BILIBILI`/`cliPath`, `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`、或字段类型异常。用 `./bin/ai-radar connectors` / `delivery-channels` 与 [docs/extensibility.md](extensibility.md) 核对。仅为 warn。
+
+**未设置 `LOCAL_TOKEN` 也能访问 `GET /api/health`（及 `/api/health/llm`）** — 有意为之（compose / 探针 / 设置里测 LLM）。其他只读 GET 同样开放；设置 token 后，写操作与 `/api/settings` 仍需带 `X-Local-Token`。
+
+**CLI/MCP `request_timeout` / 调用偏慢** — 调大 `AI_RADAR_TIMEOUT_MS`（默认 `8000`；空或未设置则用默认），或设 `0` / 负数 / 非数字关闭 AbortSignal 超时。见 [cli.md](cli.md) / [mcp.md](mcp.md)。
+
+**`BACKUP_KEEP` 保留份数** — `./bin/ai-radar backup` 在 `data/backups/` 下保留最近 N 份（默认 `14`）。先去掉首尾空白；非数字或 `<1` 回退为 `14`。
+
 ### 测试
 
 ```bash
-cd backend && ./mvnw test
-cd frontend && npm run build
+make check
+# 或：cd backend && ./mvnw test ; cd frontend && npm run build
 ```
+
 
 扩展 smoke：`scripts/smoke-extensibility.sh`。

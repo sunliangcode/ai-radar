@@ -29,16 +29,20 @@ export function ChangeCard({
   const { t } = useTranslation()
   const changeId = card.eventId ?? card.changeId
   const timeline = card.recentTimeline ?? []
+  const titleId = `change-card-title-${changeId ?? card.id ?? 'x'}`
 
   return (
     <article
       className="rounded-xl border border-border bg-surface p-5 shadow-sm"
       aria-busy={busy || undefined}
+      aria-labelledby={titleId}
     >
       <div className="mb-3 flex flex-wrap items-start gap-2">
         <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${tierDot(card.tier)}`} aria-hidden />
         <div className="min-w-0 flex-1">
-          <h3 className="text-lg font-semibold leading-snug text-ink">{card.title}</h3>
+          <h3 id={titleId} className="text-lg font-semibold leading-snug text-ink">
+            {card.title}
+          </h3>
           {card.tier ? (
             <div className="mt-1">
               <StatusBadge status={card.tier} />
@@ -49,6 +53,7 @@ export function ChangeCard({
           <Link
             to={`/changes/${changeId}`}
             state={{ from: '/' }}
+            aria-label={`${t('today.openChange')}: ${card.title}`}
             className={cn('inline-flex min-h-9 items-center text-xs', textLinkClass())}
           >
             {t('today.openChange')} →
@@ -95,16 +100,40 @@ export function ChangeCard({
         aria-label={card.title}
         aria-busy={busy || undefined}
       >
-        <Button variant="ghost" size="sm" onClick={onDecide} disabled={busy}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDecide}
+          disabled={busy}
+          aria-label={`${t('today.decide')}: ${card.title}`}
+        >
           {t('today.decide')}
         </Button>
-        <Button variant="ghost" size="sm" onClick={onWatch} disabled={busy}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onWatch}
+          disabled={busy}
+          aria-label={`${t('today.watch')}: ${card.title}`}
+        >
           {t('today.watch')}
         </Button>
-        <Button variant="ghost" size="sm" onClick={onDismiss} disabled={busy}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDismiss}
+          disabled={busy}
+          aria-label={`${t('today.dismiss')}: ${card.title}`}
+        >
           {t('today.dismiss')}
         </Button>
-        <Button variant="ghost" size="sm" onClick={onInvestigate} disabled={busy}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onInvestigate}
+          disabled={busy}
+          aria-label={`${t('today.investigate')}: ${card.title}`}
+        >
           {t('today.investigate')}
         </Button>
       </div>

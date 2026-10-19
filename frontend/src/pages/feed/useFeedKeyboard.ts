@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import type { Item } from '../../lib/api'
 import { isZhihuSource } from '../../components/magazine/magCover'
+import { isAriaModalOpen, isEditableTarget } from '../../lib/a11y'
 
 /**
  * Feed keyboard: j/k (n/p in focus) move; Enter open original (drawer for Zhihu);
- * o open drawer; s save; x not-interested (advance); m read; / search.
+ * o open drawer; s save; x not-interested (advance); m read; / search; [ ] page.
  * When the drawer is open, j/k still advances selection (drawer content follows).
  */
 export function useFeedKeyboard({
@@ -20,6 +21,8 @@ export function useFeedKeyboard({
   onDismiss,
   onMarkRead,
   onFocusSearch,
+  onPagePrev,
+  onPageNext,
 }: {
   items: Item[]
   selectedId: number | null
@@ -33,12 +36,15 @@ export function useFeedKeyboard({
   onDismiss?: (item: Item) => void
   onMarkRead: (item: Item) => void
   onFocusSearch: () => void
+  onPagePrev?: () => void
+  onPageNext?: () => void
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      if (isEditableTarget(e.target)) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
+      // Modal dialogs (⌘K, confirm, immersive) own the keyboard
+      if (isAriaModalOpen()) return
 
       if (e.key === 'Escape' && drawerOpen) {
         e.preventDefault()
@@ -92,6 +98,16 @@ export function useFeedKeyboard({
       } else if (e.key === '/') {
         e.preventDefault()
         onFocusSearch()
+      } else if (e.key === '[') {
+        if (onPagePrev) {
+          e.preventDefault()
+          onPagePrev()
+        }
+      } else if (e.key === ']') {
+        if (onPageNext) {
+          e.preventDefault()
+          onPageNext()
+        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -109,5 +125,7 @@ export function useFeedKeyboard({
     onDismiss,
     onMarkRead,
     onFocusSearch,
+    onPagePrev,
+    onPageNext,
   ])
 }

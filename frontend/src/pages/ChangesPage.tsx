@@ -15,8 +15,12 @@ export default function ChangesPage() {
   const rows = (q.data ?? []).filter((c) => changeMatchesDisplay(c, displaySourceIds))
 
   return (
-    <div>
-      <PageHeader title={t('changes.listTitle')} subtitle={t('changes.listSubtitle')} />
+    <div aria-busy={q.isFetching || undefined}>
+      <PageHeader
+        titleId="changes-list-heading"
+        title={t('changes.listTitle')}
+        subtitle={t('changes.listSubtitle')}
+      />
       {q.isLoading ? <ListSkeleton rows={6} /> : null}
       {q.isError ? (
         <QueryErrorState
@@ -25,28 +29,37 @@ export default function ChangesPage() {
         />
       ) : null}
       {rows.length ? (
-        <ul className="space-y-3" aria-label={t('changes.listTitle')} aria-busy={q.isFetching || undefined}>
-          {rows.map((c) => (
-            <li key={c.id}>
-              <Link
-                to={`/changes/${c.id}`}
-                aria-label={c.title}
-                className={cn(
-                  'block rounded-xl border border-border bg-surface px-4 py-3 transition motion-reduce:transition-none hover:border-accent/40',
-                  focusRingClass(),
-                )}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-ink">{c.title}</span>
-                  {c.tier ? <StatusBadge status={c.tier} /> : null}
-                </div>
-                {c.summary ? <p className="mt-1 text-sm text-muted line-clamp-2">{c.summary}</p> : null}
-                {c.lastUpdatedAt ? (
-                  <p className="mt-2 font-mono text-[10px] text-faint">{c.lastUpdatedAt}</p>
-                ) : null}
-              </Link>
-            </li>
-          ))}
+        <ul
+          className="space-y-3"
+          aria-labelledby="changes-list-heading"
+          aria-busy={q.isFetching || undefined}
+        >
+          {rows.map((c) => {
+            const labelParts = [c.title]
+            if (c.tier) labelParts.push(c.tier)
+            if (c.summary) labelParts.push(c.summary)
+            return (
+              <li key={c.id}>
+                <Link
+                  to={`/changes/${c.id}`}
+                  aria-label={labelParts.join(' · ')}
+                  className={cn(
+                    'block rounded-xl border border-border bg-surface px-4 py-3 transition motion-reduce:transition-none hover:border-accent/40',
+                    focusRingClass(),
+                  )}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-ink">{c.title}</span>
+                    {c.tier ? <StatusBadge status={c.tier} /> : null}
+                  </div>
+                  {c.summary ? <p className="mt-1 text-sm text-muted line-clamp-2">{c.summary}</p> : null}
+                  {c.lastUpdatedAt ? (
+                    <p className="mt-2 font-mono text-[10px] text-faint">{c.lastUpdatedAt}</p>
+                  ) : null}
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       ) : null}
       {!q.isLoading && !q.isError && !rows.length ? (

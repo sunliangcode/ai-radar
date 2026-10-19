@@ -1,11 +1,35 @@
-node_modules
-dist
+# Keep image context small (frontend npm ci runs inside the build stage).
+**/node_modules
+**/dist
+**/target
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/*.tsbuildinfo
+frontend/coverage
+.git
+.github
+.idea
+*.iml
 .DS_Store
 *.log
-target/
-backend/data/
-data/
-*.db
-*.db-journal
+**/.venv
+translate-service/.venv
+
+# Runtime / secrets (never bake into the image)
+data
+backend/data
+**/*.db
+**/*.db-journal
 backend/.env
+.env
+**/.env
+
+# Historical notes / chat dumps (not needed at runtime)
+aim
+
+# Local bake artifacts (SPA is rebuilt in the frontend stage)
+backend/src/main/resources/static/assets
+backend/src/main/resources/static/index.html
+backend/src/main/resources/static/icons.svg
 frontend/dist

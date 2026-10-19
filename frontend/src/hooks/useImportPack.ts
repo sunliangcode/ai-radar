@@ -5,8 +5,7 @@ import { useToast } from '../components/providers/ToastProvider'
 import { errorText } from '../lib/errors'
 
 /**
- * Import a curated source pack. Replaces the near-identical mutations that
- * used to live in TodayPage, SourcesPage and SettingsPage.
+ * Import a curated source pack. Shared by Today / Sources / Settings hub flows.
  */
 export function useImportPack(options?: {
   invalidate?: readonly (string | number)[][]

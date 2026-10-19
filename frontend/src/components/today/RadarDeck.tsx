@@ -5,6 +5,7 @@ import { Eye, Search, SkipForward, X } from 'lucide-react'
 import type { ImpactCard } from '../../lib/api'
 import { Button, HeroFocusCard } from '../ui'
 import { InboxZeroBurst } from '../engagement/InboxZeroBurst'
+import { isAriaModalOpen, isEditableTarget, prefersReducedMotion } from '../../lib/a11y'
 import { cn, focusRingClass } from '../../lib/cn'
 
 export function RadarDeck({
@@ -55,10 +56,7 @@ export function RadarDeck({
   }, [cards.length, everHad, clearedFired, onCleared])
 
   const runExit = useCallback((action: () => void) => {
-    const reduce =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduce) {
+    if (prefersReducedMotion()) {
       action()
       return
     }
@@ -71,9 +69,9 @@ export function RadarDeck({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      if (isEditableTarget(e.target)) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (isAriaModalOpen()) return
       if (busy || cards.length === 0 || !card) return
 
       if (e.key === '?') {
@@ -111,6 +109,7 @@ export function RadarDeck({
       <InboxZeroBurst title={t('today.deckClearTitle')} subtitle={t('today.deckClearSubtitle')}>
         <Link
           to="/radar"
+          aria-label={t('today.exploreLink')}
           className={cn(
             'inline-flex min-h-10 items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90',
             focusRingClass(),
@@ -120,6 +119,7 @@ export function RadarDeck({
         </Link>
         <Link
           to="/briefs"
+          aria-label={t('nav.briefs')}
           className={cn(
             'inline-flex min-h-10 items-center rounded-md border border-border px-3 py-2 text-sm text-accent hover:border-accent/50',
             focusRingClass(),
@@ -143,9 +143,21 @@ export function RadarDeck({
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 id="today-deck-progress" className="font-mono text-xs uppercase tracking-widest text-muted">
+          <h2
+            id="today-deck-progress"
+            className="font-mono text-xs uppercase tracking-widest text-muted"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {t('today.deckProgress', { done, total })}
           </h2>
+          <p className="sr-only" aria-live="polite" aria-atomic="true">
+            {t('today.deckCardAnnounce', {
+              current: safeIndex + 1,
+              total: cards.length,
+              title: card.title,
+            })}
+          </p>
           <div
             className="mt-2 h-1.5 w-40 overflow-hidden rounded-full bg-border"
             role="progressbar"
@@ -212,6 +224,7 @@ export function RadarDeck({
               type="button"
               onClick={() => setIndex(i)}
               aria-pressed={i === safeIndex}
+              aria-label={c.title}
               className={cn(
                 'max-w-[10rem] min-h-9 shrink-0 truncate rounded-md border px-2.5 py-1.5 text-left text-xs transition motion-reduce:transition-none',
                 focusRingClass(),
@@ -240,6 +253,7 @@ export function RadarDeck({
               <Link
                 to={`/changes/${changeId}`}
                 state={{ from: '/' }}
+                aria-label={`${t('today.openChange')}: ${card.title}`}
                 className={cn(
                   'inline-flex min-h-9 items-center rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90',
                   focusRingClass(),
@@ -281,7 +295,14 @@ export function RadarDeck({
           aria-label={card.title}
           aria-busy={busy || undefined}
         >
-          <Button size="sm" onClick={() => onWatch(card)} disabled={busy} className="gap-1.5">
+          <Button
+            size="sm"
+            onClick={() => onWatch(card)}
+            disabled={busy}
+            className="gap-1.5"
+            aria-label={`${t('today.watch')}: ${card.title}`}
+            title={`${t('today.watch')} (w)`}
+          >
             <Eye size={14} aria-hidden />
             {t('today.watch')}
           </Button>
@@ -291,6 +312,8 @@ export function RadarDeck({
             onClick={() => runExit(() => onDismiss(card))}
             disabled={busy}
             className="gap-1.5"
+            aria-label={`${t('today.dismiss')}: ${card.title}`}
+            title={`${t('today.dismiss')} (x)`}
           >
             <X size={14} aria-hidden />
             {t('today.dismiss')}
@@ -301,6 +324,8 @@ export function RadarDeck({
             onClick={() => onInvestigate(card)}
             disabled={busy}
             className="gap-1.5"
+            aria-label={`${t('today.investigate')}: ${card.title}`}
+            title={`${t('today.investigate')} (i)`}
           >
             <Search size={14} aria-hidden />
             {t('today.investigate')}
@@ -311,6 +336,8 @@ export function RadarDeck({
             onClick={() => onDecide(card)}
             disabled={busy}
             className="gap-1.5"
+            aria-label={`${t('today.decide')}: ${card.title}`}
+            title={`${t('today.decide')} (d)`}
           >
             <SkipForward size={14} aria-hidden />
             {t('today.decide')}

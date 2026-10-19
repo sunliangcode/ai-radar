@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { errorText } from '../lib/errors'
+import { isAriaModalOpen, prefersReducedMotion } from '../lib/a11y'
 import { cleanFeedLead } from '../lib/cleanFeedLead'
 import {
   loadExploreView,
@@ -127,6 +128,31 @@ export default function FeedPage({
     prevUnread.current = totalUnread
   }, [totalUnread, engagement])
 
+  useEffect(() => {
+    if (!shortcutsOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (isAriaModalOpen()) return
+      e.preventDefault()
+      setShortcutsOpen(false)
+      queueMicrotask(() => document.getElementById('feed-shortcuts-toggle')?.focus())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [shortcutsOpen])
+
+  useEffect(() => {
+    if (!showInboxZero) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (isAriaModalOpen()) return
+      e.preventDefault()
+      setShowInboxZero(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showInboxZero])
+
   const focusSearch = useCallback(() => {
     document.getElementById('feed-search-input')?.focus()
   }, [])
@@ -137,6 +163,21 @@ export default function FeedPage({
   }, [list.setSelectedId])
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+
+  const pagePrev = useCallback(() => {
+    if (list.page <= 1) return
+    list.changePage(list.page - 1)
+    const reduce = prefersReducedMotion()
+    listRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  }, [list.page, list.changePage])
+
+  const pageNext = useCallback(() => {
+    const totalPages = Math.ceil(list.total / PAGE)
+    if (list.page >= totalPages) return
+    list.changePage(list.page + 1)
+    const reduce = prefersReducedMotion()
+    listRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  }, [list.page, list.total, list.changePage])
 
   useFeedKeyboard({
     items: list.items,
@@ -151,13 +192,19 @@ export default function FeedPage({
     onDismiss: actions.dismissItem,
     onMarkRead: actions.markItemSelectedRead,
     onFocusSearch: focusSearch,
+    onPagePrev: pagePrev,
+    onPageNext: pageNext,
   })
 
   useEffect(() => {
-    const el = listRef.current?.querySelector(`[data-item-id="${list.selectedId}"]`)
+    const el = listRef.current?.querySelector(
+      `[data-item-id="${list.selectedId}"]`,
+    ) as HTMLElement | null
     if (!el) return
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduce = prefersReducedMotion()
     el.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' })
+    // Roving tabindex: move DOM focus with j/k so AT follows the selection
+    el.focus({ preventScroll: true })
   }, [list.selectedId])
 
   useEffect(() => {
@@ -238,10 +285,18 @@ export default function FeedPage({
         }
         actions={
           <>
-            <MagAction onClick={() => actions.toggleSaved(item)} tone="moss">
+            <MagAction
+              onClick={() => actions.toggleSaved(item)}
+              tone="moss"
+              title={item.saved ? t('feed.unsave') : t('feed.save')}
+            >
               {item.saved ? t('feed.unsave') : t('feed.save')}
             </MagAction>
-            <MagAction onClick={() => actions.dismissItem(item)} tone="ember">
+            <MagAction
+              onClick={() => actions.dismissItem(item)}
+              tone="ember"
+              title={t('feed.notInterested')}
+            >
               {t('feed.notInterested')}
             </MagAction>
           </>
@@ -249,7 +304,7 @@ export default function FeedPage({
         secondaryActions={
           <>
             {zhihu ? (
-              <MagAction onClick={() => openDrawer(item.id)} tone="accent">
+              <MagAction onClick={() => openDrawer(item.id)} tone="accent" title={t('feed.expand')}>
                 {t('feed.expand')}
               </MagAction>
             ) : (
@@ -258,12 +313,13 @@ export default function FeedPage({
                   list.setSelectedId(item.id)
                   openDrawer(item.id)
                 }}
+                title={t('feed.expand')}
               >
                 {t('feed.expand')}
               </MagAction>
             )}
             {!item.read ? (
-              <MagAction onClick={() => actions.markItemSelectedRead(item)}>
+              <MagAction onClick={() => actions.markItemSelectedRead(item)} title={t('feed.read')}>
                 {t('feed.read')}
               </MagAction>
             ) : null}
@@ -274,27 +330,46 @@ export default function FeedPage({
   }
 
   return (
-    <div>
+    <div
+      aria-busy={
+        isPending ||
+        actions.markAll.isPending ||
+        list.feedQuery.isFetching ||
+        list.searchQuery.isFetching ||
+        undefined
+      }
+    >
       {!hideTitle ? (
         <PageHeader
+          titleId="feed-signals-heading"
           title={t('radar.title')}
           subtitle={t('radar.signalsSubtitle')}
           actions={
             <>
               {list.hasSources ? (
-                <Button onClick={runFetch} loading={isPending} disabled={isPending}>
+                <Button
+                  id="feed-fetch-btn"
+                  onClick={runFetch}
+                  loading={isPending}
+                  disabled={isPending}
+                  aria-label={phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
+                >
                   {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
                 </Button>
               ) : (
-                <Link to="/settings/sources" className={buttonVariants()}>
+                <Link to="/settings/sources" className={buttonVariants()} aria-label={t('feed.addSource')}>
                   {t('feed.addSource')}
                 </Link>
               )}
               <Button
                 variant="ghost"
                 onClick={() => actions.setConfirmMarkAllOpen(true)}
-                disabled={actions.markAll.isPending}
+                disabled={actions.markAll.isPending || list.unreadCount === 0}
                 loading={actions.markAll.isPending}
+                title={list.unreadCount === 0 ? t('feed.markAllReadEmpty') : undefined}
+                aria-label={
+                  list.unreadCount === 0 ? t('feed.markAllReadEmpty') : t('feed.markAllRead')
+                }
               >
                 {t('feed.markAllRead')}
               </Button>
@@ -308,19 +383,29 @@ export default function FeedPage({
           aria-label={t('radar.title')}
         >
           {list.hasSources ? (
-            <Button onClick={runFetch} loading={isPending} disabled={isPending}>
+            <Button
+              id="feed-fetch-btn"
+              onClick={runFetch}
+              loading={isPending}
+              disabled={isPending}
+              aria-label={phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
+            >
               {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
             </Button>
           ) : (
-            <Link to="/settings/sources" className={buttonVariants()}>
+            <Link to="/settings/sources" className={buttonVariants()} aria-label={t('feed.addSource')}>
               {t('feed.addSource')}
             </Link>
           )}
           <Button
             variant="ghost"
             onClick={() => actions.setConfirmMarkAllOpen(true)}
-            disabled={actions.markAll.isPending}
+            disabled={actions.markAll.isPending || list.unreadCount === 0}
             loading={actions.markAll.isPending}
+            title={list.unreadCount === 0 ? t('feed.markAllReadEmpty') : undefined}
+            aria-label={
+              list.unreadCount === 0 ? t('feed.markAllReadEmpty') : t('feed.markAllRead')
+            }
           >
             {t('feed.markAllRead')}
           </Button>
@@ -336,7 +421,17 @@ export default function FeedPage({
         pending={actions.markAll.isPending}
         onConfirm={() => {
           actions.markAll.mutate(undefined, {
-            onSuccess: () => actions.setConfirmMarkAllOpen(false),
+            onSuccess: () => {
+              actions.setConfirmMarkAllOpen(false)
+              queueMicrotask(() => {
+                const heading = document.getElementById('feed-signals-heading')
+                if (heading) {
+                  heading.focus({ preventScroll: true })
+                  return
+                }
+                document.getElementById('feed-search-input')?.focus()
+              })
+            },
           })
         }}
         onCancel={() => {
@@ -347,7 +442,10 @@ export default function FeedPage({
       <FetchProgressSection
         phase={phase}
         progress={progress}
-        onDismiss={() => void dismiss()}
+        onDismiss={() => {
+          void dismiss()
+          queueMicrotask(() => document.getElementById('feed-fetch-btn')?.focus())
+        }}
         retrying={retryFailed.isPending}
         onRetryFailed={(types) => retryFailed.mutate(types)}
       />
@@ -355,7 +453,11 @@ export default function FeedPage({
       {showInboxZero ? (
         <div className="mb-6">
           <InboxZeroBurst>
-            <Button variant="ghost" onClick={() => setShowInboxZero(false)}>
+            <Button
+              variant="ghost"
+              aria-label={t('fun.inboxZeroDismiss')}
+              onClick={() => setShowInboxZero(false)}
+            >
               {t('fun.inboxZeroDismiss')}
             </Button>
           </InboxZeroBurst>
@@ -421,12 +523,13 @@ export default function FeedPage({
           }
           primary={
             list.searchMode ? (
-              <Button variant="ghost" onClick={list.clearSearch}>
+              <Button variant="ghost" aria-label={t('feed.clearSearch')} onClick={list.clearSearch}>
                 {t('feed.clearSearch')}
               </Button>
             ) : list.hasSources && (list.unreadOnly || !!list.sourceType) ? (
               <Button
                 variant="ghost"
+                aria-label={t('feed.clearFilters')}
                 onClick={() => {
                   list.setUnreadOnly(false)
                   list.onSourceTypeChange('')
@@ -435,9 +538,11 @@ export default function FeedPage({
                 {t('feed.clearFilters')}
               </Button>
             ) : list.hasSources ? (
-              <Button onClick={runFetch}>{t('common.fetchNow')}</Button>
+              <Button onClick={runFetch} aria-label={t('common.fetchNow')}>
+                {t('common.fetchNow')}
+              </Button>
             ) : (
-              <Link to="/settings/sources" className={buttonVariants()}>
+              <Link to="/settings/sources" className={buttonVariants()} aria-label={t('feed.addSource')}>
                 {t('feed.addSource')}
               </Link>
             )
@@ -454,17 +559,25 @@ export default function FeedPage({
             aria-label={selectedItem.titleDisplay || selectedItem.title}
           >
             {!selectedItem.read ? (
-              <MagAction onClick={() => actions.markItemSelectedRead(selectedItem)}>
+              <MagAction
+                onClick={() => actions.markItemSelectedRead(selectedItem)}
+                title={t('feed.read')}
+              >
                 {t('feed.read')}
               </MagAction>
             ) : null}
-            <MagAction onClick={() => actions.toggleSaved(selectedItem)} tone="moss">
+            <MagAction
+              onClick={() => actions.toggleSaved(selectedItem)}
+              tone="moss"
+              title={selectedItem.saved ? t('feed.unsave') : t('feed.save')}
+            >
               {selectedItem.saved ? t('feed.unsave') : t('feed.save')}
             </MagAction>
             <MagAction
               href={selectedItem.canonicalUrl}
               onClick={() => actions.markReadOnOpen(selectedItem)}
               tone="accent"
+              title={t('feed.openOriginal')}
             >
               {t('feed.openOriginal')} ↗
             </MagAction>
@@ -473,6 +586,7 @@ export default function FeedPage({
                 const nid = nextItemId(list.items, list.selectedId)
                 if (nid != null) list.setSelectedId(nid)
               }}
+              title={t('feed.nextItem')}
             >
               {t('feed.nextItem')}
             </MagAction>
@@ -499,7 +613,7 @@ export default function FeedPage({
           pageSize={PAGE}
           onChange={(next) => {
             list.changePage(next)
-            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            const reduce = prefersReducedMotion()
             listRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
           }}
         />
@@ -508,6 +622,7 @@ export default function FeedPage({
       <div className="mt-4">
         <button
           type="button"
+          id="feed-shortcuts-toggle"
           className="inline-flex min-h-9 items-center rounded-sm px-1 text-xs text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-bg"
           aria-expanded={shortcutsOpen}
           aria-controls="feed-shortcuts-panel"
@@ -547,6 +662,9 @@ export default function FeedPage({
             </span>
             <span>
               <kbd aria-hidden>/</kbd> {t('feed.keySearch')}
+            </span>
+            <span>
+              <kbd aria-hidden>[</kbd>/<kbd aria-hidden>]</kbd> {t('feed.keyPage')}
             </span>
             <span>
               <kbd aria-hidden>⌘K</kbd> {t('nav.search')}

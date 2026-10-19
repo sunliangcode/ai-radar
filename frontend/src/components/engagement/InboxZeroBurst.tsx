@@ -1,5 +1,6 @@
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { prefersReducedMotion } from '../../lib/a11y'
 import { cn } from '../../lib/cn'
 
 const PARTICLE_COUNT = 10
@@ -20,11 +21,11 @@ export function InboxZeroBurst({
   children?: ReactNode
 }) {
   const { t } = useTranslation()
-  const [reduceMotion] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  )
+  const [reduceMotion] = useState(() => prefersReducedMotion())
+
+  useEffect(() => {
+    document.getElementById('inbox-zero-title')?.focus({ preventScroll: true })
+  }, [])
 
   return (
     <div
@@ -51,11 +52,19 @@ export function InboxZeroBurst({
             />
           ))
         : null}
-      <p id="inbox-zero-title" className="relative font-serif text-xl text-ink md:text-2xl">
+      <p
+        id="inbox-zero-title"
+        tabIndex={-1}
+        className="relative font-serif text-xl text-ink outline-none md:text-2xl"
+      >
         {title ?? t('fun.inboxZeroTitle')}
       </p>
       <p className="relative mt-2 text-sm text-muted">{subtitle ?? t('fun.inboxZeroSubtitle')}</p>
-      {children ? <div className="relative mt-5 flex flex-wrap justify-center gap-3">{children}</div> : null}
+      {children ? (
+        <div className="relative mt-5 flex flex-wrap justify-center gap-3" role="group" aria-label={title ?? t('fun.inboxZeroTitle')}>
+          {children}
+        </div>
+      ) : null}
     </div>
   )
 }

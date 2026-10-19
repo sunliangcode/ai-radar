@@ -147,6 +147,7 @@ export function BriefEntryCard({
                 href={entry.url}
                 target="_blank"
                 rel="noreferrer"
+                aria-label={`${t('briefs.openOriginal')}: ${entry.title}`}
                 className={cn(
                   'inline-flex min-h-9 items-center gap-1 rounded-md border border-border bg-bg px-2.5 py-1 text-xs font-medium text-ink transition hover:border-accent/40 hover:text-accent motion-reduce:transition-none',
                   focusRingClass(),

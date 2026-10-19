@@ -29,7 +29,49 @@ try() {
 }
 
 say "health"
-try health "$QUICK_TIMEOUT" "$BASE/api/health" || true
+health_json="$("${CURL[@]}" "$QUICK_TIMEOUT" "$BASE/api/health" 2>/dev/null || true)"
+printf '%s\n' "${health_json:0:300}"
+if [[ -n "$health_json" ]] && command -v python3 >/dev/null 2>&1; then
+  python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d.get("version"), "missing version"; print("OK: health.version=", d["version"])' "$health_json" \
+    || echo "WARN: /api/health missing version field"
+fi
+
+say "llm probe (soft)"
+llm_json="$("${CURL[@]}" "$QUICK_TIMEOUT" "$BASE/api/health/llm" 2>/dev/null || true)"
+if [[ -n "$llm_json" ]] && command -v python3 >/dev/null 2>&1; then
+  python3 -c 'import json,sys
+d=json.loads(sys.argv[1])
+ok=bool(d.get("ok"))
+if not ok:
+    print("WARN: llm probe unreachable — scoring may use rules; ./bin/ai-radar health-llm")
+elif d.get("modelPresent") is False:
+    print("WARN: llm probe ok but modelPresent=false — pull OPENAI_MODEL or retarget; ./bin/ai-radar health-llm")
+else:
+    print("OK: llm probe reachable")
+' "$llm_json" || echo "WARN: /api/health/llm response not JSON"
+else
+  echo "WARN: llm probe did not respond (optional — ./bin/ai-radar health-llm)"
+fi
+
+say "SPI catalogs"
+conn_json="$("${CURL[@]}" "$QUICK_TIMEOUT" "$BASE/api/connectors" 2>/dev/null || true)"
+del_json="$("${CURL[@]}" "$QUICK_TIMEOUT" "$BASE/api/delivery/channels" 2>/dev/null || true)"
+printf '%s\n' "${conn_json:0:300}"
+printf '%s\n' "${del_json:0:300}"
+if command -v node >/dev/null 2>&1; then
+  if printf '%s' "$conn_json" | node "$ROOT/shared/check-spi-catalog.mjs" connectors -; then
+    :
+  else
+    echo "WARN: connectors catalog failed shared/spi-catalog check"
+  fi
+  if printf '%s' "$del_json" | node "$ROOT/shared/check-spi-catalog.mjs" delivery -; then
+    :
+  else
+    echo "WARN: delivery channels catalog failed shared/spi-catalog check"
+  fi
+elif command -v python3 >/dev/null 2>&1; then
+  echo "WARN: node not found — skipping SPI catalog check (install Node 20.12+)"
+fi
 
 say "ensure fixture source"
 try create-source "$QUICK_TIMEOUT" -X POST "$BASE/api/sources" -H 'Content-Type: application/json' -d '{

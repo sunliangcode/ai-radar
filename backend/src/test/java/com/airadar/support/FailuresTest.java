@@ -34,4 +34,25 @@ class FailuresTest {
         String described = Failures.describe(new IllegalStateException("x".repeat(5000)));
         assertTrue(described.length() < 400, "should be truncated, was " + described.length());
     }
+
+    @Test
+    void collapsesWhitespaceInMessages() {
+        String described = Failures.describe(new IllegalStateException("line1\n\t  line2"));
+        assertTrue(described.contains("line1 line2"), described);
+        assertEquals(false, described.contains("\n"));
+    }
+
+    @Test
+    void stopsOnSelfReferentialCause() {
+        // JDK forbids initCause(this); override getCause to exercise the defensive branch.
+        Throwable e = new RuntimeException("loop") {
+            @Override
+            public synchronized Throwable getCause() {
+                return this;
+            }
+        };
+        String described = Failures.describe(e);
+        assertTrue(described.contains("loop"), described);
+        assertEquals(false, described.contains("<-"), described);
+    }
 }

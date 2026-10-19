@@ -46,6 +46,7 @@ export function TrackedChangesSection({
           <span
             className="font-mono text-xs text-muted"
             aria-live="polite"
+            aria-atomic="true"
             aria-label={t('watching.trackedCount', { count: tracked.length })}
           >
             {tracked.length}
@@ -117,12 +118,15 @@ export function TrackedChangesSection({
                 </>
               }
               actions={
-                <MagAction onClick={() => setDrawerId(c.id)}>{t('today.heroOpen')}</MagAction>
+                <MagAction onClick={() => setDrawerId(c.id)} title={t('today.heroOpen')}>
+                  {t('today.heroOpen')}
+                </MagAction>
               }
               secondaryActions={
                 <Link
                   to={`/changes/${c.id}`}
                   state={{ from: '/watching' }}
+                  aria-label={`${t('today.openChange')}: ${c.title}`}
                   className={cn(
                     'inline-flex min-h-9 items-center rounded-md px-2 py-1 text-xs text-muted transition motion-reduce:transition-none hover:bg-border hover:text-ink',
                     focusRingClass(),
@@ -156,6 +160,7 @@ export function TrackedChangesSection({
             <Link
               to={`/changes/${drawerCard.id}`}
               state={{ from: '/watching' }}
+              aria-label={`${t('today.openChange')}: ${drawerCard.title}`}
               className={cn(
                 'inline-flex min-h-10 items-center rounded-md px-2 py-1 text-xs text-moss transition hover:bg-moss/10',
                 focusRingClass(),

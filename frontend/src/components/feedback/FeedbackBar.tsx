@@ -56,6 +56,7 @@ export function FeedbackBar({
             tone={kind === 'ignore' ? 'danger' : 'default'}
             active={active}
             disabled={feedback.isPending || active}
+            aria-label={t(`feedback.${kind}`)}
             onClick={() => feedback.mutate(kind)}
           >
             {t(`feedback.${kind}`)}

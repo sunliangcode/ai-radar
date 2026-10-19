@@ -4,8 +4,394 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Ops CLI**: `./bin/ai-radar` / `cli/ai-radar.mjs` — health, home, sources, fetch/push/cluster/impact, pack import, check/backup bridges ([docs/cli.md](docs/cli.md))
+- **Agent skills**: root [SKILL.md](SKILL.md) plus [skills/](skills/) copies for Claude Code / Codex / Gemini CLI ([docs/agents.md](docs/agents.md))
+- **Docs**: deep CLI / MCP / API / agents / development references; README “Choose how to run it” entry matrix
+- **MCP**: `run_cluster` when `ALLOW_WRITES=true` (alongside fetch/push)
+- **OSS hygiene**: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SUPPORT.md](SUPPORT.md); CI `cli` job; 15-minute connector walkthrough in [docs/extending-connectors.md](docs/extending-connectors.md)
+- **Release & extensibility docs**: [docs/release.md](docs/release.md), tag workflow [`.github/workflows/release.yml`](.github/workflows/release.yml), SPI overview [docs/extensibility.md](docs/extensibility.md), delivery 15-minute walkthrough
+- CHANGELOG Keep-a-Changelog compare links for `[Unreleased]` / `[0.1.0]`
+- Install/status UX: `./install.sh` and `./scripts/status.sh` surface `./bin/ai-radar` hints; [docs/release.md](docs/release.md) documents backend SNAPSHOT policy
+- **CLI UX**: actionable errors for unreachable backend / 401 / 409; `check.sh` + CI smoke for help/version/offline hint
+- **MCP UX**: tool errors return JSON `{ error, hint, fix[] }` via `mcp/errors.mjs` (aligned with CLI); unit tests in CI
+- **Shared errors**: [`shared/errors.mjs`](shared/errors.mjs) single source for CLI + MCP actionable errors
+- **Contributor DX**: root [`Makefile`](Makefile) (`make check|status|health|…`) and [`.editorconfig`](.editorconfig)
+- **Packs**: 15-minute pack authoring walkthrough in [docs/sources.md](docs/sources.md); bug report template asks for `status` / `ai-radar health`
+- **CLI**: `ai-radar pack import <id> --path FILE` for local pack JSON without jar rebuild
+- **Examples**: [`examples/packs/demo-local.json`](examples/packs/demo-local.json) for pack walkthrough; CI/check assert sample + `--path` help
+- **CLI**: `pack import --path` local preflight (exists / valid JSON array) before HTTP
+- **CLI**: `pack validate FILE` — local SourceType/schema check (no backend); shared [`shared/pack.mjs`](shared/pack.mjs); import `--path` uses the same rules
+- **CLI**: `doctor` / `make doctor` — JSON prereq + backend/translate snapshot with actionable `next[]`
+- **OSS trust**: [SECURITY.md](SECURITY.md) self-host guidance; Dependabot PR limits; bug template / SUPPORT / CONTRIBUTING prefer `ai-radar doctor`
+- **CLI**: `pack list` — enumerate + schema-check `packs/sources/*.json` (no backend); CI/check asserts built-in ids
+- **Guard**: [`shared/source-types-sync.test.mjs`](shared/source-types-sync.test.mjs) fails CI if `SOURCE_TYPES` drifts from `SourceType.java`
+- **CLI**: `AI_RADAR_TIMEOUT_MS` (default 8s) on HTTP calls; agent skills/docs prefer `doctor` / `pack list`
+- **Shared HTTP**: [`shared/http.mjs`](shared/http.mjs) timeout helper used by CLI + MCP
+- **Docs/ops**: API pack `path` field; `install.sh` / PR template prefer `doctor` / `make check`
+- **SPI discoverability**: `ai-radar connectors` + MCP `list_connectors` (`GET /api/connectors`)
+- **Guards**: connector inventory (enum ↔ beans, `JUEJIN`/`CSDN` legacy); cross-package version sync; CLI/MCP version from `package.json`
+- **Guards**: delivery inventory (docs table ↔ `*Delivery` beans); release workflow runs full check before GitHub Release
+- **Delivery SPI catalog**: `GET /api/delivery/channels`; CLI `delivery-channels`; MCP `list_delivery_channels`
+- **Docs accuracy**: connector catalog jq uses `.id` (API `ConnectorDescriptor`); sources type list complete; CI syncs extending-connectors table ↔ beans
+- **Node DX**: root `.nvmrc` (`20.12`); `engines.node` on frontend/mcp (aligned with CLI); README entry matrix prefers `doctor`
+- **Contributor DX**: CONTRIBUTING first-hour (`doctor` + `make check`); development.md notes `.nvmrc` / shared helpers
+- **Region UI guard**: `frontend-region-sync.test.mjs` — domestic/foreign sets cover every non-legacy `SourceType`
+- **Compose**: `daily-hot` healthcheck; `ai-radar` waits until healthy; Makefile SPI shortcuts (`connectors`, `delivery-channels`, `pack-list`)
+- **i18n guard**: en/zh `sourceType.*` must cover every `SourceType`; smoke asserts SPI catalog sizes
+- **CI DX**: `shared/` runs `node --test *.test.mjs` (no forgotten gates); [`shared/README.md`](shared/README.md); feature-request Area dropdown
+- **Doctor**: reports `builtInPacks` (schema-check every `packs/sources/*.json`)
+- **Delivery catalog UX**: Feishu/Email/Webhook override `descriptor()` with display names + settings keys; CI asserts human displayName
+- **Docs**: [`scripts/README.md`](scripts/README.md); CLI↔MCP matrix covers doctor / SPI catalogs / packs
+- **Repo hygiene**: [`.gitattributes`](.gitattributes) (LF for scripts); CI asserts `bin/` + `scripts/*.sh` executable bits
+- **Settings health**: delivery channel catalog (`GET /api/delivery/channels`) shown when system health is expanded
+- **Docker**: Node 20 frontend stage (matches `.nvmrc`); `backend-*.jar` wildcard; image `HEALTHCHECK`; CI covers Dockerfile sync + `install.sh`/`stop.sh` exec bits
+- **MCP docs guard**: `shared/mcp-tools-sync.test.mjs` syncs Tools tables ↔ `mcp/server.mjs`; tighter `.dockerignore`
+- **OpenAPI**: `@Tag` / `@Operation` on connector + delivery SPI controllers; typed `DeliveryChannelView`; `make docker-build`
+- **OpenAPI info**: titled MIT-licensed API with `radar.api.version`; Swagger tag/operation sort; docs relative-link CI guard
+- **Citation**: [`CITATION.cff`](CITATION.cff); root markdown link CI; `RadarProperties.api`; extensibility verify uses doctor/SPI catalogs
+- **Health `version`**: `GET /api/health` returns `radar.api.version`; Settings health card + doctor + `status.sh` surface it; CI/release pin Node via `.nvmrc`
+- **OpenAPI Health tag**; skills-copy CI guard (`doctor` / SPI / pack); docs index cites `CITATION.cff`
+- **MCP `get_health`**: read tool for `GET /api/health`; CLI↔MCP matrices updated
+- **Dependabot Docker** for root + `translate-service/`; CN install docs prefer `doctor`
+- **OpenAPI** declares local server `http://127.0.0.1:8080`; agents docs prefer MCP `get_health`
+- **Doctor `cliVersion`**; README Node 20.12+ badge; SKILL mentions MCP `get_health`
+- **Guards**: HealthController ↔ `RadarProperties.api`; CONTRIBUTING points at full shared test suite + CITATION bump
+- **LocalTokenFilter** unit tests; OpenAPI contact → GitHub; SECURITY notes health probe bypass
+- PR template release version checklist; api.md documents health token bypass
+- Smoke asserts `health.version`; CN API docs note health probe bypass
+- README MCP matrix lists `get_health`; bug template prefers doctor `cliVersion`
+- Release workflow concurrency + doctor `cliVersion` gate; AGENTS.md health notes
+- Release `make_latest`; CLI/MCP `package.json` descriptions; release.md documents doctor gate
+- OpenAPI externalDocs → `docs/api.md`; release workflow CI guard; frontend package description
+- Package `homepage` / `bugs` on frontend/cli/mcp (CI-guarded)
+- **Doctor `versionAlign`**: warn when CLI SemVer ≠ `GET /api/health.version`
+- Install FAQ for `versionAlign` / health token bypass; release `draft: false`
+- CN install FAQ mirrors `versionAlign` / health probe notes
+- Shared [`version-align.mjs`](shared/version-align.mjs) + unit tests (used by `doctor`)
+- SKILL / CLI troubleshooting for `versionAlign`
+- `OpenApiConfig` unit test; bug template / AGENTS note `versionAlign`
+- `HealthController` unit tests assert `version` on ok and degraded paths
+- CLI help / CI smoke mention health `version`; scripts README notes `versionAlign`
+- Guard: CLI imports `version-align`; `stop.sh` hints restart + doctor
+- Package `keywords` on frontend/cli/mcp; agents docs note `versionAlign`
+- [`.github/CODEOWNERS`](.github/CODEOWNERS); platform skills mention MCP `get_health`
+- Release tags with `-` (e.g. `-rc.1`) marked prerelease; CODEOWNERS CI guard
+- CONTRIBUTING / docs index link CODEOWNERS
+- CI workflow `permissions: contents: read` (least privilege)
+- Explicit `LOCAL_TOKEN` bypass for `GET /api/health/llm` (matches prior open GET behavior)
+- CN/EN install + API docs document health/llm probe bypass
+- **Doctor `llm` check**: surfaces `ai` / `heuristic` / `degraded` from health snapshot
+- Shared [`llm-mode.mjs`](shared/llm-mode.mjs) + unit tests (used by `doctor`)
+- SKILL / CLI / SUPPORT document doctor `llm` check
+- Install FAQ / bug template / AGENTS cover doctor `llm`
+- Shared [`translate-status.mjs`](shared/translate-status.mjs) + unit tests (used by `doctor`)
+- `make health-llm` shortcut for live LLM probe
+- CLI/agents docs mention `make health-llm`
+- **MCP `probe_llm`**: live `GET /api/health/llm` (maps to `ai-radar health-llm`)
+- Skills / agents docs mention `probe_llm`
+- README MCP matrix lists `probe_llm`
+- SUPPORT / CN install mention MCP `probe_llm`
+- AGENTS / bug template mention `probe_llm` / `health-llm`
+- Dependabot pip updates for `translate-service/`
+- Guard: Argos pin in `requirements.txt` ↔ `THIRD_PARTY_NOTICES.md`
+- release.md documents Argos pin sync
+- CONTRIBUTING notes Argos pin ↔ notices when touching translate-service
+- `install.sh` hints `health-llm` / `probe_llm` when LLM probe fails
+- `status.sh` LLM soft lines point at `./bin/ai-radar health-llm`
+- Install / scripts / CLI docs list `health-llm` next to doctor/status
+- Guard: `install.sh` / `status.sh` mention `health-llm`; unreachable CLI hint prefers `doctor`
+- SECURITY / development docs list `health-llm` in useful checks
+- CONTRIBUTING ops/smoke list `health-llm`; issue template contact links → docs/SUPPORT/security
+- Docs-link CI also covers `scripts/` / `examples/` / `shared/` / `skills/` READMEs
+- `backend/.env.example` notes `health-llm` probe and health/llm token bypass
+- Smoke script soft-probes `/api/health/llm`; release checklist mentions `health-llm`
+- `backup.sh` / docs hint `AI_RADAR_DB=backend/data/radar.db` when Maven CWD differs
+- CLI help / SKILL / cli.md document `AI_RADAR_DB` for backup path
+- AGENTS / README note dual DB path for backup; ops-hint guard covers `AI_RADAR_DB`
+- CN install mirrors backup/`AI_RADAR_DB`; cli.md documents `BACKUP_KEEP`
+- CLI help lists `BACKUP_KEEP`; CI/check smoke assert `health-llm` + `AI_RADAR_DB`
+- `status.sh` footer lists `health-llm`; feature template links extensibility docs
+- SKILL / CLI troubleshooting for backup dual DB path
+- `.dockerignore` drops `__pycache__` / coverage noise; OpenAPI blurb cites `/api/health/llm`
+- api.md curl helpers include `/api/health/llm`; dockerignore CI guard; make backup notes `AI_RADAR_DB`
+- CN API table + SUPPORT mention `health-llm` / dual DB path
+- `backup.sh` auto-falls back to `backend/data/radar.db` when root DB is missing
+- Docs / SKILL / ops-hint guard cover backup Maven auto-fallback
+- Install (EN/CN) + AGENTS document backup Maven auto-fallback
+- Release workflow help smoke asserts `health-llm` + `AI_RADAR_DB`
+- CLI help / CI smoke document `AI_RADAR_TIMEOUT_MS`
+- Release help smoke asserts `AI_RADAR_TIMEOUT_MS`; `.gitattributes` forces LF for `*.mjs`
+- CI guards for `.gitattributes` LF rules and release `AI_RADAR_TIMEOUT_MS` smoke
+- `stop.sh` footer mentions backup; Flyway reset tip notes backup auto-find
+- `status.sh` reports optional daily-hot port `:6688` when listening
+- scripts / install / CLI docs note status `:6688` daily-hot port
+- Ops-hint CI guard: `status.sh` mentions daily-hot `:6688`
+- CONTRIBUTING lists `make backup` and Maven DB auto-find
+- Makefile / development note status ports include optional `:6688`
+- `.gitattributes` also forces LF for `*.yml` / `*.yaml` / `*.md`
+- `LocalTokenFilterTest` covers wrong `X-Local-Token` on mutating routes
+- Shared HTTP timeout tests cover negative / NaN `AI_RADAR_TIMEOUT_MS`
+- CLI / MCP env docs note timeout disable for `0` / negative / non-numeric
+- CLI/MCP error helpers surface `request_timeout` with `AI_RADAR_TIMEOUT_MS` fix
+- MCP re-exports `isTimeout`; shared README notes timeout errors
+- SUPPORT / MCP error example aligned with timeout + doctor verify hints
+- Bug template diagnostics mention `AI_RADAR_TIMEOUT_MS` / `request_timeout`
+- AGENTS.md notes CLI/MCP `AI_RADAR_TIMEOUT_MS` → `request_timeout`
+- Install FAQ (EN/CN) covers CLI/MCP `request_timeout`
+- Agents safety defaults mention `AI_RADAR_TIMEOUT_MS` / `request_timeout`
+- MCP docs include a `request_timeout` JSON example
+- Development HTTP section notes `AI_RADAR_TIMEOUT_MS`
+- `.gitattributes` LF for `*.java`; guard: mcp docs ↔ `request_timeout` error code
+- `.gitattributes` also forces LF for `*.xml` / `*.properties`
+- CLI help / SKILL clarify timeout disable for `0` / negative / non-numeric
+- CONTRIBUTING PR checklist notes `.gitattributes` LF rules
+- CLI / API docs describe `health-llm` `modelPresent` / `hint` fields
+- MCP / SKILL / CLI troubleshooting for missing configured model
+- Install FAQ (EN/CN) covers `modelPresent: false`
+- `install.sh` warns when LLM probe is ok but `modelPresent` is false
+- `status.sh` soft-warns when LLM endpoint is up but configured model is missing
+- scripts README notes status `modelPresent` soft-warn
+- Smoke script soft-warns when `modelPresent` is false
+- `HealthControllerTest` covers unconfigured LLM probe without network
+- Unit test for OpenAI-compatible `/models` id parsing (`modelIds`)
+- `HealthController.putModelPresence` + unit tests for `modelPresent` / `hint`
+- CLI/API docs note empty `models[]` skips presence check; `trimTrailingSlash` unit tests
+- MCP `probe_llm` docs note empty `models[]` skip; `.gitattributes` LF for `*.json` / `*.ts` / `*.tsx` / `*.css`
+- CN API + CONTRIBUTING note empty-`models[]` skip and expanded LF file types
+- OpenAPI `/health/llm` operation + info blurb document `modelPresent` / `hint`
+- scripts README documents `BACKUP_KEEP`; install FAQ (EN/CN) notes empty `models[]` skip
+- `backup.sh` rejects invalid `BACKUP_KEEP` (non-numeric / <1 → 14); Makefile help lists it
+- CLI help + cli.md document invalid `BACKUP_KEEP` fallback
+- SKILL / AGENTS document `BACKUP_KEEP` retention
+- `modelIds` accepts bare JSON arrays; CONTRIBUTING notes `BACKUP_KEEP`
+- cli.md notes bare-array `/models` parsing; `FailuresTest` covers whitespace + self-cause
+- api.md + development.md note bare-array `/models` and `BACKUP_KEEP`
+- CN API table notes bare-array `/models` parsing
+- Bug template diagnostics mention `modelPresent` + `BACKUP_KEEP`
+- SUPPORT + `stop.sh` footer mention `BACKUP_KEEP`
+- Ops-hint guard for `stop.sh` `BACKUP_KEEP`; `UrlNormalizerTest` blank + click-id cases
+- MCP `probe_llm` docs note bare-array `/models` parsing
+- Install FAQ (EN/CN) documents `BACKUP_KEEP` retention
+- CI / check / release help smoke assert `BACKUP_KEEP`
+- Shared error tests: `ENOTFOUND`, HTTP 404, CLI timeout hint
+- Shared error test for HTTP 403; release pre-flight mentions `backup` / `BACKUP_KEEP`
+- `HealthControllerTest` asserts translate `disabled` + `llm` heuristic on healthy path
+- agents.md + README (EN/CN) mention `BACKUP_KEEP` on backup
+- `LocalTokenFilterTest` covers read-only GET bypass + settings PUT
+- SECURITY clarifies `LOCAL_TOKEN` covers mutations + `/api/settings` (read GETs open)
+- api.md (EN/CN) mirrors `LOCAL_TOKEN` mutation vs read-GET scope
+- Install FAQ (EN/CN) notes other read-only GETs stay open under `LOCAL_TOKEN`
+- `.env.example` LOCAL_TOKEN comment matches mutation vs read-GET scope
+- Ops-hint guard: `.env.example` documents `LOCAL_TOKEN` + health/llm bypass
+- `doctor` soft-warns when live LLM probe is ok but `modelPresent` is false
+- SUPPORT + install FAQ note doctor `modelPresent` soft-warn
+- Shared [`model-present.mjs`](shared/model-present.mjs) + unit tests (used by `doctor`)
+- AGENTS + bug template mention doctor `modelPresent` soft-warn
+- development.md lists `model-present` among shared helpers
+- agents.md doctor guidance checks `modelPresent`
+- scripts README + CONTRIBUTING note doctor soft `modelPresent`
+- CLI help documents doctor soft `modelPresent`
+- CI / check / release help smoke assert doctor `modelPresent`
+- release.md pre-flight prefers `doctor` (soft `modelPresent`)
+- `UrlNormalizerTest` covers invalid URL fallback trim, non-default port, default :80/:443 drop
+- `versionAlignCheck` trims CLI/API SemVer strings (blank API → skip)
+- `translateStatusCheck` skips blank/whitespace status
+- `llmModeCheck` skips blank/whitespace mode
+- Makefile `doctor` help notes soft `modelPresent`
+- Pack validate unit tests for empty array + invalid JSON
+- Shared HTTP test: empty `AI_RADAR_TIMEOUT_MS` uses fallback
+- cli.md notes empty/unset `AI_RADAR_TIMEOUT_MS` uses default
+- mcp.md notes empty/unset `AI_RADAR_TIMEOUT_MS` uses default
+- shared README notes empty/unset timeout uses default
+- CLI help notes empty `AI_RADAR_TIMEOUT_MS` uses default
+- MCP server header documents `AI_RADAR_TIMEOUT_MS`
+- Ops-hint guard: `mcp/server.mjs` documents `AI_RADAR_TIMEOUT_MS`
+- Shared HTTP test: unset `AI_RADAR_TIMEOUT_MS` uses fallback
+- SKILL env + tip note empty/unset `AI_RADAR_TIMEOUT_MS` → default
+- AGENTS.md notes empty/unset `AI_RADAR_TIMEOUT_MS` → default
+- installation.md notes empty/unset `AI_RADAR_TIMEOUT_MS` → default
+- Whitespace-only `AI_RADAR_TIMEOUT_MS` uses the default timeout (same as empty)
+- `backup.sh` trims `BACKUP_KEEP` so padded numbers stay valid
+- `/api/health/llm` `modelPresent` trims configured model (and skips blank) so .env whitespace does not false-warn
+- `LOCAL_TOKEN` comparison trims configured + header values (CLI/MCP env trimmed too)
+- UI sends a trimmed `X-Local-Token`; CI requires connector/delivery catalog ids to match `type()` / `channel()`
+- CLI/MCP share `apiBaseUrl` (trim + drop trailing slashes); connector/delivery steps list the catalog CI gates
+- Error hints use `apiBaseUrl`; CI rejects duplicate connector `type()` and delivery `channel()` ids
+- Connector registry and delivery catalog fail startup on blank or duplicate SPI ids; connector lookup trims and ignores case
+- `DeliveryService` shares that unique `channel()` check with the catalog controller
+- Extensibility docs note fail-fast unique SPI ids; blank delivery `channel()` covered by unit tests
+- Connector catalog returns descriptors sorted by id; CI validates `examples/packs/demo-local.json` + `packs/sources/*.json`
+- Startup fails when a connector or delivery descriptor id does not match `typeCode()` / `channel()`
+- CN API table lists connector/delivery catalogs; OpenAPI description links those SPI endpoints
+- Smoke extensibility asserts SPI catalogs are sorted/unique (connectors include `FIXTURE`); development.md notes startup fail-fast
+- MCP `list_connectors` / `list_delivery_channels` describe sorted catalogs; CI locks the smoke assertions
+- Source forms match connector catalogs with the same trim + case-insensitive id lookup as the registry
+- Startup rejects blank or duplicate connector config-field keys and delivery `settingsKeys`; CI scans the built-in beans
+- Startup rejects blank SPI `displayName`; smoke checks catalog display names plus unique config/settings keys
+- Agent skills document MCP `list_connectors` / `list_delivery_channels` (CI-locked with root SKILL.md)
+- Delivery catalog sorts case-insensitively (matches smoke); SPI ids/names/keys reject surrounding whitespace at startup
+- Connector config field types limited to `text`/`path`/`secret`/`textarea` (new `ConfigField.textarea` factory); Sources UI styles `path` as monospace
+- Smoke asserts live connector field types stay in that allowlist; `pack validate` warns on non-canonical `type` casing
+- `ai-radar doctor` soft-checks SPI catalogs (sorted/unique/`FIXTURE`/field types) via shared `spi-catalog.mjs`
+- `scripts/status.sh` soft-checks the same SPI catalogs when the backend is up; install/agent hints mention `connectors` / `delivery-channels`
+- Settings system-health detail lists connector SPI catalog size; `pack validate` warns when `FIXTURE` lacks `config.path`
+- Settings connector health warns when `FIXTURE` is missing; bug/install docs cover SPI catalog diagnostics
+- Delivery SPI soft-checks require built-in `outbox` (doctor / status / smoke / Settings); PR template covers SPI verification
+- Doctor / status / smoke soft-warn when SPI catalog ids, names, or keys have surrounding whitespace (startup already fail-fast)
+- CI inventory hard-gates built-in `FIXTURE` connector and `outbox` delivery beans (matches doctor soft-checks)
+- `pack validate` warns when `name` or `type` has surrounding whitespace (still accepted after trim)
+- Doctor / status / smoke soft-warn when `FIXTURE` lacks a `path` config field
+- CI inventory hard-gates `FixtureConnector` `ConfigField.path("path")`
+- Settings SPI health uses `findDeliveryChannelById` / `findConnectorById` (trim + case-insensitive)
+- Settings connector health warns when `FIXTURE` lacks a `path` config field
+- Doctor / status / smoke require `FIXTURE.path` field type to be `path` (not merely the key name)
+- Doctor / status / smoke / CI require `outbox` settings key `radar.delivery.outbox-enabled`
+- Settings delivery health warns when `outbox` lacks `radar.delivery.outbox-enabled`
+- Doctor / status / smoke / CI require `RSS` with config field `feedUrl`
+- `pack validate` warns when `RSS` lacks `config.feedUrl` (legacy `config.url` still accepted)
+- Doctor / status / smoke / CI require `webhook` with settings key `WEBHOOK_URL`
+- Settings delivery health warns when `webhook` lacks `WEBHOOK_URL`
+- SKILL / install troubleshooting names required SPI keys (`path` / `feedUrl` / `outbox-enabled` / `WEBHOOK_URL`)
+- Doctor / status / smoke / CI require `email` with settings key `SMTP_HOST`
+- Settings delivery health warns when `email` lacks `SMTP_HOST`; SKILL/install list `SMTP_HOST`
+- Doctor / status / smoke / CI require `feishu` with settings key `FEISHU_WEBHOOK_URL`
+- Settings delivery health warns when `feishu` lacks `FEISHU_WEBHOOK_URL`
+- Settings connector health warns when `RSS` lacks config field `feedUrl`
+- Extending-delivery / shared README document required built-in SPI settings keys (`outbox` / `webhook` / `email` / `feishu`)
+- Doctor / status / smoke / CI require `email` settings key `SMTP_TO` (with `SMTP_HOST`)
+- Settings delivery health warns when `email` lacks `SMTP_TO`
+- MCP `list_connectors` / `list_delivery_channels` and CLI help name expected built-in SPI keys
+- OpenAPI SPI catalog summaries / info description name `FIXTURE`/`RSS` and built-in delivery settings keys
+- `pack validate` warns when `DAILY_HOT` lacks `config.route`
+- docs/api.md SPI catalog rows note expected built-in keys
+- Doctor / status / smoke / CI require `DAILY_HOT` with config field `route`
+- Settings connector health warns when `DAILY_HOT` lacks `route`
+- MCP / CLI / OpenAPI connector catalog hints name `DAILY_HOT`/`route`
+- `pack validate` warns when `WEB` lacks `config.url`
+- docs/api.md connector catalog rows include `DAILY_HOT`/`route`
+- Doctor / status / smoke / CI require `WEB` with config field `url`
+- Settings connector health warns when `WEB` lacks `url`
+- MCP / CLI / OpenAPI connector catalog hints name `WEB`/`url`
+- `pack validate` warns when `TELEGRAM` lacks `config.channels` (string or array)
+- Doctor / status / smoke / CI require `TELEGRAM` with config field `channels`
+- Settings connector health warns when `TELEGRAM` lacks `channels`
+- MCP / OpenAPI / api.md name `TELEGRAM`/`channels` among connector catalog invariants
+- `pack validate` warns when `HACKER_NEWS` lacks `config.query`
+- Doctor / status / smoke / CI require `HACKER_NEWS` with config field `query`
+- Settings connector health warns when `HACKER_NEWS` lacks `query`
+- MCP / OpenAPI / api.md name `HACKER_NEWS`/`query` among connector catalog invariants
+- `pack validate` warns when `GOOGLE_NEWS` lacks `config.query`
+- Doctor / status / smoke / CI require `GOOGLE_NEWS` with config field `query`
+- Settings connector health warns when `GOOGLE_NEWS` lacks `query`
+- MCP / OpenAPI / api.md name `GOOGLE_NEWS`/`query` among connector catalog invariants
+- `pack validate` warns when `GDELT` lacks `config.query`
+- Doctor / status / smoke / CI require `GDELT` with config field `query`
+- Settings connector health warns when `GDELT` lacks `query`
+- MCP / OpenAPI / api.md name `GDELT`/`query` among connector catalog invariants
+- Settings connector health uses shared `connectorCatalogInvariantsOk` / `connectorCatalogHealthIssueKey` helpers
+- Settings delivery health uses shared `deliveryCatalogInvariantsOk` / `deliveryCatalogHealthIssueKey` helpers
+- `pack validate` warns when `REDDIT` lacks `config.subreddits` (string or array)
+- Doctor / status / smoke / CI require `REDDIT` with config field `subreddits`
+- Settings connector health warns when `REDDIT` lacks `subreddits`
+- MCP / OpenAPI / api.md name `REDDIT`/`subreddits` among connector catalog invariants
+- `pack validate` warns when `V2EX` lacks `config.nodes` (string or array)
+- Doctor / status / smoke / CI require `V2EX` with config field `nodes`
+- Settings connector health warns when `V2EX` lacks `nodes`
+- MCP `list_connectors` / OpenAPI SPI summaries name `V2EX`/`nodes`
+- `pack validate` warns when `GITHUB` lacks `config.query`
+- Doctor / status / smoke / CI require `GITHUB` with config field `query`
+- Settings connector health warns when `GITHUB` lacks `query`
+- MCP `list_connectors` / OpenAPI SPI summaries name `GITHUB`/`query`
+- `pack validate` warns when `TWITTER` lacks `config.users` (string or array)
+- Doctor / status / smoke / CI require `TWITTER` with config field `users`
+- Settings connector health warns when `TWITTER` lacks `users`
+- MCP `list_connectors` / OpenAPI SPI summaries name `TWITTER`/`users`
+- Doctor SPI catalog check uses shared `BUILTIN_CONNECTOR_FIELDS` helper (min ≥12 connectors)
+- `pack validate` warns when `OSS_INSIGHT` lacks `config.keywords` (string or array)
+- Doctor / status / smoke / CI require `OSS_INSIGHT` with config field `keywords` (catalog min ≥13)
+- Settings connector health warns when `OSS_INSIGHT` lacks `keywords`
+- MCP `list_connectors` / OpenAPI SPI summaries name `OSS_INSIGHT`/`keywords`
+- `pack validate` warns when `GITHUB_TRENDING` lacks `config.since`
+- Doctor / status / smoke / CI require `GITHUB_TRENDING` with config field `since` (catalog min ≥14)
+- Settings connector health warns when `GITHUB_TRENDING` lacks `since`
+- MCP `list_connectors` / OpenAPI SPI summaries name `GITHUB_TRENDING`/`since`
+- Settings connector health driven by `BUILTIN_CONNECTOR_FIELD_CHECKS` (table-aligned with doctor SPI)
+- CI locks frontend `BUILTIN_CONNECTOR_FIELD_CHECKS` ↔ shared `BUILTIN_CONNECTOR_FIELDS` (+ FIXTURE/path)
+- Shared `healthyConnectorCatalog()` fixture for SPI catalog unit tests
+- Doctor / status / smoke / CI require `PRODUCT_HUNT` with config field `maxItems` (catalog min ≥15)
+- Settings connector health warns when `PRODUCT_HUNT` lacks `maxItems`
+- MCP `list_connectors` / OpenAPI SPI summaries name `PRODUCT_HUNT`/`maxItems`
+- Doctor / status / smoke / CI require `EMAIL` with config field `maxMessages` (catalog min ≥16)
+- Settings connector health warns when `EMAIL` lacks `maxMessages`
+- MCP `list_connectors` / OpenAPI SPI summaries name `EMAIL`/`maxMessages`
+- `pack validate` warns when `PRODUCT_HUNT` lacks `config.maxItems` (string or number)
+- `pack validate` warns when `EMAIL` lacks `config.maxMessages` (string or number)
+- `pack validate` warns when `ZHIHU` lacks `config.cliPath`
+- Doctor / status / smoke / CI require `ZHIHU` with config field `cliPath` (catalog min ≥17)
+- Settings connector health warns when `ZHIHU` lacks `cliPath`
+- MCP `list_connectors` / OpenAPI SPI summaries name `ZHIHU`/`cliPath`
+- `pack validate` warns when `WEIBO` lacks `config.cliPath`
+- Doctor / status / smoke / CI require `WEIBO` with config field `cliPath` (catalog min ≥18)
+- Settings connector health warns when `WEIBO` lacks `cliPath`
+- MCP `list_connectors` / OpenAPI SPI summaries name `WEIBO`/`cliPath`
+- `pack validate` warns when `BILIBILI` lacks `config.cliPath`
+- Doctor / status / smoke / CI require `BILIBILI` with config field `cliPath` (catalog min ≥19)
+- Settings connector health warns when `BILIBILI` lacks `cliPath`
+- MCP `list_connectors` / OpenAPI SPI summaries name `BILIBILI`/`cliPath`
+- CI locks OpenAPI / MCP / ConnectorsController / docs/mcp.md / docs/api.md to every `BUILTIN_CONNECTOR_FIELDS` pair (+ `FIXTURE`/`path`)
+- CI locks `pack validate` soft-warns to every `BUILTIN_CONNECTOR_FIELDS` pair (+ `FIXTURE`/`path`)
+- `smoke-extensibility.sh` / `status.sh` SPI catalog checks reuse `shared/check-spi-catalog.mjs` (same soft rules as doctor)
+- `BUILTIN_DELIVERY_SETTINGS` table (+ `healthyDeliveryCatalog`) DRYs doctor delivery soft-checks; CI locks OpenAPI/MCP/DeliveryChannelsController/`docs/api.md`/`docs/mcp.md` + delivery beans to the same pairs
+- Frontend `BUILTIN_DELIVERY_SETTING_CHECKS` (+ `deliveryHasSettingsKey`) aligns Settings health with shared delivery settings; CI sync test; zh install troubleshooting lists `BILIBILI`
+- `docs/cli.md` / `docs/development.md` list every `BUILTIN_CONNECTOR_FIELDS` + `BUILTIN_DELIVERY_SETTINGS` pair (full `outbox`/`radar.delivery.outbox-enabled`); CI-locked via ops-hint
+- `SKILL.md` / `docs/installation.md` (en+zh) SPI troubleshooting use the same tick pairs; CI locks them + CLI `delivery-channels` help
+- CLI `connectors` help lists every built-in config field pair; CI locks `docs/extending-delivery.md` required `settingsKeys` to `BUILTIN_DELIVERY_SETTINGS`
+- Connector inventory ConfigField gates + `docs/extending-connectors.md` Notes are data-driven from `BUILTIN_CONNECTOR_FIELDS` (+ `FIXTURE`/`path`)
+- Frontend tests cover `deliveryHasSettingsKey` / `BUILTIN_DELIVERY_SETTING_CHECKS`; doctor delivery check avoids duplicate missing-channel pushes
+- Remove duplicate zh `healthConnectorsMissingZhihuCliPath`; CI locks en/zh `settingsHub` health issueKeys to frontend BUILTIN_* checks
+- CI rejects duplicate object keys in `frontend/src/i18n/locales/*.json` (JSON.parse would silently keep the last)
+- Drop 25 orphan zh-only `settings.*` strings (dead after Settings hub split); CI locks en/zh leaf-key parity
+- Document i18n CI gates in `shared/README.md`; frontend asserts unique connector health `issueKey`s
+- PR template SPI checklist names `BUILTIN_*` tables; bug report diagnostics include `delivery-channels`
+- SUPPORT / CONTRIBUTING call out soft SPI catalog checks (`connectors` / `delivery-channels` / `BUILTIN_*`)
+- `make help` doctor/connectors/delivery-channels lines name soft SPI / `BUILTIN_*` tables
+- `scripts/README.md` documents status/smoke reuse of `shared/check-spi-catalog.mjs`
+
 ### Changed
 
+- Drop unused per-type `*Has*Field` / delivery key wrappers; Settings health uses table-driven `connectorHasConfigField` / `deliveryHasSettingsKey` + catalog helpers
+- `pack validate` soft-warns are data-driven from `BUILTIN_CONNECTOR_FIELDS` (CI behavioral lock; trim redundant per-type pack.test cases)
+- `spi-catalog` unit tests data-drive missing-field warns over `BUILTIN_CONNECTOR_FIELDS` / `BUILTIN_DELIVERY_SETTINGS`
+- Export `connectorFieldType` (shared by healthy fixtures + connector inventory); delivery warn fixtures reuse `healthyDeliveryCatalog`
+- Export `BUILTIN_CONNECTOR_PAIRS` (FIXTURE/path + fields); frontend derives path checks via `connectorFieldType` / `expectedConnectorFieldType`
+- Frontend connector/delivery health tests build healthy fixtures from `BUILTIN_*_CHECKS` (no hand-maintained catalogs)
+- `BUILTIN_CONNECTOR_PAIRS` shape test; connector whitespace fixtures reuse `healthyConnectorCatalog`; Makefile/PR/pack docs name PAIRS
+- Ignore Python `__pycache__` / `*.pyc`; unknown-type connector warn fixture reuses `healthyConnectorCatalog`
+- `pack validate` soft-warns iterate `BUILTIN_CONNECTOR_PAIRS`; CI locks `.gitignore` Python cache excludes
+- Drop redundant `builtinConnectorPairs()`; `healthyConnectorCatalog` builds from `BUILTIN_CONNECTOR_PAIRS`
+- CLI/MCP SPI help lists generated via `formatBuiltinConnectorExpect` / `formatBuiltinDeliveryExpect` (no hand-copied slash lists)
+- Java `SpiCatalogBlurbs` single source for OpenAPI + Connectors/Delivery `@Operation` expect lists
+- CI locks `SpiCatalogBlurbs` expect strings ↔ `formatBuiltin*Expect`; OpenApiConfigTest uses blurbs constants
+- `formatBuiltin*Ticks` + CI requires contiguous markdown tick lists in api/mcp/cli/dev/install/SKILL docs
+- Clarify pack-manifest draft vs current array packs; installation EN+ZH tick-list parity CI; extensibility names `BUILTIN_*_PAIRS`
+- api.md CN connectors/delivery rows use the same contiguous tick lists as EN (CI ≥2 hits)
+- CONTRIBUTING / development.md name `BUILTIN_CONNECTOR_PAIRS` + `SpiCatalogBlurbs` / `formatBuiltin*` sync surfaces (CI-locked)
+- Drop stale `SettingsPage` reference in `useImportPack` comment
+- AGENTS.md points at `BUILTIN_*` tables + `SpiCatalogBlurbs` for SPI field sync
+- docs/agents.md doctor prompt names `BUILTIN_CONNECTOR_PAIRS` / `BUILTIN_DELIVERY_SETTINGS`
+- CI locks frontend `connectorFieldType` body ↔ shared `connectorFieldType`
+- `SpiCatalogBlurbsTest` asserts operation summaries embed expect lists and controllers wire them; extensibility.md cites blurbs
+
+
+- [docs/release.md](docs/release.md) Related links include SECURITY / SUPPORT / installation
+- CN API table notes `/api/health/llm` `modelPresent` / `hint` (parity with EN)
+
+### Fixed
+
+- Frontend package version aligned to `0.1.0`; PR template / CONTRIBUTING test plan match `./scripts/check.sh` (backend + frontend + mcp + cli)
+- **Settings**: Context 与偏好合成一页（`/settings/context`）。身份、摘要语言与推送同页；`/settings/preferences` 与 `/settings/llm` 重定向过去并保留 `#notify`。
 - **Frontend UX polish**: keyboard `focus-visible` rings on Button/Chip/nav/toolbar; MagCard roving tabindex (j/k stays primary); shared `QueryErrorState` with Retry on Today/Radar/Sources/Feed/Decisions/Actions/Settings; Toast dismiss + assertive errors; Sources create toast + optimistic enable toggle; `prefers-reduced-motion` covers skeleton/spinner; ListSkeleton announces loading to AT
 - **Frontend UX (batch 2)**: Command Palette uses shared focus trap + body scroll lock + restore focus; 「全部已读」二次确认不再误关面板；危险 ConfirmDialog 默认焦点在取消；侧栏增加情报源入口且移动端可见主题/语言；Today 关注/忽略仅锁当前卡片；Settings/Context 统一骨架与 Retry
 - **Frontend UX (batch 3)**: Brief/Change/Source 详情与 Briefs/Watching 错误态统一 Retry；移动端源类型横向 chips；Context/情报源配置/Radar 搜索改用共享 Input·Textarea 焦点样式
@@ -79,6 +465,42 @@ All notable changes to this project will be documented in this file.
 - **Frontend UX (batch 71)**: Fetch 结果源状态 i18n；Context/源详情抽样 labelledby；Radar 变化列表 busy+label；Chip pressed 仅激活时；侧栏活跃度 label
 - **Frontend UX (batch 72)**: Status/Score badge aria-label；Today 关注 feed 标签；Monitor busy；空态按钮禁用链；Feed toolbar 语义；Brief 条目 labelledby；Settings Hub busy
 - **Frontend UX (batch 73)**: Decisions due 加载骨架 + 页 busy；Chat 清空 aria-label；Toast atomic；SourceBadge/分类计数可读
+- **Frontend UX (batch 74)**: Feed 页 busy + 无未读禁「全部已读」；⌘K 搜索错误态；Context 理解区 labelledby；Change/关注卡片 labelledby；Monitor 控制台 labelledby
+- **Frontend UX (batch 75)**: EmptyState/QueryErrorState labelledby；Brief 详情 hero；Actions 行 labelledby；Notify 推送 aria-label
+- **Frontend UX (batch 76)**: Today 提醒/复盘 labelledby；Deck 卡片 picker aria-label；MagCard labelledby+未读 describedby；Feed 搜索筛选 status；Skip link 聚焦主区；Sources 添加按钮 aria-label
+- **Frontend UX (batch 77)**: Fetch 结果 labelledby + 操作组；Chat 消息 article、错误关闭；健康条展开 labelledby；FormSaveBar atomic
+- **Frontend UX (batch 78)**: PageHeader 标题 id + Settings 表单 labelledby；Watching/Pack/⌘K busy；ErrorBoundary labelledby；Radar 模式栏按钮 aria-label
+- **Frontend UX (batch 79)**: Changes/Radar 列表更丰富 aria-label；Radar 搜索 Esc 清空；Settings Hub nav landmark；Chat 引用列表；密度切换 live；分页 atomic；多页 titleId
+- **Frontend UX (batch 80)**: Brief 详情外链 aria-label；Source 行操作带源名；Today/Feed/Sources/Change/Source 详情 titleId；收藏/跟踪计数 atomic；FormSaveBar 操作组
+- **Frontend UX (batch 81)**: Today 关注卡操作带标题；Radar 抓取按钮标签；Monitor 暂停/过滤/进行中；Hero 操作组；Feedback Chip 标签
+- **Frontend UX (batch 82)**: QueryError 重试标签；Pack 导入含包名；新建源必填 * + 提交提示；显示筛选区域标签与计数 live；Brief 原文链接；崩溃页操作标签
+- **Frontend UX (batch 83)**: RadarDeck 操作标签/快捷键 title + 进度 live；侧栏源类型未读 aria-label；InboxZero 操作组；基础设置语言 Select 标签
+- **Frontend UX (batch 84)**: 通知飞书绑定/解绑标签；推送时间 Select；ChangeCard 操作带标题；Fetch 结果重试/关闭；Monitor TPS atomic
+- **Frontend UX (batch 85)**: Feed 筛选 Chip 标签 + 计数 atomic；健康刷新/日程行；Monitor 队列 atomic；ListSkeleton status；MagCard lead describedby
+- **Frontend UX (batch 86)**: Actions 状态/关联标签；收藏/跟踪 MagAction title；Today 引导与告警链接；Context 提取；Change 摘要 region；配置字段 aria-required；Drawer 外链标题
+- **Frontend UX (batch 87)**: Feed 空态/InboxZero/MagAction title；Focus 模式操作；Source 样例外链；Notify 高级折叠标签
+- **Frontend UX (batch 88)**: 路由同步浏览器 tab 标题（`useDocumentTitle`）；详情页用实体名；404 返回标签
+- **Frontend UX (batch 109)**: 404 Esc 回 Today；抽屉评论展开/收起 live 计数；DecisionForm 共用 Field/Input + Esc 取消
+- **Frontend UX (batch 108)**: MagCard 滑动收藏/忽略 aria-live 播报
+- **Frontend UX (batch 107)**: ConfirmDialog pending 时 assertive 播报保存中；创建源 Esc 捕获取消；Feed 分页按钮组标签
+- **Frontend UX (batch 106)**: 飞书绑定 Esc 取消（捕获阶段）并回焦绑定按钮；二维码出现后聚焦取消
+- **Frontend UX (batch 105)**: Briefs 列表计数 live；Actions 步骤勾选进度播报；FormSaveBar Esc 阻止冒泡以免脏态放弃时误导航
+- **Frontend UX (batch 104)**: Today 甲板切换卡片播报标题；Pack 导入结果 aria-live；Chat 空输入 Esc 回 Today；抓取摘要 Esc 阻止冒泡以免误导航
+- **Frontend UX (batch 103)**: Radar 视图/筛选与变化列表结果数 aria-live；Decisions/Briefs/Settings Hub Esc 回 Today（Briefs 在抓取摘要时让出 Esc）
+- **Frontend UX (batch 102)**: Feed 选中 MagCard 同步 DOM 焦点；Feed/Today/Sources/Radar 关闭抓取结果后回焦抓取按钮；基础设置语言变更 aria-live；⌘K 结果数 live 播报
+- **Frontend UX (batch 101)**: Chat 错误条聚焦关闭；Watching 时间线展开播报；Briefs 关闭抓取结果后回焦生成
+- **Frontend UX (batch 100)**: Chat Esc 停止流式 / 清空输入；抽屉正文错误聚焦 Retry；健康检查刷新态文案；a11y 单元测试
+- **Frontend UX (batch 99)**: Skip-to-content 尊重 reduced-motion；Fetch 进度面板聚焦标题；Feed 筛选条滚动克制
+- **Frontend UX (batch 98)**: 修复 EmptyState/QueryError 抢焦；FormSaveBar Esc 放弃；Feed `[`/`]` 翻页；Today 关注后回焦；Monitor `p` 暂停
+- **Frontend UX (batch 97)**: EmptyState/InboxZero 自动聚焦；Feed Inbox Zero Esc 关闭；Monitor 进度条尊重 reduced-motion
+- **Frontend UX (batch 96)**: ConfirmDialog 关闭后回焦触发器；Sidebar 横向滚动尊重 reduced-motion；Actions/Sources/Monitor Esc 返回；Feed 快捷键面板 Esc 关闭并回焦
+- **Frontend UX (batch 95)**: MagCard/RadarDeck/InboxZero 统一 reduced-motion；RadarDeck 快捷键让出 modal；Settings/Context 未脏 Esc 返回 Hub
+- **Frontend UX (batch 94)**: a11y 工具（prefersReducedMotion / isEditableTarget）；详情页 Esc 返回；Fetch 结果自动聚焦关闭；Toast Esc 对齐 modal 检测
+- **Frontend UX (batch 93)**: QueryErrorState 自动聚焦 Retry；Feed 全部已读后回焦；Today 忽略后回焦关注计数；Sources 区域模式 aria-live
+- **Frontend UX (batch 92)**: Context 保存/导入回焦；Feed Esc 清空搜索；Sources 删除后回焦页标题；语言切换 aria-live；Decisions 摘要播报；Pack 导入后回焦；Briefs 推送后回焦
+- **Frontend UX (batch 91)**: 共享 isAriaModalOpen；PageHeader 可程序聚焦；Source/Settings 保存后回焦标题；Actions 筛选结果 aria-live 播报
+- **Frontend UX (batch 90)**: Feed 快捷键在 modal 打开时让出；Radar Changes `/` 聚焦搜索；Settings #notify 滚动后聚焦标题；Sources 创建/取消后焦点回「添加」；FormSaveBar ⌘S 避开 modal；Chat 流式结束后回焦输入
+- **Frontend UX (batch 89)**: 路由 aria-live 播报；FocusTrap 延迟聚焦 + Esc 捕获；Chat 自动聚焦输入；⌘K 滚动尊重 reduced-motion；Context 提取后聚焦结果区；documentTitle API 清理
 ### Added
 
 - **CN media RSS**: 虎嗅 / InfoQ 中国 / 钛媒体 / 雷峰网 / 掘金 / 新浪科技 / 人人都是产品经理 / HelloGitHub / SegmentFault / 数英 / 数字尾巴 — pack + boot-ensure (live-probed)
@@ -246,3 +668,7 @@ All notable changes to this project will be documented in this file.
 - Read-only MCP sidecar (`mcp/server.mjs`)
 - Docker Compose / `install.sh` one-box run paths
 - MIT license, contributing / security docs, CI, and self-hosted star history
+
+
+[Unreleased]: https://github.com/sunliangcode/ai-radar/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sunliangcode/ai-radar/releases/tag/v0.1.0

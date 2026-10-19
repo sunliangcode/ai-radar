@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FetchProgress, FetchSourceProgress } from '../../lib/api'
 import { formatDuration, progressPercent } from '../../lib/format'
@@ -35,6 +35,12 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
     [t],
   )
 
+  const hasProgress = progress != null
+  useEffect(() => {
+    if (!hasProgress) return
+    document.getElementById('fetch-progress-heading')?.focus({ preventScroll: true })
+  }, [hasProgress])
+
   if (!progress) {
     return (
       <div
@@ -62,11 +68,16 @@ export function FetchProgressPanel({ progress }: { progress?: FetchProgress }) {
       role="status"
       aria-live="polite"
       aria-busy={progress.stage !== 'done' && progress.stage !== 'error' ? true : undefined}
+      aria-labelledby="fetch-progress-heading"
     >
       <div className="border-b border-border/80 px-4 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="font-serif text-lg text-ink">
+            <p
+              id="fetch-progress-heading"
+              tabIndex={-1}
+              className="font-serif text-lg text-ink outline-none"
+            >
               {step === 'error'
                 ? t('fetchProgress.stage.error')
                 : t(`fetchProgress.step.${step}`)}

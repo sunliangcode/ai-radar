@@ -4,6 +4,8 @@ import com.airadar.config.RadarProperties;
 import com.airadar.provider.ai.AiHealthTracker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +20,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
+@Tag(name = "Health", description = "Liveness, translate sidecar, and LLM readiness")
 public class HealthController {
 
     private final JdbcTemplate jdbcTemplate;
@@ -34,8 +37,10 @@ public class HealthController {
     }
 
     @GetMapping("/health")
+    @Operation(summary = "Health snapshot (version, DB, translate, LLM config)")
     public Map<String, Object> health() {
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("version", properties.getApi().getVersion());
         String db = "up";
         try {
             jdbcTemplate.queryForObject("SELECT 1", Integer.class);
@@ -81,6 +86,9 @@ public class HealthController {
      * having been pulled. A failed probe is recorded so the health card stops claiming "live".
      */
     @GetMapping("/health/llm")
+    @Operation(summary = "Live LLM probe (GET {baseUrl}/models)",
+            description = "Returns ok, latencyMs, models[], modelPresent, and optional hint when the configured "
+                    + "model is missing from a non-empty list. Empty models[] skips the presence check.")
     public Map<String, Object> llmProbe() {
         RadarProperties.OpenAi cfg = properties.getOpenai();
         Map<String, Object> out = new LinkedHashMap<>();
@@ -110,10 +118,7 @@ public class HealthController {
             out.put("latencyMs", System.currentTimeMillis() - start);
             List<String> models = modelIds(body);
             out.put("models", models);
-            out.put("modelPresent", models.isEmpty() || models.contains(cfg.getModel()));
-            if (!models.isEmpty() && !models.contains(cfg.getModel())) {
-                out.put("hint", "The configured model is not in the endpoint's model list — pull it or pick one that exists.");
-            }
+            putModelPresence(out, models, cfg.getModel());
             return out;
         } catch (Exception e) {
             String reason = com.airadar.support.Failures.describe(e);
@@ -125,14 +130,33 @@ public class HealthController {
         }
     }
 
+    /**
+     * When {@code models} is non-empty, require {@code configuredModel} to appear;
+     * empty lists skip the check (some providers omit ids).
+     * Configured name is trimmed so accidental .env whitespace does not false-warn;
+     * blank configured model skips the check (connectivity already proven).
+     */
+    static void putModelPresence(Map<String, Object> out, List<String> models, String configuredModel) {
+        String wanted = configuredModel == null ? "" : configuredModel.trim();
+        boolean present = models.isEmpty() || wanted.isEmpty() || models.contains(wanted);
+        out.put("modelPresent", present);
+        if (!present) {
+            out.put("hint", "The configured model is not in the endpoint's model list — pull it or pick one that exists.");
+        }
+    }
+
     /** Best-effort extraction of model ids from an OpenAI-compatible {@code /models} response. */
-    private List<String> modelIds(String body) {
+    List<String> modelIds(String body) {
         List<String> ids = new ArrayList<>();
         if (body == null || body.isBlank()) {
             return ids;
         }
         try {
-            JsonNode data = objectMapper.readTree(body).path("data");
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode data = root.path("data");
+            if (!data.isArray() && root.isArray()) {
+                data = root; // some providers return a bare array
+            }
             if (data.isArray()) {
                 for (JsonNode node : data) {
                     String id = node.path("id").asText("");
@@ -174,7 +198,7 @@ public class HealthController {
         return out;
     }
 
-    private static String trimTrailingSlash(String url, String fallback) {
+    static String trimTrailingSlash(String url, String fallback) {
         if (url == null || url.isBlank()) {
             return fallback;
         }

@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type ActionCard } from '../lib/api'
 import { FeedbackBar } from '../components/feedback/FeedbackBar'
 import { EmptyState, ListSkeleton, PageHeader, QueryErrorState, StatusBadge, useToast } from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { cn, focusRingClass, textLinkClass } from '../lib/cn'
@@ -16,9 +17,15 @@ const STATUS_ORDER: Filter[] = ['open', 'watching', 'started', 'useful', 'ignore
 
 export default function ActionsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { displaySourceIds } = useDisplaySources()
   const actions = useQuery({ queryKey: ['actions'], queryFn: api.actions })
   const [filter, setFilter] = useState<Filter>('open')
+
+  const goBack = useCallback(() => {
+    navigate('/settings')
+  }, [navigate])
+  useEscapeBack(goBack)
 
   const grouped = useMemo(() => {
     const list = (actions.data ?? []).filter((a) => changeMatchesDisplay(a, displaySourceIds))
@@ -40,12 +47,18 @@ export default function ActionsPage() {
 
   const filters: Filter[] = ['open', 'watching', 'started', 'useful', 'ignored', 'all']
 
+  const visibleCount = useMemo(
+    () => visibleStatuses.reduce((n, s) => n + (grouped[s]?.length ?? 0), 0),
+    [visibleStatuses, grouped],
+  )
+
   return (
     <div aria-busy={actions.isFetching || undefined}>
       <PageHeader
+        titleId="actions-page-heading"
         title={t('actions.title')}
         subtitle={t('actions.subtitle')}
-        back={{ label: t('common.backToList'), to: '/settings' }}
+        back={{ label: t('common.backToList'), onClick: goBack }}
       />
       <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label={t('actions.filterLabel')}>
         {filters.map((f) => {
@@ -77,6 +90,12 @@ export default function ActionsPage() {
           )
         })}
       </div>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {t('actions.filterResult', {
+          filter: t(`actions.filter.${filter}`),
+          count: visibleCount,
+        })}
+      </p>
 
       {actions.isLoading ? <ListSkeleton rows={4} /> : null}
       {actions.isError ? (
@@ -152,13 +171,22 @@ function ActionRow({ action }: { action: ActionCard }) {
     { value: 'useful', labelKey: 'actions.markUseful' },
     { value: 'ignored', labelKey: 'actions.markIgnored' },
   ]
+  const stepsDone = Object.values(doneSteps).filter(Boolean).length
+  const stepsTotal = action.steps?.length ?? 0
 
   return (
-    <li className="border-b border-border/80 py-4 first:pt-0 last:border-0">
+    <li className="border-b border-border/80 py-4 first:pt-0 last:border-0" aria-labelledby={`action-title-${action.id}`}>
+      {stepsTotal > 0 ? (
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {t('actions.stepsProgress', { done: stepsDone, total: stepsTotal })}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-medium text-ink">{action.title}</h3>
+            <h3 id={`action-title-${action.id}`} className="text-base font-medium text-ink">
+              {action.title}
+            </h3>
             <StatusBadge status={status} />
           </div>
           <p className="mt-1 text-xs text-muted">
@@ -182,6 +210,7 @@ function ActionRow({ action }: { action: ActionCard }) {
                 type="button"
                 disabled={patch.isPending || active}
                 aria-pressed={active}
+                aria-label={`${t(qs.labelKey)}: ${action.title}`}
                 onClick={() => patch.mutate(qs.value)}
                 className={cn(
                   'min-h-9 rounded-sm border px-2.5 py-1 text-xs transition motion-reduce:transition-none disabled:opacity-40',
@@ -242,13 +271,18 @@ function ActionRow({ action }: { action: ActionCard }) {
           <Link
             to={`/changes/${action.eventId}`}
             state={{ from: '/actions' }}
+            aria-label={`${t('actions.relatedChange')}: ${action.title}`}
             className={`inline-flex min-h-9 items-center ${textLinkClass('moss')}`}
           >
             {t('actions.relatedChange')}
           </Link>
         ) : null}
         {action.newsItemId ? (
-          <Link to="/radar" className={`inline-flex min-h-9 items-center ${textLinkClass('moss')}`}>
+          <Link
+            to="/radar"
+            aria-label={`${t('actions.relatedItem')}: ${action.title}`}
+            className={`inline-flex min-h-9 items-center ${textLinkClass('moss')}`}
+          >
             {t('actions.relatedItem')}
           </Link>
         ) : null}

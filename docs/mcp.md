@@ -1,23 +1,49 @@
-# AI Radar MCP (read-only)
+# MCP server
 
-Local stdio MCP sidecar that calls the AI Radar REST API on loopback.
+Local **stdio** MCP sidecar that calls the AI Radar REST API on loopback. No cloud API keys for the sidecar itself (the backend may still talk to a local or cloud LLM).
 
-## Setup
+For CLI ops see [cli.md](cli.md). Agent workflow: [agents.md](agents.md) · [SKILL.md](../SKILL.md).
+
+---
+
+## Install
 
 ```bash
 cd mcp
 npm install
 ```
 
-Environment:
+Requires **Node 20.12+**. The backend must be reachable (default `http://127.0.0.1:8080`).
+
+Verify syntax:
+
+```bash
+node --check server.mjs
+```
+
+Optional bin after install:
+
+```bash
+npx ai-radar-mcp
+# or: node server.mjs
+```
+
+---
+
+## Environment
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `AI_RADAR_BASE_URL` | `http://127.0.0.1:8080` | Backend base URL (loopback) |
+| `AI_RADAR_BASE_URL` | `http://127.0.0.1:8080` | Backend base URL |
 | `LOCAL_TOKEN` | empty | Sent as `X-Local-Token` when backend requires it |
-| `ALLOW_WRITES` | `false` | If `true`, exposes `run_fetch` / `run_push` |
+| `ALLOW_WRITES` | `false` | If `true`, registers `run_fetch` / `run_push` / `run_cluster` |
+| `AI_RADAR_TIMEOUT_MS` | `8000` | Per-request HTTP timeout (same as CLI; `0` / negative / non-numeric disables; empty/unset uses default) |
 
-## Cursor / Claude Desktop snippet
+With writes disabled, write tool names are **not registered** (and are rejected if called).
+
+---
+
+## Cursor / Claude Desktop
 
 ```json
 {
@@ -35,15 +61,149 @@ Environment:
 }
 ```
 
+Replace `/ABS/PATH/ai-radar` with your checkout. Prefer **read-only** (`ALLOW_WRITES=false`) for agents unless you explicitly want job triggers.
+
+---
+
 ## Tools
 
-- `list_events`, `get_event`
-- `list_briefs`
-- `get_intelligence_home` (five-question home)
-- `list_sources`
-- `list_contexts`
-- `list_high_impacts`
-- `list_active_experiments`
-- Writes (`run_fetch`, `run_push`) only when `ALLOW_WRITES=true`
+### Read (always registered)
 
-With writes disabled, write tool names are not registered (and are rejected if called).
+| Tool | Args | Backend |
+| --- | --- | --- |
+| `get_health` | — | `GET /api/health` (`version`, DB, translate, LLM) |
+| `probe_llm` | — | `GET /api/health/llm` (live models probe; check `modelPresent` / `hint`; empty `models[]` skips; accepts `{data:[]}` or bare array) |
+| `list_events` | optional `status`, `minScore`, `limit` | `GET /api/events?…` |
+| `get_event` | required `id` | `GET /api/events/{id}` |
+| `list_briefs` | — | `GET /api/briefs` |
+| `get_intelligence_home` | — | `GET /api/intelligence/home` |
+| `list_sources` | — | `GET /api/sources` |
+| `list_connectors` | — | `GET /api/connectors` (sorted by id; id == typeCode; expect `FIXTURE`/`path`, `RSS`/`feedUrl`, `DAILY_HOT`/`route`, `WEB`/`url`, `TELEGRAM`/`channels`, `HACKER_NEWS`/`query`, `GOOGLE_NEWS`/`query`, `GDELT`/`query`, `REDDIT`/`subreddits`, `V2EX`/`nodes`, `GITHUB`/`query`, `TWITTER`/`users`, `OSS_INSIGHT`/`keywords`, `GITHUB_TRENDING`/`since`, `PRODUCT_HUNT`/`maxItems`, `EMAIL`/`maxMessages`, `ZHIHU`/`cliPath`, `WEIBO`/`cliPath`, `BILIBILI`/`cliPath`) |
+| `list_delivery_channels` | — | `GET /api/delivery/channels` (sorted by id; id == channel(); expect `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`) |
+| `list_contexts` | — | `GET /api/contexts` |
+| `list_high_impacts` | — | Derived from intelligence home (`impacts` / `whyCare`) |
+| `list_active_experiments` | — | `GET /api/experiments` filtered to `status=running` |
+
+### Write (`ALLOW_WRITES=true` only)
+
+| Tool | Backend |
+| --- | --- |
+| `run_fetch` | `POST /api/jobs/fetch` |
+| `run_push` | `POST /api/jobs/push` |
+| `run_cluster` | `POST /api/jobs/cluster` |
+
+Overlapping jobs return HTTP **409** from the API (mutex). Surfaces as a tool error string like `409 …`.
+
+---
+
+## Examples
+
+Health (version / DB / translate / LLM):
+
+```text
+Tool: get_health
+Args: {}
+```
+
+Live LLM probe:
+
+```text
+Tool: probe_llm
+Args: {}
+```
+
+Intelligence home:
+
+```text
+Tool: get_intelligence_home
+Args: {}
+```
+
+List high-score events:
+
+```text
+Tool: list_events
+Args: { "minScore": 0.7, "limit": 20 }
+```
+
+Trigger fetch (writes enabled):
+
+```text
+Tool: run_fetch
+Args: {}
+```
+
+---
+
+## CLI ↔ MCP map
+
+| Intent | MCP | CLI |
+| --- | --- | --- |
+| Health snapshot | `get_health` | `ai-radar health` |
+| Live LLM probe | `probe_llm` | `ai-radar health-llm` |
+| Home payload | `get_intelligence_home` | `ai-radar home` |
+| Sources | `list_sources` | `ai-radar sources` |
+| Connector catalog | `list_connectors` | `ai-radar connectors` |
+| Delivery catalog | `list_delivery_channels` | `ai-radar delivery-channels` |
+| Fetch | `run_fetch` | `ai-radar fetch` |
+| Cluster | `run_cluster` | `ai-radar cluster` |
+| Push | `run_push` | `ai-radar push` |
+| Prereq / doctor JSON | — | `ai-radar doctor` |
+| Process/PID status | — | `./scripts/status.sh` |
+
+CI keeps the Tools tables above aligned with `mcp/server.mjs` (`shared/mcp-tools-sync.test.mjs`).
+
+---
+
+## Security
+
+- Default bind target is **loopback**. Do not expose the MCP process on a public interface.
+- Keep `ALLOW_WRITES=false` unless you trust the MCP client to trigger pipeline jobs.
+- If the backend sets `LOCAL_TOKEN`, configure the same value on the MCP server.
+- Responses are JSON text blobs; treat them as local-user data.
+
+---
+
+## Errors
+
+Tool failures return **JSON** (not a bare stack string) with `error`, `hint`, and `fix[]` — same intent as the [CLI](cli.md) actionable messages:
+
+```json
+{
+  "error": "backend_unreachable",
+  "hint": "Cannot reach backend at http://127.0.0.1:8080.",
+  "fix": [
+    "Start: ./install.sh  or  cd backend && ./mvnw spring-boot:run",
+    "Verify: ./scripts/status.sh  or  ./bin/ai-radar doctor",
+    "Check AI_RADAR_BASE_URL"
+  ]
+}
+```
+
+```json
+{
+  "error": "request_timeout",
+  "hint": "Request to http://127.0.0.1:8080 timed out.",
+  "fix": [
+    "Raise AI_RADAR_TIMEOUT_MS (default 8000) or set 0 to disable",
+    "Check backend load: ./bin/ai-radar doctor  or  ./scripts/status.sh"
+  ]
+}
+```
+
+| `error` | Cause | Fix |
+| --- | --- | --- |
+| `backend_unreachable` | Backend down / bad base URL | `./install.sh`; `./bin/ai-radar doctor`; check `AI_RADAR_BASE_URL` |
+| `request_timeout` | AbortSignal timeout | Raise `AI_RADAR_TIMEOUT_MS` or set `0` to disable |
+| `writes_disabled` | Write tool with `ALLOW_WRITES=false` | Enable writes only with user consent, or use CLI |
+| `job_conflict` | HTTP 409 mutex | Wait; AI Monitor / `./bin/ai-radar doctor` |
+| `unauthorized` | 401/403 | Set `LOCAL_TOKEN` |
+| `api_error` | Other HTTP/API failure | See `hint`; [cli.md](cli.md) |
+
+Helpers live in [`shared/errors.mjs`](../shared/errors.mjs) (re-exported as `mcp/errors.mjs`). Unit tests: `node --test shared/errors.test.mjs`.
+
+---
+
+## Related
+
+- [CLI](cli.md) · [API](api.md) · [Agents](agents.md) · [Installation](installation.md)

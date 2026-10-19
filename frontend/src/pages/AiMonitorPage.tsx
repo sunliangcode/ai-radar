@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ListSkeleton, PageHeader, QueryErrorState } from '../components/ui'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { useAiMonitorStream } from './monitor/useAiMonitorStream'
 import { buildIoEntries } from './monitor/monitorUtils'
 import { MonitorQueueCard } from './monitor/MonitorQueueCard'
@@ -11,8 +13,14 @@ import { errorText } from '../lib/errors'
 
 export default function AiMonitorPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { monitor, mon, inFlights, sseLive, paused, setPaused } = useAiMonitorStream()
   const [opFilter, setOpFilter] = useState('')
+
+  const goBack = useCallback(() => {
+    navigate('/settings')
+  }, [navigate])
+  useEscapeBack(goBack)
 
   if (monitor.isLoading) return <ListSkeleton rows={5} />
   if (monitor.isError) {
@@ -42,9 +50,10 @@ export default function AiMonitorPage() {
   return (
     <div aria-busy={filteredFlights.length > 0 && !paused ? true : undefined}>
       <PageHeader
+        titleId="ai-monitor-heading"
         title={t('nav.monitor')}
         subtitle={t('settings.monitorHint')}
-        back={{ label: t('common.backToList'), to: '/settings' }}
+        back={{ label: t('common.backToList'), onClick: goBack }}
       />
       <p className="mb-4 text-xs text-muted">
         {t('settings.monitorOpenSettings')}{' '}

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button, buttonVariants } from '../components/ui'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
+import { isAriaModalOpen, isEditableTarget } from '../lib/a11y'
 import {
   RadarChangesPanel,
   RadarModeBar,
@@ -29,6 +30,21 @@ export default function RadarPage() {
     ['intelligence-home'],
   ])
 
+  // Changes view: `/` focuses search (parity with Feed Signals)
+  useEffect(() => {
+    if (view !== 'changes') return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/') return
+      if (isEditableTarget(e.target)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (isAriaModalOpen()) return
+      e.preventDefault()
+      document.getElementById('radar-search-input')?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [view])
+
   if (view === 'signals') {
     return (
       <div aria-busy={isPending || undefined}>
@@ -43,17 +59,30 @@ export default function RadarPage() {
     <div aria-busy={isPending || undefined}>
       <RadarPageHeader />
       <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={t('radar.title')}>
-        <Button onClick={() => fetchJob.mutate(undefined)} loading={isPending} disabled={isPending}>
+        <Button
+          id="radar-fetch-btn"
+          onClick={() => fetchJob.mutate(undefined)}
+          loading={isPending}
+          disabled={isPending}
+          aria-label={phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
+        >
           {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
         </Button>
-        <Link to="/settings/sources" className={buttonVariants({ variant: 'ghost' })}>
+        <Link
+          to="/settings/sources"
+          className={buttonVariants({ variant: 'ghost' })}
+          aria-label={t('nav.sources')}
+        >
           {t('nav.sources')}
         </Link>
       </div>
       <FetchProgressSection
         phase={phase}
         progress={progress}
-        onDismiss={() => void dismiss()}
+        onDismiss={() => {
+          void dismiss()
+          queueMicrotask(() => document.getElementById('radar-fetch-btn')?.focus())
+        }}
         retrying={retryFailed.isPending}
         onRetryFailed={(types) => retryFailed.mutate(types)}
       />

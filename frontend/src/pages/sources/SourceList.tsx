@@ -44,6 +44,10 @@ export function SourceList({
     if (wasRemoving.current) {
       wasRemoving.current = false
       setDeleteTarget(null)
+      // Row (and trigger) is gone — land on page heading instead of a dead node
+      queueMicrotask(() =>
+        document.getElementById('sources-page-heading')?.focus({ preventScroll: true }),
+      )
     }
   }, [removePending])
 
@@ -94,6 +98,7 @@ export function SourceList({
                     <div>
                       <Link
                         to={`/settings/sources/${s.id}`}
+                        aria-label={`${s.name} · ${s.enabled ? t('common.enabled') : t('common.disabled')}`}
                         className={cn(
                           'inline-flex min-h-9 items-center rounded-sm font-medium text-ink hover:text-moss',
                           focusRingClass(),
@@ -123,6 +128,7 @@ export function SourceList({
                         disabled={fetchPending || !s.enabled}
                         loading={rowFetching}
                         title={s.enabled ? t('sources.testFetchHint') : t('sources.testFetchDisabled')}
+                        aria-label={`${s.name}: ${rowFetching ? t('common.fetching') : t('sources.testFetch')}`}
                         onClick={() => onTestFetch(s.type)}
                       >
                         {rowFetching ? t('common.fetching') : t('sources.testFetch')}
@@ -132,6 +138,7 @@ export function SourceList({
                         disabled={patchPendingId === s.id}
                         loading={patchPendingId === s.id}
                         aria-pressed={s.enabled}
+                        aria-label={`${s.name}: ${s.enabled ? t('sources.disable') : t('sources.enable')}`}
                         onClick={() => onToggleEnabled(s.id, !s.enabled)}
                       >
                         {s.enabled ? t('sources.disable') : t('sources.enable')}
@@ -139,6 +146,7 @@ export function SourceList({
                       <Button
                         variant="danger"
                         disabled={removePending}
+                        aria-label={`${s.name}: ${t('sources.delete')}`}
                         onClick={() => setDeleteTarget({ id: s.id, name: s.name })}
                       >
                         {t('sources.delete')}

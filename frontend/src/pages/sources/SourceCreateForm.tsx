@@ -55,13 +55,13 @@ export function SourceCreateForm({
   useEffect(() => {
     if (!onCancel || creating) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onCancel()
-      }
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      onCancel()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [onCancel, creating])
 
   const typeOptions = useMemo(() => {
@@ -93,13 +93,20 @@ export function SourceCreateForm({
       className="mb-6 grid gap-3 rounded-xl border border-border bg-surface/80 p-4 sm:grid-cols-2"
     >
       <label className="text-sm">
-        <span className="text-muted">{t('sources.name')}</span>
+        <span className="text-muted">
+          {t('sources.name')}
+          <span className="text-ember" aria-hidden>
+            {' '}
+            *
+          </span>
+        </span>
         <Input
           ref={nameRef}
           className="mt-1"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           required
+          aria-required="true"
           disabled={creating}
         />
       </label>
@@ -163,11 +170,23 @@ export function SourceCreateForm({
         <p className="text-xs text-muted sm:col-span-2">{t('sources.dailyHotHint')}</p>
       ) : null}
       <div className="flex flex-wrap items-center gap-2 sm:col-span-2" role="group" aria-label={t('sources.create')}>
-        <Button type="submit" loading={creating} disabled={creating || !name.trim()}>
+        <Button
+          type="submit"
+          loading={creating}
+          disabled={creating || !name.trim()}
+          aria-label={creating ? t('common.saving') : t('sources.create')}
+          title={!name.trim() ? t('sources.name') : undefined}
+        >
           {creating ? t('common.saving') : t('sources.create')}
         </Button>
         {onCancel ? (
-          <Button type="button" variant="ghost" disabled={creating} onClick={onCancel}>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={creating}
+            aria-label={t('common.cancel')}
+            onClick={onCancel}
+          >
             {t('common.cancel')}
           </Button>
         ) : null}

@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { api, type DecisionRecord } from '../lib/api'
 import { ListSkeleton, PageHeader, QueryErrorState, EmptyState } from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
+import { useEscapeBack } from '../hooks/useEscapeBack'
 import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { dateLocale } from '../i18n'
@@ -35,12 +36,18 @@ function DecisionRow({
   emphasize?: boolean
 }) {
   const { t } = useTranslation()
+  const labelParts = [
+    d.changeTitle ?? t('decisions.untitled'),
+    kindLabel(d.kind, t),
+  ]
+  if (d.reason) labelParts.push(d.reason)
+  if (d.revisitAt) labelParts.push(new Date(d.revisitAt).toLocaleDateString(locale))
   return (
     <li>
       <Link
         to={`/changes/${d.changeId}`}
         state={{ from: '/decisions' }}
-        aria-label={`${d.changeTitle ?? t('decisions.untitled')} — ${kindLabel(d.kind, t)}`}
+        aria-label={labelParts.join(' · ')}
         className={cn(
           'block px-4 py-3 transition motion-reduce:transition-none hover:border-accent/40',
           focusRingClass(),
@@ -94,10 +101,16 @@ function DecisionRow({
 
 export default function DecisionsPage() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const locale = dateLocale(i18n.language)
   const { displaySourceIds } = useDisplaySources()
   const q = useQuery({ queryKey: ['decisions'], queryFn: () => api.decisions() })
   const due = useQuery({ queryKey: ['decisions-due'], queryFn: () => api.decisions('due') })
+
+  const goBack = useCallback(() => {
+    navigate('/')
+  }, [navigate])
+  useEscapeBack(goBack)
 
   const dueRows = useMemo(
     () => (due.data ?? []).filter((d) => changeMatchesDisplay(d, displaySourceIds)),
@@ -110,7 +123,14 @@ export default function DecisionsPage() {
 
   return (
     <div aria-busy={q.isFetching || due.isFetching || undefined}>
-      <PageHeader title={t('decisions.title')} subtitle={t('decisions.subtitle')} />
+      <PageHeader
+        titleId="decisions-page-heading"
+        title={t('decisions.title')}
+        subtitle={t('decisions.subtitle')}
+      />
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {t('decisions.summary', { due: dueRows.length, open: openRows.length })}
+      </p>
 
       {due.isError ? (
         <div className="mb-6">

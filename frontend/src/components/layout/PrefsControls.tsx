@@ -27,6 +27,9 @@ export function LanguageSwitcher() {
           {lng === 'zh' ? '中' : 'EN'}
         </button>
       ))}
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {current === 'zh' ? t('nav.langZh') : t('nav.langEn')}
+      </span>
     </div>
   )
 }
@@ -82,6 +85,9 @@ export function ThemeDensityControls() {
           </button>
         ))}
       </div>
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {t(`app.density.${density}`)}
+      </span>
     </div>
   )
 }

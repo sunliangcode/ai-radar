@@ -55,7 +55,7 @@ export function SavedItemsSection({
         <h2 id="watching-saved-heading" className="text-base font-semibold text-ink">
           {t('watching.savedItems')}
         </h2>
-        <span className="font-mono text-xs text-muted" aria-live="polite">
+        <span className="font-mono text-xs text-muted" aria-live="polite" aria-atomic="true">
           {t('watching.savedCount', { count: items.length })}
         </span>
       </div>
@@ -122,9 +122,13 @@ export function SavedItemsSection({
               }
               secondaryActions={
                 <>
-                  <MagAction onClick={() => setDrawerId(item.id)}>{t('feed.expand')}</MagAction>
+                  <MagAction onClick={() => setDrawerId(item.id)} title={t('feed.expand')}>
+                    {t('feed.expand')}
+                  </MagAction>
                   {!item.read ? (
-                    <MagAction onClick={() => onMarkRead(item.id)}>{t('common.markRead')}</MagAction>
+                    <MagAction onClick={() => onMarkRead(item.id)} title={t('common.markRead')}>
+                      {t('common.markRead')}
+                    </MagAction>
                   ) : null}
                 </>
               }
@@ -157,6 +161,7 @@ export function SavedItemsSection({
               href={drawerItem.canonicalUrl}
               target="_blank"
               rel="noreferrer"
+              aria-label={t('feed.openOriginal')}
               onClick={() => {
                 if (!drawerItem.read) onMarkRead(drawerItem.id)
               }}
@@ -173,7 +178,9 @@ export function SavedItemsSection({
           drawerItem ? (
             <div className="flex flex-wrap gap-1">
               {!drawerItem.read ? (
-                <MagAction onClick={() => onMarkRead(drawerItem.id)}>{t('common.markRead')}</MagAction>
+                <MagAction onClick={() => onMarkRead(drawerItem.id)} title={t('common.markRead')}>
+                  {t('common.markRead')}
+                </MagAction>
               ) : null}
               <MagAction
                 disabled={patchPending}
@@ -182,6 +189,7 @@ export function SavedItemsSection({
                   setDrawerId(null)
                 }}
                 tone="ember"
+                title={t('watching.unsave')}
               >
                 {t('watching.unsave')}
               </MagAction>
@@ -191,6 +199,7 @@ export function SavedItemsSection({
                   if (!drawerItem.read) onMarkRead(drawerItem.id)
                 }}
                 tone="accent"
+                title={t('feed.openOriginal')}
               >
                 {t('feed.openOriginal')} ↗
               </MagAction>

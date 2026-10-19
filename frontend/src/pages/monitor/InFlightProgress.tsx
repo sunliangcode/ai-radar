@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AiMonitorInFlight } from '../../lib/api'
+import { prefersReducedMotion } from '../../lib/a11y'
 import { progressFromElapsed } from './monitorUtils'
 
 /** Live progress bars for in-flight AI calls. */
@@ -17,14 +18,15 @@ export function InFlightProgress({
 
   useEffect(() => {
     if (!flightIds || paused) return
-    const id = window.setInterval(() => setNowMs(Date.now()), 250)
+    const tick = prefersReducedMotion() ? 1000 : 250
+    const id = window.setInterval(() => setNowMs(Date.now()), tick)
     return () => window.clearInterval(id)
   }, [flightIds, paused])
 
   if (flights.length === 0) return null
 
   return (
-    <div className="mb-4 grid gap-2" aria-busy={!paused || undefined} aria-live="polite">
+    <div className="mb-4 grid gap-2" aria-busy={!paused || undefined} aria-live="polite" aria-atomic="false">
       {flights.map((flight) => {
         const started = Date.parse(flight.startedAt)
         const liveElapsedMs = Number.isFinite(started)
@@ -39,6 +41,8 @@ export function InFlightProgress({
           <div
             key={flight.id}
             className="rounded-xl border border-accent/40 bg-accent/5 px-4 py-3"
+            role="status"
+            aria-label={`${t('settings.monitorInFlight')} ${flight.operation}`}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-sm font-medium text-ink">

@@ -82,11 +82,21 @@ export function RadarModeBar({
       role="toolbar"
       aria-label={t('radar.title')}
     >
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {`${view === 'signals' ? t('radar.tabSignals') : t('radar.tabChanges')} · ${
+          filter === 'following'
+            ? t('radar.filterFollowing')
+            : filter === 'unread'
+              ? t('radar.filterUnread')
+              : t('radar.filterAll')
+        }`}
+      </p>
       <div className="flex flex-wrap gap-1" role="group" aria-label={t('radar.viewLabel')}>
         <button
           type="button"
           className={chip(view === 'signals')}
           aria-pressed={view === 'signals'}
+          aria-label={t('radar.tabSignals')}
           onClick={() => onView('signals')}
         >
           {t('radar.tabSignals')}
@@ -95,6 +105,7 @@ export function RadarModeBar({
           type="button"
           className={chip(view === 'changes')}
           aria-pressed={view === 'changes'}
+          aria-label={t('radar.tabChanges')}
           onClick={() => onView('changes')}
         >
           {t('radar.tabChanges')}
@@ -105,6 +116,7 @@ export function RadarModeBar({
           type="button"
           className={chip(filter === 'all')}
           aria-pressed={filter === 'all'}
+          aria-label={t('radar.filterAll')}
           onClick={() => onFilter('all')}
         >
           {t('radar.filterAll')}
@@ -113,6 +125,7 @@ export function RadarModeBar({
           type="button"
           className={chip(filter === 'following')}
           aria-pressed={filter === 'following'}
+          aria-label={t('radar.filterFollowing')}
           onClick={() => onFilter('following')}
         >
           {t('radar.filterFollowing')}
@@ -121,6 +134,7 @@ export function RadarModeBar({
           type="button"
           className={chip(filter === 'unread')}
           aria-pressed={filter === 'unread'}
+          aria-label={t('radar.filterUnread')}
           onClick={() => onFilter('unread')}
         >
           {t('radar.filterUnread')}
@@ -184,6 +198,11 @@ export function RadarChangesPanel({
 
   return (
     <div aria-busy={changes.isFetching || (followingOnly && watching.isFetching) || undefined}>
+      {!loading && !err ? (
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {t('radar.resultCount', { count: rows.length })}
+        </p>
+      ) : null}
       {loading ? <ListSkeleton rows={6} /> : null}
       {err ? (
         <QueryErrorState
@@ -246,12 +265,16 @@ export function RadarChangesPanel({
 }
 
 function ChangeRow({ change: c }: { change: ChangeCard }) {
+  const blurb = c.why || c.summary
+  const labelParts = [c.title]
+  if (c.tier) labelParts.push(c.tier)
+  if (blurb) labelParts.push(blurb)
   return (
     <li>
       <Link
         to={`/changes/${c.id}`}
         state={{ from: '/radar' }}
-        aria-label={c.title}
+        aria-label={labelParts.join(' · ')}
         className={cn(
           'block rounded-xl border border-border bg-surface px-4 py-3 transition motion-reduce:transition-none hover:border-accent/40',
           focusRingClass(),
@@ -261,9 +284,7 @@ function ChangeRow({ change: c }: { change: ChangeCard }) {
           <span className="font-medium text-ink">{c.title}</span>
           {c.tier ? <StatusBadge status={c.tier} /> : null}
         </div>
-        {c.why || c.summary ? (
-          <p className="mt-1 text-sm text-muted line-clamp-2">{c.why || c.summary}</p>
-        ) : null}
+        {blurb ? <p className="mt-1 text-sm text-muted line-clamp-2">{blurb}</p> : null}
         {c.lastUpdatedAt ? (
           <p className="mt-2 font-mono text-[10px] text-faint">{c.lastUpdatedAt}</p>
         ) : null}
@@ -282,6 +303,10 @@ export function RadarSearch({
   placeholder: string
 }) {
   const { t } = useTranslation()
+  const clear = () => {
+    onChange('')
+    document.getElementById('radar-search-input')?.focus()
+  }
   return (
     <div className="relative mb-4" role="search">
       <input
@@ -289,6 +314,12 @@ export function RadarSearch({
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && value) {
+            e.preventDefault()
+            clear()
+          }
+        }}
         placeholder={placeholder}
         aria-label={placeholder}
         className={cn(inputClasses, 'rounded-lg', value ? 'pr-11' : undefined)}
@@ -296,7 +327,7 @@ export function RadarSearch({
       {value ? (
         <button
           type="button"
-          onClick={() => onChange('')}
+          onClick={clear}
           aria-label={t('radar.clearSearch')}
           className={cn(
             'absolute right-1.5 top-1/2 inline-flex min-h-9 min-w-9 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-border hover:text-ink',
@@ -313,5 +344,7 @@ export function RadarSearch({
 /** Thin header used when RadarPage owns chrome; FeedPage signals keep their own header. */
 export function RadarPageHeader() {
   const { t } = useTranslation()
-  return <PageHeader title={t('radar.title')} subtitle={t('radar.subtitle')} />
+  return (
+    <PageHeader titleId="radar-page-heading" title={t('radar.title')} subtitle={t('radar.subtitle')} />
+  )
 }

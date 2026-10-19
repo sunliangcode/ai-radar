@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Thin wrapper: run ops CLI from a git clone without npm link.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+exec node "$ROOT/cli/ai-radar.mjs" "$@"

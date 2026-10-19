@@ -9,6 +9,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -37,7 +40,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -63,7 +66,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: mcp/package-lock.json
 
@@ -71,4 +74,76 @@ jobs:
         run: npm ci
 
       - name: Syntax check
-        run: node --check server.mjs
+        run: node --check server.mjs && node --check errors.mjs
+
+      - name: Shared Node tests (all *.test.mjs)
+        working-directory: shared
+        run: |
+          set -euo pipefail
+          for f in *.mjs; do
+            case "$f" in *.test.mjs) continue ;; esac
+            node --check "$f"
+          done
+          node --test *.test.mjs
+
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Syntax check
+        working-directory: cli
+        run: node --check ai-radar.mjs
+
+      - name: Executable bits
+        run: |
+          test -x bin/ai-radar
+          test -x install.sh
+          test -x stop.sh
+          test -x scripts/check.sh
+          test -x scripts/status.sh
+          test -x scripts/backup.sh
+          test -x scripts/smoke-extensibility.sh
+
+      - name: Smoke (help / version / offline error)
+        run: |
+          set -euo pipefail
+          ./bin/ai-radar version | grep -q ai-radar-cli
+          help="$(./bin/ai-radar help)"
+          echo "$help" | grep -q "pack import"
+          echo "$help" | grep -q "pack validate"
+          echo "$help" | grep -q "pack list"
+          echo "$help" | grep -q "connectors"
+          echo "$help" | grep -q "delivery-channels"
+          echo "$help" | grep -q "doctor"
+          echo "$help" | grep -q "modelPresent"
+          echo "$help" | grep -q "health-llm"
+          echo "$help" | grep -q "version, DB"
+          echo "$help" | grep -q "AI_RADAR_DB"
+          echo "$help" | grep -q "BACKUP_KEEP"
+          echo "$help" | grep -q "AI_RADAR_TIMEOUT_MS"
+          echo "$help" | grep -q -- "--path"
+          test -f examples/packs/demo-local.json
+          ./bin/ai-radar pack validate examples/packs/demo-local.json | grep -q '"ok": true'
+          listed="$(./bin/ai-radar pack list)"
+          echo "$listed" | grep -q ai-core
+          echo "$listed" | grep -q ai-cn
+          echo "$listed" | grep -q ai-signals
+          echo "$listed" | grep -q '"ok": true'
+          miss="$(AI_RADAR_BASE_URL=http://127.0.0.1:1 ./bin/ai-radar pack import x --path /no/such/pack.json 2>&1 || true)"
+          echo "$miss" | grep -qi "not found"
+          bad="$(./bin/ai-radar pack validate /no/such/pack.json 2>&1 || true)"
+          echo "$bad" | grep -qi "not found"
+          doc="$(AI_RADAR_BASE_URL=http://127.0.0.1:1 ./bin/ai-radar doctor 2>&1 || true)"
+          echo "$doc" | grep -q '"ok": false'
+          echo "$doc" | grep -q cliVersion
+          echo "$doc" | grep -q "install.sh"
+          echo "$doc" | grep -q builtInPacks
+          echo "$doc" | grep -q ai-core
+          msg="$(AI_RADAR_BASE_URL=http://127.0.0.1:1 ./bin/ai-radar health 2>&1 || true)"
+          echo "$msg" | grep -qi "Cannot reach backend"
+          echo "$msg" | grep -qi "install.sh"

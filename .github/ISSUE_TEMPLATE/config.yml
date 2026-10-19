@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Documentation
-    url: https://github.com/sunliangcode/ai-radar/blob/main/README.md
-    about: Quick start, APIs, delivery, and extensibility docs
+    url: https://github.com/sunliangcode/ai-radar/blob/main/docs/README.md
+    about: Install, CLI, API, MCP, extensibility, and release docs
+  - name: Support
+    url: https://github.com/sunliangcode/ai-radar/blob/main/SUPPORT.md
+    about: How to ask for help (prefer doctor / status output)
+  - name: Security advisories
+    url: https://github.com/sunliangcode/ai-radar/security/advisories/new
+    about: Private vulnerability reports only — do not open a public issue

@@ -3,6 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
+import {
+  connectorCatalogHealthIssueKey,
+  connectorCatalogInvariantsOk,
+  deliveryCatalogHealthIssueKey,
+  deliveryCatalogInvariantsOk,
+} from '../../lib/connectors'
 import { formatRelativeInstant } from '../../lib/format'
 import { textLinkClass } from '../../lib/cn'
 
@@ -50,11 +56,15 @@ function ScheduleRow({ label, iso, hint }: { label: string; iso?: string | null;
   const abs = iso ? new Date(iso).toLocaleString(i18n.language) : null
   const value = rel ? `${rel}${abs ? ` · ${abs}` : ''}` : '—'
   return (
-    <div className="flex items-start gap-2 py-1.5">
+    <div
+      className="flex items-start gap-2 py-1.5"
+      role="group"
+      aria-label={`${label}: ${value}${hint ? `. ${hint}` : ''}`}
+    >
       <span className="mt-1.5">
         <StatusDot ok={Boolean(iso)} warn={!iso} />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1" aria-hidden>
         <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
           <span className="text-muted">{label}</span>
           <span className={`font-mono text-xs ${iso ? 'text-moss' : 'text-ember'}`}>{value}</span>
@@ -79,6 +89,20 @@ export function SystemHealthCard() {
     queryKey: ['jobs-schedule'],
     queryFn: api.jobsSchedule,
     refetchInterval: 60_000,
+    retry: 1,
+  })
+  const delivery = useQuery({
+    queryKey: ['delivery-channels'],
+    queryFn: api.deliveryChannels,
+    enabled: open,
+    refetchInterval: open ? 60_000 : false,
+    retry: 1,
+  })
+  const connectors = useQuery({
+    queryKey: ['connectors'],
+    queryFn: api.connectors,
+    enabled: open,
+    refetchInterval: open ? 60_000 : false,
     retry: 1,
   })
 
@@ -135,6 +159,7 @@ export function SystemHealthCard() {
         aria-expanded={open}
         aria-controls="system-health-detail"
         aria-busy={healthPending || undefined}
+        aria-label={`${t('settingsHub.healthTitle')}: ${stripLabel}`}
       >
         {healthPending ? (
           <span
@@ -164,21 +189,50 @@ export function SystemHealthCard() {
         <div
           id="system-health-detail"
           role="region"
-          aria-label={t('settingsHub.healthTitle')}
+          aria-labelledby="system-health-detail-heading"
           className="border-t border-border px-4 pb-3 pt-1"
         >
+          <h3 id="system-health-detail-heading" className="sr-only">
+            {t('settingsHub.healthTitle')}
+          </h3>
           <div className="mb-1 flex justify-end">
             <button
               type="button"
               className="inline-flex min-h-9 items-center rounded-sm px-2 text-xs text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              aria-busy={health.isFetching || schedule.isFetching || undefined}
-              disabled={health.isFetching || schedule.isFetching}
+              aria-busy={
+                health.isFetching ||
+                schedule.isFetching ||
+                delivery.isFetching ||
+                connectors.isFetching ||
+                undefined
+              }
+              aria-label={
+                health.isFetching ||
+                schedule.isFetching ||
+                delivery.isFetching ||
+                connectors.isFetching
+                  ? t('settingsHub.healthChecking')
+                  : t('settingsHub.healthRefresh')
+              }
+              disabled={
+                health.isFetching ||
+                schedule.isFetching ||
+                delivery.isFetching ||
+                connectors.isFetching
+              }
               onClick={() => {
                 void health.refetch()
                 void schedule.refetch()
+                void delivery.refetch()
+                void connectors.refetch()
               }}
             >
-              {t('settingsHub.healthRefresh')}
+              {health.isFetching ||
+              schedule.isFetching ||
+              delivery.isFetching ||
+              connectors.isFetching
+                ? t('settingsHub.healthChecking')
+                : t('settingsHub.healthRefresh')}
             </button>
           </div>
 
@@ -199,6 +253,14 @@ export function SystemHealthCard() {
                 value={backendOk ? t('settingsHub.healthUp') : t('settingsHub.healthDegraded')}
                 ok={backendOk}
               />
+              {h.version ? (
+                <Row
+                  label={t('settingsHub.healthVersion')}
+                  value={h.version}
+                  ok={backendOk}
+                  hint={t('settingsHub.healthVersionHint')}
+                />
+              ) : null}
               <Row
                 label={t('settingsHub.healthLlm')}
                 value={llmValue}
@@ -241,15 +303,71 @@ export function SystemHealthCard() {
                 iso={sched?.nextPushAt}
                 hint={sched?.pushCronError ?? (sched ? `${sched.pushCron} · ${sched.timezone}` : undefined)}
               />
+              {connectors.data
+                ? (() => {
+                    const rows = connectors.data
+                    const issue = connectorCatalogHealthIssueKey(rows)
+                    const invariantsOk = connectorCatalogInvariantsOk(rows)
+                    return (
+                      <Row
+                        label={t('settingsHub.healthConnectors')}
+                        value={t('settingsHub.healthConnectorsValue', {
+                          total: rows.length,
+                        })}
+                        ok={rows.length >= 10 && invariantsOk}
+                        warn={rows.length < 10 || !invariantsOk}
+                        hint={
+                          issue
+                            ? t(`settingsHub.${issue}`)
+                            : rows
+                                .slice(0, 8)
+                                .map((c) => c.displayName || c.id)
+                                .join(' · ')
+                        }
+                      />
+                    )
+                  })()
+                : null}
+              {delivery.data
+                ? (() => {
+                    const rows = delivery.data
+                    const issue = deliveryCatalogHealthIssueKey(rows)
+                    const invariantsOk = deliveryCatalogInvariantsOk(rows)
+                    const anyEnabled = rows.some((c) => c.enabled)
+                    return (
+                      <Row
+                        label={t('settingsHub.healthDelivery')}
+                        value={t('settingsHub.healthDeliveryValue', {
+                          enabled: rows.filter((c) => c.enabled).length,
+                          total: rows.length,
+                        })}
+                        ok={rows.length >= 4 && invariantsOk && anyEnabled}
+                        warn={rows.length < 4 || !invariantsOk || !anyEnabled}
+                        hint={
+                          issue
+                            ? t(`settingsHub.${issue}`)
+                            : rows
+                                .map(
+                                  (c) =>
+                                    `${c.displayName}${c.enabled ? '' : ` (${t('settingsHub.healthDisabled')})`}`,
+                                )
+                                .join(' · ')
+                        }
+                      />
+                    )
+                  })()
+                : null}
             </div>
           ) : null}
 
           <p className="mt-3 text-xs text-muted">
             {t('settingsHub.healthCli')}{' '}
+            <code className="rounded bg-border/60 px-1 font-mono">./bin/ai-radar doctor</code>
+            {' · '}
             <code className="rounded bg-border/60 px-1 font-mono">./scripts/status.sh</code>
             {' · '}
-            <Link to="/settings/preferences" className={`inline-flex min-h-9 items-center ${textLinkClass()}`}>
-              {t('settingsHub.preferences')}
+            <Link to="/settings/context#notify" className={`inline-flex min-h-9 items-center ${textLinkClass()}`}>
+              {t('settingsHub.notifications')}
             </Link>
             {' · '}
             <Link to="/settings/system" className={`inline-flex min-h-9 items-center ${textLinkClass()}`}>

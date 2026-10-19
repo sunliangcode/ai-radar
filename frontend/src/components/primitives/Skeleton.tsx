@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   const { t } = useTranslation()
   return (
-    <div className="space-y-3" aria-busy="true" aria-live="polite">
+    <div className="space-y-3" role="status" aria-busy="true" aria-live="polite">
       <span className="sr-only">{t('common.loading')}</span>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="rounded-lg border border-border bg-surface px-4 py-4" aria-hidden>

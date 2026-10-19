@@ -11,6 +11,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Properties;
 
 @Component
@@ -29,6 +30,15 @@ public class EmailDelivery implements DeliveryChannel {
     @Override
     public String channel() {
         return "email";
+    }
+
+    @Override
+    public DeliveryDescriptor descriptor() {
+        return DeliveryDescriptor.of(
+                "email",
+                "Email (SMTP)",
+                List.of("SMTP_HOST", "SMTP_TO", "Settings → Preferences inbox")
+        );
     }
 
     @Override

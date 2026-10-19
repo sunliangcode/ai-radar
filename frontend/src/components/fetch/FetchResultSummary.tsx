@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FetchProgress, FetchSourceProgress } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
+import { isAriaModalOpen } from '../../lib/a11y'
 import { Button } from '../primitives/Button'
 
 function statusDot(status: FetchSourceProgress['status']): string {
@@ -22,12 +23,18 @@ export function FetchResultSummary({
   retrying?: boolean
 }) {
   const { t } = useTranslation()
+  const dismissRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    dismissRef.current?.focus({ preventScroll: true })
+  }, [])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
-      const target = e.target as HTMLElement | null
-      if (target?.closest?.('dialog,[role="dialog"],[role="alertdialog"]')) return
+      if (isAriaModalOpen()) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
       onDismiss()
     }
     window.addEventListener('keydown', onKey)
@@ -50,9 +57,12 @@ export function FetchResultSummary({
       className="mb-6 overflow-hidden rounded-xl border border-border bg-surface/90"
       role={isError || failedCount > 0 ? 'alert' : 'status'}
       aria-live={isError || failedCount > 0 ? 'assertive' : 'polite'}
+      aria-labelledby="fetch-result-title"
     >
       <div className="border-b border-border/80 px-5 py-5">
-        <h3 className="font-serif text-2xl text-ink">{title}</h3>
+        <h3 id="fetch-result-title" className="font-serif text-2xl text-ink">
+          {title}
+        </h3>
         <p className="mt-2 font-mono text-sm text-muted">
           {t('fetchProgress.summary.overview', {
             fetched: result?.fetched ?? progress.sources?.reduce((n, s) => n + (s.itemCount ?? 0), 0) ?? 0,
@@ -106,17 +116,24 @@ export function FetchResultSummary({
         <p className="px-5 py-6 text-sm text-muted">{t('fetchProgress.summary.noSources')}</p>
       )}
 
-      <div className="flex flex-wrap justify-end gap-2 border-t border-border/80 px-5 py-4">
+      <div className="flex flex-wrap justify-end gap-2 border-t border-border/80 px-5 py-4" role="group" aria-label={title}>
         {failedCount > 0 && onRetryFailed ? (
           <Button
             variant="ghost"
             loading={retrying}
+            disabled={retrying}
+            aria-label={t('fetchProgress.summary.retryFailed')}
             onClick={() => onRetryFailed(failedTypes)}
           >
             {t('fetchProgress.summary.retryFailed')}
           </Button>
         ) : null}
-        <Button onClick={onDismiss} title={`${t('fetchProgress.summary.dismiss')} (Esc)`}>
+        <Button
+          ref={dismissRef}
+          onClick={onDismiss}
+          title={`${t('fetchProgress.summary.dismiss')} (Esc)`}
+          aria-label={t('fetchProgress.summary.dismiss')}
+        >
           {t('fetchProgress.summary.dismiss')}
         </Button>
       </div>

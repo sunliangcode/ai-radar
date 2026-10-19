@@ -27,7 +27,7 @@ export function MonitorQueueCard({ queue }: { queue: AiMonitorQueue }) {
             })}
           </p>
         </div>
-        <p className="font-mono text-lg tabular-nums text-ink" aria-live="polite">
+        <p className="font-mono text-lg tabular-nums text-ink" aria-live="polite" aria-atomic="true">
           {queue.itemsDone ?? 0}/{queue.itemsTotal ?? 0}
         </p>
       </div>

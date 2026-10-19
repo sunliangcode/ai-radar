@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Backend tests
+        working-directory: backend
+        run: ./mvnw -B -q test
+
+      - name: Frontend install + lint/test/build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run test
+          npm run build
+
+      - name: Shared / MCP / CLI gates
+        run: |
+          set -euo pipefail
+          cd shared
+          for f in *.mjs; do
+            case "$f" in *.test.mjs) continue ;; esac
+            node --check "$f"
+          done
+          node --test *.test.mjs
+          cd ../mcp && node --check server.mjs errors.mjs
+          cd ../cli && node --check ai-radar.mjs
+          cd ..
+          ./bin/ai-radar version | grep -q ai-radar-cli
+          help="$(./bin/ai-radar help)"
+          echo "$help" | grep -q health-llm
+          echo "$help" | grep -q modelPresent
+          echo "$help" | grep -q AI_RADAR_DB
+          echo "$help" | grep -q BACKUP_KEEP
+          echo "$help" | grep -q AI_RADAR_TIMEOUT_MS
+          ./bin/ai-radar pack list | grep -q '"ok": true'
+          doc="$(AI_RADAR_BASE_URL=http://127.0.0.1:1 ./bin/ai-radar doctor 2>&1 || true)"
+          echo "$doc" | grep -q cliVersion
+          echo "$doc" | grep -q '"ok": false'
+
+  release:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          make_latest: true
+          # Tags like v0.2.0-rc.1 stay prerelease; plain v0.2.0 is a stable release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            See [CHANGELOG.md](https://github.com/sunliangcode/ai-radar/blob/main/CHANGELOG.md) for curated notes.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

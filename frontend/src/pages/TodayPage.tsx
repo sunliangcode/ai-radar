@@ -77,6 +77,9 @@ export default function TodayPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['intelligence-home'] })
       pushToast('success', t('today.dismissed'))
+      queueMicrotask(() =>
+        document.getElementById('today-attention-count')?.focus({ preventScroll: true }),
+      )
     },
     onError: (err) => pushToast('error', errorText(err, t)),
   })
@@ -87,6 +90,9 @@ export default function TodayPage() {
       await qc.invalidateQueries({ queryKey: ['intelligence-home'] })
       await qc.invalidateQueries({ queryKey: ['watching'] })
       pushToast('success', t('today.followed'))
+      queueMicrotask(() =>
+        document.getElementById('today-attention-count')?.focus({ preventScroll: true }),
+      )
     },
     onError: (err) => pushToast('error', errorText(err, t)),
   })
@@ -132,10 +138,17 @@ export default function TodayPage() {
   return (
     <div aria-busy={isPending || impactJob.isPending || undefined}>
       <PageHeader
+        titleId="today-page-heading"
         title={t(greetingKey(hour))}
         subtitle={dateLabel}
         actions={
-          <Button onClick={runFetch} loading={isPending} disabled={isPending}>
+          <Button
+            id="today-fetch-btn"
+            onClick={runFetch}
+            loading={isPending}
+            disabled={isPending}
+            aria-label={phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
+          >
             {phase === 'running' ? t('common.fetching') : t('common.fetchNow')}
           </Button>
         }
@@ -144,7 +157,10 @@ export default function TodayPage() {
       <FetchProgressSection
         phase={phase}
         progress={progress}
-        onDismiss={() => void dismiss()}
+        onDismiss={() => {
+          void dismiss()
+          queueMicrotask(() => document.getElementById('today-fetch-btn')?.focus())
+        }}
         retrying={retryFailed.isPending}
         onRetryFailed={(types) => retryFailed.mutate(types)}
       />
@@ -185,6 +201,7 @@ export default function TodayPage() {
                 <>
                   <Link
                     to="/radar"
+                    aria-label={t('home.gettingStarted.browseRadar')}
                     className={cn(
                       'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink transition motion-reduce:transition-none hover:border-accent/40',
                       focusRingClass(),
@@ -196,12 +213,18 @@ export default function TodayPage() {
                     onClick={() => impactJob.mutate()}
                     loading={impactJob.isPending}
                     disabled={impactJob.isPending || isPending}
+                    aria-label={t('home.gettingStarted.recomputeImpact')}
                   >
                     {t('home.gettingStarted.recomputeImpact')}
                   </Button>
                 </>
               ) : (
-                <Button onClick={runFetch} loading={isPending} disabled={isPending}>
+                <Button
+                  onClick={runFetch}
+                  loading={isPending}
+                  disabled={isPending}
+                  aria-label={hasSources ? t('common.fetchNow') : t('home.gettingStarted.step2')}
+                >
                   {hasSources ? t('common.fetchNow') : t('home.gettingStarted.step2')}
                 </Button>
               )}
@@ -210,6 +233,7 @@ export default function TodayPage() {
           secondary={
             <Link
               to="/settings/context"
+              aria-label={t('home.gettingStarted.stepContext')}
               className={cn(
                 'inline-flex min-h-10 items-center rounded-md border border-border px-3 py-2 text-sm text-accent hover:border-accent/50',
                 focusRingClass(),
@@ -225,13 +249,16 @@ export default function TodayPage() {
         <div
           className="mb-6 rounded-lg border border-accent/30 bg-accent-soft px-4 py-3 text-sm"
           role="status"
-          aria-label={t('today.proactiveTitle')}
+          aria-labelledby="today-proactive-heading"
         >
-          <p className="font-medium text-accent">{t('today.proactiveTitle')}</p>
+          <p id="today-proactive-heading" className="font-medium text-accent">
+            {t('today.proactiveTitle')}
+          </p>
           <p className="mt-1 text-ink">{alerts[0]?.title ?? alerts[0]?.label}</p>
           {alerts[0]?.changeId ? (
             <Link
               to={`/changes/${alerts[0].changeId}`}
+              aria-label={t('today.reviewChange')}
               className={`mt-2 inline-flex min-h-9 items-center text-xs ${textLinkClass()}`}
             >
               {t('today.reviewChange')}
@@ -244,9 +271,11 @@ export default function TodayPage() {
         <div
           className="mb-6 rounded-lg border border-moss/30 bg-moss/5 px-4 py-3"
           role="status"
-          aria-label={t('today.revisitTitle')}
+          aria-labelledby="today-revisit-heading"
         >
-          <p className="text-sm font-medium text-moss">{t('today.revisitTitle')}</p>
+          <p id="today-revisit-heading" className="text-sm font-medium text-moss">
+            {t('today.revisitTitle')}
+          </p>
           <p className="mt-1 text-sm text-ink">
             {t('today.revisitBody', {
               title: revisit[0].changeTitle ?? '',
@@ -255,6 +284,7 @@ export default function TodayPage() {
           </p>
           <Link
             to="/decisions"
+            aria-label={t('today.openDecisions')}
             className={`mt-2 inline-flex min-h-9 items-center text-xs ${textLinkClass('moss')}`}
           >
             {t('today.openDecisions')}
@@ -264,7 +294,12 @@ export default function TodayPage() {
 
       {ready ? (
         <>
-          <p className="mb-4 text-base font-medium text-ink">
+          <p
+            id="today-attention-count"
+            tabIndex={-1}
+            className="mb-4 text-base font-medium text-ink outline-none"
+            aria-live="polite"
+          >
             {t('today.attentionCount', { count: majorCount })}
           </p>
 

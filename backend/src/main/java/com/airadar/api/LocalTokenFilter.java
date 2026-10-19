@@ -33,8 +33,12 @@ public class LocalTokenFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
+        // Trim so accidental .env / clipboard whitespace does not disable or break the guard.
         String token = properties.getLocalToken();
-        if (token == null || token.isBlank()) {
+        if (token != null) {
+            token = token.trim();
+        }
+        if (token == null || token.isEmpty()) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -43,7 +47,9 @@ public class LocalTokenFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        if ("GET".equalsIgnoreCase(request.getMethod()) && path.equals("/api/health")) {
+        // Liveness + optional LLM probe stay open so compose/UI "Test connection" work without a token.
+        if ("GET".equalsIgnoreCase(request.getMethod())
+                && (path.equals("/api/health") || path.equals("/api/health/llm"))) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -54,6 +60,9 @@ public class LocalTokenFilter extends OncePerRequestFilter {
             return;
         }
         String provided = request.getHeader("X-Local-Token");
+        if (provided != null) {
+            provided = provided.trim();
+        }
         if (token.equals(provided)) {
             filterChain.doFilter(request, response);
             return;

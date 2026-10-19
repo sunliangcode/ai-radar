@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -11,13 +12,18 @@ export function PageHeader({
   subtitle,
   actions,
   back,
+  titleId,
 }: {
   title: string
   subtitle?: string
   actions?: ReactNode
   /** Consistent back control above the title (link or button). */
   back?: { label: string; to?: string; onClick?: () => void }
+  /** Stable id for the page heading (forms can aria-labelledby it). */
+  titleId?: string
 }) {
+  const autoId = useId()
+  const headingId = titleId ?? autoId
   const backControl = back ? (
     back.to ? (
       <Link to={back.to} className={backLinkClass} aria-label={back.label}>
@@ -33,11 +39,17 @@ export function PageHeader({
   ) : null
 
   return (
-    <header className="mb-6">
+    <header className="mb-6" aria-labelledby={headingId}>
       {backControl ? <div className="mb-2">{backControl}</div> : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-balance text-ink">{title}</h1>
+          <h1
+            id={headingId}
+            tabIndex={-1}
+            className="text-xl font-semibold tracking-tight text-balance text-ink outline-none"
+          >
+            {title}
+          </h1>
           {subtitle ? (
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{subtitle}</p>
           ) : null}

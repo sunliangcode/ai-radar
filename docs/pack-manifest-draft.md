@@ -1,5 +1,7 @@
 # PackManifest draft (marketplace pre-bury)
 
+**Not implemented.** Current packs are plain JSON **arrays** of sources under `packs/sources/*.json` (see [sources.md](sources.md)). This note only sketches a future wrapper object for marketplace metadata.
+
 This step does **not** implement an online marketplace, signatures, or paid packs.
 
 Future shape:

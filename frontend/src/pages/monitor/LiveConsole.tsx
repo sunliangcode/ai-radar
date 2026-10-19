@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MonitorBubble } from './MonitorBubble'
 import type { IoEntry } from './monitorUtils'
+import { isAriaModalOpen, isEditableTarget } from '../../lib/a11y'
 import { cn, focusRingClass } from '../../lib/cn'
 
 /**
@@ -37,6 +38,20 @@ export function LiveConsole({
     consoleRef.current.scrollTop = consoleRef.current.scrollHeight
   }, [ioEntries.length, inFlightCount, streamLen, stickBottom])
 
+  // `p` toggles pause/resume while the monitor page is open (parity with media players)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'p' && e.key !== 'P') return
+      if (isEditableTarget(e.target)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (isAriaModalOpen()) return
+      e.preventDefault()
+      onTogglePause()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onTogglePause])
+
   function onConsoleScroll() {
     const el = consoleRef.current
     if (!el) return
@@ -45,22 +60,24 @@ export function LiveConsole({
   }
 
   return (
-    <section className="mb-4 overflow-hidden rounded-xl border border-border bg-gradient-to-b from-surface to-border/30">
+    <section className="mb-4 overflow-hidden rounded-xl border border-border bg-gradient-to-b from-surface to-border/30" aria-labelledby="monitor-live-heading">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
         <div>
-          <p className="text-xs font-medium tracking-wide text-ink">
+          <p id="monitor-live-heading" className="text-xs font-medium tracking-wide text-ink">
             {t('settings.monitorLiveIo')}
           </p>
           <p className="text-[11px] text-muted">{t('settings.monitorLiveIoHint')}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" role="group" aria-label={t('settings.monitorLiveIo')}>
           {inFlightCount > 0 ? (
-            <span className="font-mono text-[11px] text-accent">
+            <span className="font-mono text-[11px] text-accent" aria-live="polite" aria-atomic="true">
               {t('settings.monitorInFlight')} {inFlightCount}
             </span>
           ) : null}
           {paused ? (
-            <span className="font-mono text-[11px] text-accent">{t('settings.monitorPaused')}</span>
+            <span className="font-mono text-[11px] text-accent" role="status" aria-live="polite">
+              {t('settings.monitorPaused')}
+            </span>
           ) : null}
           <button
             type="button"
@@ -69,6 +86,7 @@ export function LiveConsole({
               focusRingClass(),
             )}
             aria-pressed={paused}
+            aria-label={paused ? t('settings.monitorResume') : t('settings.monitorPause')}
             onClick={onTogglePause}
           >
             {paused ? t('settings.monitorResume') : t('settings.monitorPause')}
@@ -80,6 +98,7 @@ export function LiveConsole({
                 'inline-flex min-h-9 items-center rounded border border-border px-2.5 py-1 text-[11px] text-ink hover:border-accent/50 hover:text-accent',
                 focusRingClass(),
               )}
+              aria-label={t('settings.monitorScrollBottom')}
               onClick={() => {
                 setStickBottom(true)
                 if (consoleRef.current) {
@@ -102,6 +121,7 @@ export function LiveConsole({
             type="button"
             onClick={() => onOpFilterChange('')}
             aria-pressed={!opFilter}
+            aria-label={t('settings.monitorAllOps')}
             className={cn(
               'min-h-9 rounded px-2.5 py-1 text-[11px]',
               focusRingClass(),
@@ -118,6 +138,7 @@ export function LiveConsole({
               type="button"
               onClick={() => onOpFilterChange(op)}
               aria-pressed={opFilter === op}
+              aria-label={op}
               className={cn(
                 'min-h-9 rounded px-2.5 py-1 font-mono text-[11px]',
                 focusRingClass(),

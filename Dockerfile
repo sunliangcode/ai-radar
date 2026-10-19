@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
+# Frontend Node major must match root .nvmrc / package engines (>=20.12).
 
-FROM node:22-alpine AS frontend
+FROM node:20-alpine AS frontend
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
@@ -21,9 +22,12 @@ RUN ./mvnw -q -DskipTests package
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 RUN apk add --no-cache wget && mkdir -p /app/data/briefs
-COPY --from=backend /app/backend/target/backend-0.1.0-SNAPSHOT.jar /app/app.jar
+# Wildcard survives pom version bumps (SNAPSHOT or release).
+COPY --from=backend /app/backend/target/backend-*.jar /app/app.jar
 ENV SPRING_DATASOURCE_URL=jdbc:sqlite:file:/app/data/radar.db?journal_mode=WAL&busy_timeout=30000&foreign_keys=on
 ENV RADAR_BRIEFS_DIR=/app/data/briefs
 EXPOSE 8080
 VOLUME ["/app/data"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:8080/api/health >/dev/null || exit 1
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
