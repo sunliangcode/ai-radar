@@ -40,6 +40,9 @@ test('Dependabot covers docker for root and translate-service', () => {
   assert.match(yml, /package-ecosystem:\s*docker/)
   assert.match(yml, /directory:\s*"\/"/)
   assert.match(yml, /directory:\s*"\/translate-service"/)
+  // Major Node image bumps break shared/docker-sync.test.mjs (.nvmrc stays on 20).
+  assert.match(yml, /dependency-name:\s*"node"/)
+  assert.match(yml, /version-update:semver-major/)
 })
 
 test('Dependabot covers pip for translate-service', () => {

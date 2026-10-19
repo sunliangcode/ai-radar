@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - **Node floor**: require **20.19+** (`.nvmrc`, `engines.node`, install/doctor) so oxlint’s optional native bindings install under CI `npm ci` (oxlint 1.82+ needs `^20.19.0 || >=22.12.0`)
+- **Dependabot**: ignore Docker **major** bumps for `node` / `eclipse-temurin` / `maven` (root) and `python` (translate-service) so PRs cannot drift past `.nvmrc` / Temurin 21 pins
 
 ### Added
 

@@ -25,11 +25,24 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    # Frontend stage Node major must match .nvmrc / engines (shared/docker-sync.test.mjs).
+    # Runtime JRE and Maven builder stay on Temurin 21 (see AGENTS.md).
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "maven"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: "/translate-service"
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    # Sidecar targets Python 3.10+; pin major to avoid surprise 3.x jumps.
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: pip
     directory: "/translate-service"
     schedule:
