@@ -103,6 +103,10 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | Method | Path | Notes |
 | --- | --- | --- |
 | CRUD | `/api/sources` | Source configuration |
+| GET | `/api/sources/setup/batch?ids=1,2,3` | Batch CLI setup status — `{ items: { "<id>": { …same fields as single setup… } } }`; unknown ids omitted |
+| GET | `/api/sources/{id}/setup` | CLI setup status (`supported`, `state`, `cliPath`, `installAvailable`, `reason`, `openSourceUrl`, `binaryName`, `hintCode`, `busy`, optional `installPhase` / `installMessage` while install runs) — ZHIHU/WEIBO/BILIBILI; others `unsupported` |
+| POST | `/api/sources/{id}/setup/install` | Install allowlisted OSS CLI (`uv`/`pipx`/clone), write `cliPath` (always available for supported types; no AI required). Overlap → `409`/`setup_busy`. Failures return typed `SetupException` codes (`setup_toolchain_missing`, `setup_git_missing`, …) |
+| POST | `/api/sources/{id}/setup/probe` | Body `{ cookie?, enableOnSuccess? }` — write Cookie, smoke probe, optionally enable source |
 | GET | `/api/connectors` | Connector catalog sorted by id case-insensitively (Swagger tag **Connectors**; expect `FIXTURE`/`path`, `RSS`/`feedUrl`, `DAILY_HOT`/`route`, `WEB`/`url`, `TELEGRAM`/`channels`, `HACKER_NEWS`/`query`, `GOOGLE_NEWS`/`query`, `GDELT`/`query`, `REDDIT`/`subreddits`, `V2EX`/`nodes`, `GITHUB`/`query`, `TWITTER`/`users`, `OSS_INSIGHT`/`keywords`, `GITHUB_TRENDING`/`since`, `PRODUCT_HUNT`/`maxItems`, `EMAIL`/`maxMessages`, `ZHIHU`/`cliPath`, `WEIBO`/`cliPath`, `BILIBILI`/`cliPath`; field types: `text`/`path`/`secret`/`textarea`) |
 | GET | `/api/delivery/channels` | Delivery channel catalog sorted by id case-insensitively (`id` == `channel()`, `displayName`, `settingsKeys`, `enabled`; expect `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`; Swagger tag **Delivery**) |
 | POST | `/api/packs/import` | Body `{"packId":"ai-core\|ai-cn\|ai-signals"}`; optional `"path"` = absolute JSON array file (no jar rebuild). Prefer CLI: `ai-radar pack validate` / `pack import … --path` |
@@ -150,6 +154,7 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | GET | `/api/health` (includes `version` + `translate.status`: up/down/disabled) |
 | POST | `/api/jobs/fetch`, `/api/jobs/push` |
 | CRUD | `/api/sources` |
+| GET/POST | `/api/sources/setup/batch`, `/api/sources/{id}/setup`, `…/setup/install`, `…/setup/probe` (CLI Install wizard) |
 | GET/PATCH | `/api/items` (`saved` / `unread` / `sourceType`; `cursor` / `hasMore` / `nextCursor`; PATCH `read` / `saved` / `dismissed`) |
 | GET | `/api/items/unread-counts`, `/api/items/badge` |
 | GET | `/api/items/interest-keywords` (keywords from Interested titles) |
@@ -201,6 +206,7 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | GET | `/api/delivery/channels`（投递渠道目录，按 id 忽略大小写排序；`id` == `channel()`；需有 `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`；CLI `delivery-channels` / MCP `list_delivery_channels`） |
 | POST | `/api/jobs/fetch`, `/api/jobs/push` |
 | CRUD | `/api/sources` |
+| GET/POST | `/api/sources/setup/batch`、`/api/sources/{id}/setup`、`…/setup/install`、`…/setup/probe`（CLI 一键安装向导） |
 | GET/PATCH | `/api/items`（`saved` / `unread` / `sourceType`；`cursor` / `hasMore` / `nextCursor`；`PATCH` 可设 `read` / `saved` / `dismissed`） |
 | GET | `/api/items/unread-counts`、`/api/items/badge` |
 | GET | `/api/items/interest-keywords`（从感兴趣标题提取的关键词） |

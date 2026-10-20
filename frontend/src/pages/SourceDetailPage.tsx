@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ApiError, api, type Source } from '../lib/api'
+import { ApiError, api, CLI_SETUP_SOURCE_TYPES, type Source } from '../lib/api'
 import {
   Button,
   ConfirmDialog,
@@ -20,7 +20,14 @@ import { useConnectors } from '../hooks/useConnectors'
 import { useDisplaySources } from '../hooks/useDisplaySources'
 import { findConnectorById } from '../lib/connectors'
 import { useEscapeBack } from '../hooks/useEscapeBack'
+import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { SourceConfigFieldInput } from './sources/SourceConfigFieldInput'
+import { SourceSetupWizard } from './sources/SourceSetupWizard'
+import {
+  localizedSetupHint,
+  setupChipClass,
+  setupStateLabelKey,
+} from './sources/sourceSetupUi'
 import { buildSourceConfig } from './sources/buildSourceConfig'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
@@ -46,6 +53,7 @@ export default function SourceDetailPage() {
   const connectors = useConnectors()
   const { displaySourceIds, setDisplayedIds, setAllDisplayed } = useDisplaySources()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [setupOpen, setSetupOpen] = useState(false)
   const q = useQuery({
     queryKey: ['source', sourceId],
     queryFn: () => api.source(sourceId),
@@ -54,6 +62,19 @@ export default function SourceDetailPage() {
       if (err instanceof ApiError && err.status === 404) return false
       return count < 2
     },
+  })
+  const { fetchJob } = useFetchJobWithProgress([
+    ['source', String(sourceId)],
+    ['sources'],
+  ])
+  const setup = useQuery({
+    queryKey: ['source-setup', sourceId],
+    queryFn: () => api.sourceSetup(sourceId),
+    enabled:
+      Number.isFinite(sourceId) &&
+      !!q.data &&
+      CLI_SETUP_SOURCE_TYPES.has(q.data.type.toUpperCase()),
+    staleTime: 30_000,
   })
   useDocumentTitle({ title: q.data?.name ?? null })
 
@@ -221,7 +242,14 @@ export default function SourceDetailPage() {
 
   const s = q.data
   const fields = descriptor?.configFields ?? []
-  const isOssCli = s.type === 'ZHIHU' || s.type === 'WEIBO' || s.type === 'BILIBILI'
+  const isOssCli = CLI_SETUP_SOURCE_TYPES.has(s.type.toUpperCase())
+  const setupStatus = setup.data
+  const showInstall = Boolean(setupStatus?.installAvailable)
+  const showConfigure =
+    isOssCli &&
+    setupStatus?.supported &&
+    setupStatus.state !== 'ready' &&
+    !showInstall
 
   function saveConfig() {
     const config = buildSourceConfig(descriptor, fieldValues)
@@ -230,6 +258,18 @@ export default function SourceDetailPage() {
 
   return (
     <div aria-busy={patch.isPending || undefined}>
+      {setupOpen && setupStatus ? (
+        <SourceSetupWizard
+          source={s}
+          initial={setupStatus}
+          onClose={() => {
+            setSetupOpen(false)
+            void setup.refetch()
+            void q.refetch()
+          }}
+          onTestFetch={(sourceType) => fetchJob.mutate({ sourceType })}
+        />
+      ) : null}
       <PageHeader
         titleId="source-detail-heading"
         title={s.name}
@@ -237,6 +277,28 @@ export default function SourceDetailPage() {
         back={{ label: t('common.backToList'), to: '/settings/sources' }}
         actions={
           <>
+            {showInstall ? (
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={patch.isPending || remove.isPending}
+                onClick={() => setSetupOpen(true)}
+                aria-label={`${s.name}: ${t('sources.setup.install')}`}
+              >
+                {t('sources.setup.install')}
+              </Button>
+            ) : null}
+            {showConfigure ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={patch.isPending || remove.isPending}
+                onClick={() => setSetupOpen(true)}
+                aria-label={`${s.name}: ${t('sources.setup.configure')}`}
+              >
+                {t('sources.setup.configure')}
+              </Button>
+            ) : null}
             <Button
               size="sm"
               variant={s.enabled ? 'ghost' : 'primary'}
@@ -285,6 +347,28 @@ export default function SourceDetailPage() {
         </h2>
         {isOssCli ? (
           <p className="mb-3 text-xs text-muted">{t('sources.ossCliHint')}</p>
+        ) : null}
+        {isOssCli && setupStatus?.state && setupStatus.state !== 'unsupported' ? (
+          (() => {
+            const setupHint = localizedSetupHint(setupStatus, t)
+            const labelKey = setupStateLabelKey(setupStatus.state)
+            return (
+              <p className="mb-3 flex flex-wrap items-center gap-2 text-xs" role="status">
+                <span
+                  className={cn(
+                    'rounded-sm px-1.5 py-0.5 font-medium',
+                    setupChipClass(setupStatus.state),
+                  )}
+                >
+                  {labelKey ? t(labelKey) : setupStatus.state}
+                </span>
+                {setupStatus.cliPath ? (
+                  <span className="font-mono text-muted break-all">{setupStatus.cliPath}</span>
+                ) : null}
+                {setupHint ? <span className="text-muted">{setupHint}</span> : null}
+              </p>
+            )
+          })()
         ) : null}
         {fields.length === 0 ? (
           <p className="text-sm text-muted">—</p>

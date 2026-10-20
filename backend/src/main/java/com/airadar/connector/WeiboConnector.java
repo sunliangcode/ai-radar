@@ -25,7 +25,7 @@ import java.util.Map;
  * Paste Cookie into source config — no need to edit the CLI project.
  */
 @Component
-public class WeiboConnector implements SourceConnector {
+public class WeiboConnector implements SourceConnector, CliSetupSupport {
 
     private static final Logger log = LoggerFactory.getLogger(WeiboConnector.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(90);
@@ -34,6 +34,7 @@ public class WeiboConnector implements SourceConnector {
     public static final String DEFAULT_SOURCE_NAME = "微博热搜";
     public static final int DEFAULT_LIMIT = 20;
     public static final String OPEN_SOURCE_URL = "https://github.com/jackwener/weibo-cli";
+    public static final String PYPI_PACKAGE = "kabi-weibo-cli";
 
     private final ObjectMapper objectMapper;
 
@@ -60,6 +61,58 @@ public class WeiboConnector implements SourceConnector {
                         false),
                 ConnectorDescriptor.ConfigField.text("limit", "每次条数（默认 20）", false)
         ));
+    }
+
+    @Override
+    public CliSetupRecipe setupRecipe() {
+        return new CliSetupRecipe(
+                OPEN_SOURCE_URL,
+                PYPI_PACKAGE,
+                DEFAULT_CLI,
+                DEFAULT_CLI,
+                List.of(
+                        List.of("uv", "sync"),
+                        List.of("uv", "pip", "install", "-e", ".")
+                )
+        );
+    }
+
+    @Override
+    public void writeCookie(String cookieHeader) {
+        if (cookieHeader != null && !cookieHeader.isBlank()) {
+            CliCredentialWriter.writeWeiboCookie(cookieHeader.trim());
+        }
+    }
+
+    @Override
+    public String resolveCliPath(Map<String, Object> sourceConfig) {
+        String fromEnv = System.getenv("WEIBO_CLI_PATH");
+        if (fromEnv != null && !fromEnv.isBlank()) {
+            return fromEnv.trim();
+        }
+        if (sourceConfig != null) {
+            Object v = sourceConfig.get("cliPath");
+            if (v != null && !String.valueOf(v).isBlank()) {
+                return String.valueOf(v).trim();
+            }
+        }
+        return DEFAULT_CLI;
+    }
+
+    @Override
+    public ProbeResult probe(String cliPath) {
+        try {
+            OpenSourceCliRunner.run(
+                    cliPath,
+                    List.of("hot", "--json", "--count", "1"),
+                    Map.of(),
+                    TIMEOUT,
+                    "Weibo"
+            );
+            return ProbeResult.ok();
+        } catch (Exception e) {
+            return ProbeResult.fromCliFailure(e.getMessage());
+        }
     }
 
     @Override

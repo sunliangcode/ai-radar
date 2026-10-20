@@ -133,7 +133,7 @@ class SourceSeederTest {
         when(sourceRepository.findFirstByType(SourceType.ZHIHU)).thenReturn(Optional.of(existing));
 
         Predicate<String> onlyCustom = p -> "/opt/custom/zhihu".equals(p);
-        seeder.ensureZhihu("/Users/sunliang/workspace/own/zhihu-cli-go/zhihu", onlyCustom);
+        seeder.ensureZhihu("zhihu", onlyCustom);
 
         verify(sourceRepository, never()).save(any());
         assertEquals("/opt/custom/zhihu", readCliPath(existing));

@@ -18,11 +18,11 @@ import java.util.Map;
 
 /**
  * B站热门 via open-source {@code bili} CLI
- * (<a href="https://github.com/public-clis/bilibili-cli">public-clis/bilibili-cli</a>).
+ * (<a href="https://github.com/jackwener/bilibili-cli">jackwener/bilibili-cli</a>).
  * Paste Cookie into source config when login is required — no edits inside the CLI repo.
  */
 @Component
-public class BilibiliConnector implements SourceConnector {
+public class BilibiliConnector implements SourceConnector, CliSetupSupport {
 
     private static final Logger log = LoggerFactory.getLogger(BilibiliConnector.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(90);
@@ -30,7 +30,9 @@ public class BilibiliConnector implements SourceConnector {
     public static final String DEFAULT_CLI = "bili";
     public static final String DEFAULT_SOURCE_NAME = "B站热门";
     public static final int DEFAULT_LIMIT = 20;
-    public static final String OPEN_SOURCE_URL = "https://github.com/public-clis/bilibili-cli";
+    /** Canonical upstream (jackwener); public-clis may mirror. */
+    public static final String OPEN_SOURCE_URL = "https://github.com/jackwener/bilibili-cli";
+    public static final String PYPI_PACKAGE = "bilibili-cli";
 
     private final ObjectMapper objectMapper;
 
@@ -57,6 +59,58 @@ public class BilibiliConnector implements SourceConnector {
                         false),
                 ConnectorDescriptor.ConfigField.text("limit", "每次条数（默认 20）", false)
         ));
+    }
+
+    @Override
+    public CliSetupRecipe setupRecipe() {
+        return new CliSetupRecipe(
+                OPEN_SOURCE_URL,
+                PYPI_PACKAGE,
+                DEFAULT_CLI,
+                DEFAULT_CLI,
+                List.of(
+                        List.of("uv", "sync"),
+                        List.of("uv", "pip", "install", "-e", ".")
+                )
+        );
+    }
+
+    @Override
+    public void writeCookie(String cookieHeader) {
+        if (cookieHeader != null && !cookieHeader.isBlank()) {
+            CliCredentialWriter.writeBilibiliCookie(cookieHeader.trim());
+        }
+    }
+
+    @Override
+    public String resolveCliPath(Map<String, Object> sourceConfig) {
+        String fromEnv = System.getenv("BILI_CLI_PATH");
+        if (fromEnv != null && !fromEnv.isBlank()) {
+            return fromEnv.trim();
+        }
+        if (sourceConfig != null) {
+            Object v = sourceConfig.get("cliPath");
+            if (v != null && !String.valueOf(v).isBlank()) {
+                return String.valueOf(v).trim();
+            }
+        }
+        return DEFAULT_CLI;
+    }
+
+    @Override
+    public ProbeResult probe(String cliPath) {
+        try {
+            OpenSourceCliRunner.run(
+                    cliPath,
+                    List.of("hot", "--max", "1", "--json"),
+                    Map.of(),
+                    TIMEOUT,
+                    "Bilibili"
+            );
+            return ProbeResult.ok();
+        } catch (Exception e) {
+            return ProbeResult.fromCliFailure(e.getMessage());
+        }
     }
 
     @Override

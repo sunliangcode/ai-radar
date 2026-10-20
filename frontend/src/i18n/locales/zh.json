@@ -876,7 +876,77 @@
     "disabledToast": "已停用情报源",
     "updated": "情报源已更新",
     "created": "已添加情报源",
-    "openSource": "打开情报源"
+    "openSource": "打开情报源",
+    "setup": {
+      "title": "配置 {{name}}",
+      "install": "安装",
+      "configure": "配置 Cookie",
+      "test": "测试连通",
+      "done": "完成",
+      "installHint": "将自动安装开源 CLI 并写入路径。需要本机有 git，以及 uv / pipx / Python 3 之一。",
+      "toolchainDocs": "安装前置依赖（git、uv / pipx）",
+      "joinedInstall": "已有安装在进行 — 显示实时进度",
+      "cookieHint": "如需登录请粘贴浏览器 Cookie，然后测试连通。",
+      "successHint": "已连通 — 情报源已启用。",
+      "successToast": "{{name}} 已连通",
+      "cookieLabel": "Cookie",
+      "cookiePlaceholder": "在此粘贴 Cookie…",
+      "cookieOptional": "部分热榜可不填 — 不确定可先留空再测试。",
+      "cliPath": "CLI 路径",
+      "openProject": "在 GitHub 打开开源项目",
+      "stepsLabel": "配置步骤",
+      "installing": "正在安装 CLI，可能需要一分钟…",
+      "installPhaseLabel": "安装进度",
+      "installPhase": {
+        "package": "从 PyPI 安装（uv / pipx / pip）",
+        "clone": "从 GitHub 克隆（备选）",
+        "build": "在克隆目录中构建",
+        "resolve": "定位 CLI 可执行文件",
+        "probe": "连通性冒烟测试"
+      },
+      "copyDiagnostics": "复制诊断信息",
+      "copiedDiagnostics": "已复制诊断信息",
+      "batchLoadFailed": "无法加载 CLI 就绪状态 — {{message}}",
+      "installingShort": "安装中…",
+      "probing": "正在测试连通…",
+      "probingShort": "测试中…",
+      "installMethod": "安装方式：{{method}}",
+      "installDetail": "安装日志",
+      "cookieHelpTitle": "如何复制 Cookie",
+      "cookieHelpGeneric": "在浏览器打开对应网站并登录，打开开发者工具 → 网络，刷新页面，选中对该域名的请求，复制请求头里的 Cookie 整段内容。",
+      "cookieHelp": {
+        "zhihu": "登录 zhihu.com，开发者工具 → 网络 → 任意 zhihu.com 请求 → 请求头 → Cookie。",
+        "weibo": "登录 weibo.com，开发者工具 → 网络 → weibo.com 请求 → 复制 Cookie。",
+        "bilibili": "登录 bilibili.com，开发者工具 → 网络 → bilibili.com 请求 → 复制 Cookie。"
+      },
+      "checking": "检测中…",
+      "probeFailed": "仍未连通 — 请检查 Cookie 或 CLI",
+      "step": {
+        "install": "安装",
+        "cookie": "Cookie",
+        "done": "完成"
+      },
+      "hints": {
+        "setup_ready": "CLI 已就绪。",
+        "setup_cli_missing": "本机未找到 CLI。",
+        "setup_need_cookie": "请粘贴有效 Cookie 后再测试。",
+        "setup_unreachable": "CLI 已运行但请求失败 — 可重试或更新 Cookie。"
+      },
+      "errors": {
+        "setup_toolchain_missing": "请先安装 uv（推荐）、pipx 或 Python 3，然后重试。",
+        "setup_git_missing": "请先安装 git，然后重试安装。",
+        "setup_install_failed": "安装失败 — 请查看上方说明后重试。",
+        "setup_busy": "已有安装在进行 — 请稍后再试。",
+        "setup_unsupported": "该类型不支持一键安装。",
+        "setup_cookie_write_failed": "无法保存 Cookie — 请检查磁盘权限。",
+        "setup_failed": "配置失败 — 请重试或查看日志。",
+        "conflict": "已有安装在进行 — 请稍后再试。"
+      },
+      "stateReady": "已连通",
+      "stateCliMissing": "未安装 CLI",
+      "stateNeedCookie": "需要 Cookie",
+      "stateUnreachable": "不通"
+    }
   },
   "items": {
     "title": "Raw feed",

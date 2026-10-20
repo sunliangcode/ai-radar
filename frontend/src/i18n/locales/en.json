@@ -876,7 +876,77 @@
     "disabledToast": "Source disabled",
     "updated": "Source updated",
     "created": "Source added",
-    "openSource": "Open source"
+    "openSource": "Open source",
+    "setup": {
+      "title": "Set up {{name}}",
+      "install": "Install",
+      "configure": "Configure Cookie",
+      "test": "Test connection",
+      "done": "Done",
+      "installHint": "We install the open-source CLI and set the path for you. Needs git and uv, pipx, or Python 3.",
+      "toolchainDocs": "Install prerequisites (git, uv / pipx)",
+      "joinedInstall": "Another install is running — showing live progress",
+      "cookieHint": "Paste a browser Cookie if login is required, then we test the connection.",
+      "successHint": "Connected — this source is ready and enabled.",
+      "successToast": "{{name}} is connected",
+      "cookieLabel": "Cookie",
+      "cookiePlaceholder": "Paste Cookie header here…",
+      "cookieOptional": "Optional for some hot lists — leave empty and test if unsure.",
+      "cliPath": "CLI path",
+      "openProject": "Open source project on GitHub",
+      "stepsLabel": "Setup steps",
+      "installing": "Installing CLI — this can take a minute…",
+      "installPhaseLabel": "Install progress",
+      "installPhase": {
+        "package": "Install from PyPI (uv / pipx / pip)",
+        "clone": "Clone from GitHub (fallback)",
+        "build": "Build in clone directory",
+        "resolve": "Locate CLI binary",
+        "probe": "Smoke test"
+      },
+      "copyDiagnostics": "Copy diagnostics",
+      "copiedDiagnostics": "Diagnostics copied",
+      "batchLoadFailed": "Could not load CLI readiness — {{message}}",
+      "installingShort": "Installing…",
+      "probing": "Testing connection…",
+      "probingShort": "Testing…",
+      "installMethod": "Installed via {{method}}",
+      "installDetail": "Install log",
+      "cookieHelpTitle": "How to copy Cookie",
+      "cookieHelpGeneric": "Open the site in your browser, sign in, open DevTools → Network, reload, pick a request to the site, and copy the full Cookie header value.",
+      "cookieHelp": {
+        "zhihu": "Sign in at zhihu.com, DevTools → Network → any zhihu.com request → Request headers → Cookie.",
+        "weibo": "Sign in at weibo.com, DevTools → Network → weibo.com request → copy Cookie.",
+        "bilibili": "Sign in at bilibili.com, DevTools → Network → bilibili.com request → copy Cookie."
+      },
+      "checking": "Checking…",
+      "probeFailed": "Still not connected — check Cookie or CLI",
+      "step": {
+        "install": "Install",
+        "cookie": "Cookie",
+        "done": "Done"
+      },
+      "hints": {
+        "setup_ready": "CLI is ready.",
+        "setup_cli_missing": "CLI binary not found on this machine.",
+        "setup_need_cookie": "Paste a valid Cookie, then test again.",
+        "setup_unreachable": "CLI ran but the request failed — retry or update Cookie."
+      },
+      "errors": {
+        "setup_toolchain_missing": "Install uv (recommended), pipx, or Python 3, then retry.",
+        "setup_git_missing": "Install git, then retry Install.",
+        "setup_install_failed": "Install failed — see the message above and retry.",
+        "setup_busy": "Another install is already running — wait and retry.",
+        "setup_unsupported": "This source type does not support one-click Install.",
+        "setup_cookie_write_failed": "Could not save Cookie — check disk permissions.",
+        "setup_failed": "Setup failed — retry or check logs.",
+        "conflict": "Another install is already running — wait and retry."
+      },
+      "stateReady": "Connected",
+      "stateCliMissing": "CLI missing",
+      "stateNeedCookie": "Needs Cookie",
+      "stateUnreachable": "Unreachable"
+    }
   },
   "items": {
     "title": "Raw feed",

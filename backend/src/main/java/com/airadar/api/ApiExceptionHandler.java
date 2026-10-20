@@ -1,5 +1,6 @@
 package com.airadar.api;
 
+import com.airadar.connector.SetupException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,6 +13,11 @@ import java.util.NoSuchElementException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(SetupException.class)
+    public ResponseEntity<Map<String, Object>> handleSetup(SetupException ex) {
+        return body(ex.httpStatus(), ex.code(), ex.getMessage());
+    }
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> handleStatus(ResponseStatusException ex) {

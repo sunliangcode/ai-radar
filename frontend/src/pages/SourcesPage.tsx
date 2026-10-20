@@ -1,8 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api, type Source } from '../lib/api'
+import { api, CLI_SETUP_SOURCE_TYPES, type Source, type SourceSetupStatus } from '../lib/api'
 import { Button, EmptyState, ListSkeleton, PageHeader, QueryErrorState, useToast } from '../components/ui'
 import { PackPicker } from '../components/PackPicker'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
@@ -189,6 +189,40 @@ export default function SourcesPage() {
 
   const isEmpty = !sources.isLoading && sources.data?.length === 0
 
+  const cliSources = useMemo(
+    () => (sources.data ?? []).filter((s) => CLI_SETUP_SOURCE_TYPES.has(s.type.toUpperCase())),
+    [sources.data],
+  )
+  const cliSourceIds = useMemo(() => cliSources.map((s) => s.id), [cliSources])
+  const setupBatch = useQuery({
+    queryKey: ['source-setup-batch', cliSourceIds.join(',')],
+    queryFn: () => api.sourceSetupBatch(cliSourceIds),
+    enabled: cliSourceIds.length > 0,
+    staleTime: 30_000,
+    refetchInterval: (query) => {
+      const items = query.state.data?.items
+      if (!items) return false
+      return Object.values(items).some((s) => s.busy) ? 2000 : false
+    },
+  })
+  const setupById = useMemo(() => {
+    const map: Record<number, SourceSetupStatus | undefined> = {}
+    const items = setupBatch.data?.items
+    if (items) {
+      for (const s of cliSources) {
+        map[s.id] = items[String(s.id)]
+      }
+    }
+    return map
+  }, [cliSources, setupBatch.data])
+  const setupLoadingIds = useMemo(() => {
+    const ids = new Set<number>()
+    if (setupBatch.isLoading) {
+      cliSources.forEach((s) => ids.add(s.id))
+    }
+    return ids
+  }, [cliSources, setupBatch.isLoading])
+
   return (
     <div aria-busy={isPending || create.isPending || sources.isFetching || undefined}>
       <PageHeader
@@ -294,6 +328,21 @@ export default function SourcesPage() {
       {!isEmpty && sources.data ? (
         <>
           <p className="mb-4 text-sm text-muted">{t('sources.listLead')}</p>
+          {setupBatch.isError ? (
+            <div
+              className="mb-4 flex flex-col gap-2 rounded-xl border border-border bg-surface/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              role="alert"
+            >
+              <p className="text-sm text-ink">
+                {t('sources.setup.batchLoadFailed', {
+                  message: errorText(setupBatch.error, t),
+                })}
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => void setupBatch.refetch()}>
+                {t('common.retry')}
+              </Button>
+            </div>
+          ) : null}
           <SourceDisplayPicker sources={sources.data} />
           <SourceList
             sources={sources.data}
@@ -304,6 +353,8 @@ export default function SourcesPage() {
             }
             patchPendingId={patch.isPending ? (patch.variables?.id ?? null) : null}
             removePending={remove.isPending}
+            setupById={setupById}
+            setupLoadingIds={setupLoadingIds}
             onTestFetch={(sourceType) => fetchJob.mutate({ sourceType })}
             onToggleEnabled={(id, enabled) => patch.mutate({ id, body: { enabled } })}
             onDelete={(id) => remove.mutate(id)}

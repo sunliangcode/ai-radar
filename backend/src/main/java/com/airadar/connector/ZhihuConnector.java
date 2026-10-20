@@ -25,17 +25,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class ZhihuConnector implements SourceConnector {
+public class ZhihuConnector implements SourceConnector, CliSetupSupport {
 
     private static final Logger log = LoggerFactory.getLogger(ZhihuConnector.class);
 
-    /** Fixed local binary used by seed ensure and as the default fetch path. */
-    public static final String DEFAULT_CLI = "/Users/sunliang/workspace/own/zhihu-cli-go/zhihu";
+    /** PATH / installed binary name (portable; was a machine-local absolute path). */
+    public static final String DEFAULT_CLI = "zhihu";
     public static final String DEFAULT_SOURCE_NAME = "知乎推荐";
     public static final int DEFAULT_LIMIT = 5;
     public static final int DEFAULT_COMMENT_LIMIT = 10;
+    public static final String OPEN_SOURCE_URL = "https://github.com/BAIGUANGMEI/zhihu-cli";
+    public static final String PYPI_PACKAGE = "pyzhihu-cli";
 
-    /** Env override, else the historical machine-local default. */
+    /** Env override, else portable binary name on PATH. */
     public static String preferredCliPath() {
         String fromEnv = System.getenv("ZHIHU_CLI_PATH");
         if (fromEnv != null && !fromEnv.isBlank()) {
@@ -84,6 +86,52 @@ public class ZhihuConnector implements SourceConnector {
     }
 
     @Override
+    public CliSetupRecipe setupRecipe() {
+        return new CliSetupRecipe(
+                OPEN_SOURCE_URL,
+                PYPI_PACKAGE,
+                DEFAULT_CLI,
+                DEFAULT_CLI,
+                List.of(
+                        List.of("uv", "sync"),
+                        List.of("pip", "install", "-e", ".")
+                )
+        );
+    }
+
+    @Override
+    public void writeCookie(String cookieHeader) {
+        if (cookieHeader != null && !cookieHeader.isBlank()) {
+            CliCredentialWriter.writeZhihuCookie(cookieHeader.trim());
+        }
+    }
+
+    @Override
+    public String resolveCliPath(Map<String, Object> sourceConfig) {
+        String fromEnv = System.getenv("ZHIHU_CLI_PATH");
+        if (fromEnv != null && !fromEnv.isBlank()) {
+            return fromEnv.trim();
+        }
+        if (sourceConfig != null) {
+            Object v = sourceConfig.get("cliPath");
+            if (v != null && !String.valueOf(v).isBlank()) {
+                return String.valueOf(v).trim();
+            }
+        }
+        return DEFAULT_CLI;
+    }
+
+    @Override
+    public ProbeResult probe(String cliPath) {
+        try {
+            runCli(cliPath, List.of("feeds", "--json", "--limit", "1"), Map.of());
+            return ProbeResult.ok();
+        } catch (Exception e) {
+            return ProbeResult.fromCliFailure(e.getMessage());
+        }
+    }
+
+    @Override
     public List<RawItem> fetch(FetchContext ctx) {
         String cliPath = resolveCliPath(ctx);
         int limit = Math.max(1, ConnectorConfigs.integer(ctx, "limit", DEFAULT_LIMIT));
@@ -94,8 +142,9 @@ public class ZhihuConnector implements SourceConnector {
         try {
             Map<String, String> env = new HashMap<>();
             if (!cookie.isBlank()) {
-                // zhihu-cli-go reads ZHIHU_COOKIE directly — no need to cd into the CLI repo.
+                // Prefer env for Go CLIs; also write cookies.json for Python pyzhihu-cli.
                 env.put("ZHIHU_COOKIE", cookie.trim());
+                CliCredentialWriter.writeZhihuCookie(cookie.trim());
             }
             feedsJson = runCli(cliPath, List.of("feeds", "--json", "--limit", String.valueOf(limit)), env);
         } catch (Exception e) {

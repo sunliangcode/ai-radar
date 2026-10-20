@@ -84,6 +84,29 @@ export type Source = {
   sampleItems?: Item[]
 }
 
+/** CLI setup status for ZHIHU / WEIBO / BILIBILI (and unsupported for others). */
+export type SourceSetupStatus = {
+  supported: boolean
+  state: 'ready' | 'cli_missing' | 'need_cookie' | 'unreachable' | 'unsupported' | string
+  cliPath: string
+  installAvailable: boolean
+  reason: string
+  openSourceUrl: string
+  binaryName?: string
+  /** Stable code for i18n (setup_cli_missing, setup_need_cookie, setup_toolchain_missing, …). */
+  hintCode?: string
+  busy?: boolean
+  enabled?: boolean
+  method?: string
+  detail?: string
+  /** While POST /setup/install is running — polled via GET /setup. */
+  installPhase?: string
+  installMessage?: string
+}
+
+/** Source types that expose the Install / Cookie wizard. */
+export const CLI_SETUP_SOURCE_TYPES = new Set(['ZHIHU', 'WEIBO', 'BILIBILI'])
+
 export type Item = {
   id: number
   title: string
@@ -669,6 +692,26 @@ export const api = {
     request<Source>(`/api/sources/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteSource: (id: number) =>
     request<void>(`/api/sources/${id}`, { method: 'DELETE' }),
+  sourceSetup: (id: number) => request<SourceSetupStatus>(`/api/sources/${id}/setup`),
+  sourceSetupBatch: (ids: number[]) => {
+    const q =
+      ids.length > 0
+        ? `?ids=${ids.map((id) => encodeURIComponent(String(id))).join(',')}`
+        : ''
+    return request<{ items: Record<string, SourceSetupStatus> }>(
+      `/api/sources/setup/batch${q}`,
+    )
+  },
+  sourceSetupInstall: (id: number) =>
+    request<SourceSetupStatus & { method?: string; detail?: string }>(
+      `/api/sources/${id}/setup/install`,
+      { method: 'POST' },
+    ),
+  sourceSetupProbe: (id: number, body?: { cookie?: string; enableOnSuccess?: boolean }) =>
+    request<SourceSetupStatus & { enabled?: boolean }>(`/api/sources/${id}/setup/probe`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
   connectors: () => request<ConnectorDescriptor[]>('/api/connectors'),
   deliveryChannels: () => request<DeliveryChannelInfo[]>('/api/delivery/channels'),
   briefs: () => request<BriefSummary[]>('/api/briefs'),

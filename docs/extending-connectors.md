@@ -38,9 +38,9 @@ public interface SourceConnector {
 | `TWITTER` | Apify actor | `users` (doctor/CI/MCP/OpenAPI require this config field; pack validate warns when missing); requires `APIFY_TOKEN` |
 | `WEB` | HTML + AI extract | `url` (doctor/CI require this config field), `extractionPrompt` |
 | `EMAIL` | IMAP unread + AI extract | `maxMessages` (doctor/CI/MCP/OpenAPI require this config field; pack validate warns when missing); `EMAIL_INGEST_ENABLED` + IMAP_* |
-| `ZHIHU` | Open-source `zhihu` CLI | `cliPath` (doctor/CI/MCP/OpenAPI require this config field; pack validate warns when missing), paste `cookie` (or `ZHIHU_COOKIE` / `zhihu login`) |
-| `WEIBO` | Open-source [weibo-cli](https://github.com/jackwener/weibo-cli) | `cliPath` (doctor/CI/MCP/OpenAPI require this config field; pack validate warns when missing), paste `cookie` → `~/.config/weibo-cli/credential.json` |
-| `BILIBILI` | Open-source [bilibili-cli](https://github.com/public-clis/bilibili-cli) | `cliPath` (doctor/CI/MCP/OpenAPI require this config field; pack validate warns when missing), paste `cookie` → `~/.bilibili-cli/credential.json` |
+| `ZHIHU` | Open-source [zhihu-cli](https://github.com/BAIGUANGMEI/zhihu-cli) (`pyzhihu-cli`) | `cliPath` (doctor/CI/MCP/OpenAPI require this config field; pack validate warns when missing), paste `cookie` → `~/.zhihu-cli/cookies.json` (also `ZHIHU_COOKIE`); Sources **Install** wizard (no AI required) |
+| `WEIBO` | Open-source [weibo-cli](https://github.com/jackwener/weibo-cli) (`kabi-weibo-cli`) | `cliPath` (doctor/CI/MCP/OpenAPI require this config field; pack validate warns when missing), paste `cookie` → `~/.config/weibo-cli/credential.json`; Sources **Install** wizard (no AI required) |
+| `BILIBILI` | Open-source [bilibili-cli](https://github.com/jackwener/bilibili-cli) | `cliPath` (doctor/CI/MCP/OpenAPI require this config field; pack validate warns when missing), paste `cookie` → `~/.bilibili-cli/credential.json`; Sources **Install** wizard (no AI required) |
 | `DAILY_HOT` | Self-hosted [DailyHotApi](https://github.com/imsyy/DailyHotApi) | `route` (doctor/CI require this config field) + optional `baseUrl` (`DAILY_HOT_BASE_URL`, default `http://127.0.0.1:6688`); compose service `daily-hot` |
 | `FIXTURE` | Local JSON | demos / offline; doctor/CI require `path` (`ConfigField.path`) |
 
@@ -48,7 +48,7 @@ Optional full-text enrichment: set `WEB_FETCH_ENABLED=true` (`radar.web-fetch.en
 
 Empty databases are seeded from pack `ai-cn` via `PackImportService` (filesystem `packs/` or classpath). Import `ai-core` from the UI when you want English AI sources. Prefer editing pack JSON rather than hard-coding sources.
 
-**Zhihu / Weibo / Bilibili** are ensured on every boot: create the named source if missing; **enabled only when the preferred CLI binary is present**. A working custom `cliPath` is never overwritten. Paste Cookie in the Sources UI — AI Radar writes the open-source CLI credential file (or sets `ZHIHU_COOKIE`) so you do not configure each CLI project separately.
+**Zhihu / Weibo / Bilibili** are ensured on every boot: create the named source if missing; **enabled only when the preferred CLI binary is present**. A working custom `cliPath` is never overwritten. Paste Cookie in the Sources UI — AI Radar writes the open-source CLI credential file (or sets `ZHIHU_COOKIE`) so you do not configure each CLI project separately. Sources always shows **Install** for missing/broken CLIs (`GET/POST /api/sources/{id}/setup*`) — allowlisted `uv tool install` / `pipx`, then Cookie + probe (no AI required).
 
 **Removed (no OSS)**: homemade `JUEJIN` / `CSDN` HTTP scrapers. Enum values remain for old DB rows; boot disables them. Listed in `LEGACY_SOURCE_TYPES` (`shared/pack.mjs`); CI [`connector-inventory.test.mjs`](../shared/connector-inventory.test.mjs) requires every other `SourceType` to have a `*Connector` bean.
 

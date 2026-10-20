@@ -45,6 +45,25 @@ final class CliCredentialWriter {
         }
     }
 
+    /**
+     * BAIGUANGMEI/zhihu-cli → {@code ~/.zhihu-cli/cookies.json}.
+     * Accepts a raw Cookie header; writes name/value map.
+     */
+    static void writeZhihuCookie(String cookieHeader) {
+        Map<String, String> cookies = parseCookieHeader(cookieHeader);
+        if (cookies.isEmpty()) {
+            return;
+        }
+        Path file = Path.of(System.getProperty("user.home"), ".zhihu-cli", "cookies.json");
+        try {
+            Files.createDirectories(file.getParent());
+            writeSecretFile(file, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(cookies));
+            log.info("wrote zhihu-cli cookies from source cookie path={}", file);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to write zhihu-cli cookies: " + e.getMessage(), e);
+        }
+    }
+
     /** public-clis/bilibili-cli → {@code ~/.bilibili-cli/credential.json} */
     static void writeBilibiliCookie(String cookieHeader) {
         Map<String, String> cookies = parseCookieHeader(cookieHeader);

@@ -6,7 +6,7 @@ English | [中文](#数据源与-pack)
 
 Seeded on empty DB: OpenAI / Hugging Face / Simon Willison RSS, 量子位 & 新智元 WeChat RSS, 36氪, HN, Reddit, GitHub search, Google News, GDELT, OSS Insight, GitHub Trending, V2EX. Token-gated samples (Product Hunt, Twitter, Telegram) are seeded **disabled**.
 
-**Zhihu** (`知乎推荐`) is ensured on every application start. It is enabled only when the preferred CLI exists (`ZHIHU_CLI_PATH` or the historical default path); otherwise the source is created **disabled**. A working custom `cliPath` is not overwritten.
+**Zhihu** (`知乎推荐`) is ensured on every application start. It is enabled only when the preferred CLI exists (`ZHIHU_CLI_PATH` or `zhihu` on PATH); otherwise the source is created **disabled**. A working custom `cliPath` is not overwritten. Sources can **Install** `pyzhihu-cli` and probe with Cookie by default (no AI required; same for Weibo / Bilibili).
 
 ## Import packs
 
@@ -83,7 +83,7 @@ How to add a connector: [extending-connectors.md](extending-connectors.md).
 
 空库种子：OpenAI / Hugging Face / Simon Willison RSS、量子位与新智元微信 RSS、36氪、HN、Reddit、GitHub Search、Google News、GDELT、OSS Insight、GitHub Trending、V2EX。Product Hunt / Twitter / Telegram 示例默认关闭（需 token）。
 
-**知乎**（「知乎推荐」）每次启动都会 ensure。仅当本机 CLI 可执行时（`ZHIHU_CLI_PATH` 或历史默认路径）默认启用；否则创建为**禁用**。可用的自定义 `cliPath` 不会被覆盖。
+**知乎**（「知乎推荐」）每次启动都会 ensure。仅当本机 CLI 可执行时（`ZHIHU_CLI_PATH` 或 PATH 上的 `zhihu`）默认启用；否则创建为**禁用**。可用的自定义 `cliPath` 不会被覆盖。情报源页默认即可一键安装 `pyzhihu-cli` 并探测 Cookie（无需 AI；微博 / B 站同理）。
 
 ### 导入 Pack
 

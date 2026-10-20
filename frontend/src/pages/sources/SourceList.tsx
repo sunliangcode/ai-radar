@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import type { Source } from '../../lib/api'
+import type { Source, SourceSetupStatus } from '../../lib/api'
+import { CLI_SETUP_SOURCE_TYPES } from '../../lib/api'
 import { Button, ConfirmDialog } from '../../components/ui'
 import { SourceBadge } from '../../components/primitives/Badge'
 import { groupSourcesByCategory } from '../../lib/sourceCategories'
 import { cn, focusRingClass } from '../../lib/cn'
+import { SourceSetupWizard } from './SourceSetupWizard'
+import { setupChipClass, setupListRowActions, setupStateLabelKey } from './sourceSetupUi'
 
 export function SourceList({
   sources,
@@ -14,6 +17,8 @@ export function SourceList({
   testingSourceType,
   patchPendingId,
   removePending,
+  setupById,
+  setupLoadingIds,
   onTestFetch,
   onToggleEnabled,
   onDelete,
@@ -25,12 +30,16 @@ export function SourceList({
   testingSourceType: string | null
   patchPendingId: number | null
   removePending: boolean
+  setupById: Record<number, SourceSetupStatus | undefined>
+  /** Source ids whose setup status is still loading. */
+  setupLoadingIds: Set<number>
   onTestFetch: (sourceType: string) => void
   onToggleEnabled: (id: number, enabled: boolean) => void
   onDelete: (id: number) => void
 }) {
   const { t } = useTranslation()
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
+  const [setupTarget, setSetupTarget] = useState<Source | null>(null)
   const wasRemoving = useRef(false)
   const groups = groupSourcesByCategory(sources)
 
@@ -69,6 +78,15 @@ export function SourceList({
         }}
       />
 
+      {setupTarget && setupById[setupTarget.id] ? (
+        <SourceSetupWizard
+          source={setupTarget}
+          initial={setupById[setupTarget.id]!}
+          onClose={() => setSetupTarget(null)}
+          onTestFetch={onTestFetch}
+        />
+      ) : null}
+
       <div className="space-y-6">
         {groups.map((group) => {
           const headingId = `source-cat-${group.id}`
@@ -89,11 +107,25 @@ export function SourceList({
                   testingSourceType === '*' ||
                   (testingSourceType != null && testingSourceType === s.type)
                 const rowBusy = rowFetching || patchPendingId === s.id
+                const setup = setupById[s.id]
+                const cliType = CLI_SETUP_SOURCE_TYPES.has(s.type.toUpperCase())
+                const setupLoading = cliType && setupLoadingIds.has(s.id) && !setup
+                const labelKey = setupStateLabelKey(setup?.state)
+                const chip = cliType
+                  ? setupLoading
+                    ? t('sources.setup.checking')
+                    : setup?.busy
+                      ? t('sources.setup.installingShort')
+                      : labelKey
+                        ? t(labelKey)
+                        : null
+                  : null
+                const { showInstall, showCookieSetup } = setupListRowActions(setup, cliType)
                 return (
                   <li
                     key={s.id}
                     className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                    aria-busy={rowBusy || undefined}
+                    aria-busy={rowBusy || setupLoading || undefined}
                   >
                     <div>
                       <Link
@@ -108,6 +140,17 @@ export function SourceList({
                       </Link>
                       <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
                         <SourceBadge type={s.type} />
+                        {chip ? (
+                          <span
+                            className={cn(
+                              'rounded-sm px-1.5 py-0.5 font-medium',
+                              setupChipClass(setup?.state),
+                            )}
+                            title={setup?.reason || undefined}
+                          >
+                            {chip}
+                          </span>
+                        ) : null}
                         <span>
                           {s.enabled ? t('common.enabled') : t('common.disabled')}
                           {s.lastFetchedAt
@@ -123,6 +166,24 @@ export function SourceList({
                       role="group"
                       aria-label={s.name}
                     >
+                      {showInstall ? (
+                        <Button
+                          variant="primary"
+                          aria-label={`${s.name}: ${t('sources.setup.install')}`}
+                          onClick={() => setSetupTarget(s)}
+                        >
+                          {t('sources.setup.install')}
+                        </Button>
+                      ) : null}
+                      {showCookieSetup ? (
+                        <Button
+                          variant="ghost"
+                          aria-label={`${s.name}: ${t('sources.setup.configure')}`}
+                          onClick={() => setSetupTarget(s)}
+                        >
+                          {t('sources.setup.configure')}
+                        </Button>
+                      ) : null}
                       <Button
                         variant="ghost"
                         disabled={fetchPending || !s.enabled}

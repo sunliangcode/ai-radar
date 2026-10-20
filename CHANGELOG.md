@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **CLI source setup wizard**: ZHIHU / WEIBO / BILIBILI readiness chip + Install by default (no AI required) — `GET|POST /api/sources/{id}/setup*` installs allowlisted PyPI CLIs (`uv`/`pipx`), sets `cliPath`, Cookie dialog + probe until success; Zhihu default path is portable (`zhihu`) instead of a machine-local absolute path
+- **CLI setup UX polish**: stepped wizard (install → cookie → done), auto-start install when CLI missing, typed `hintCode` / `SetupException` codes for i18n errors, busy/409 when install overlaps, live progress copy, success toast, list “Checking…” chip while setup loads; batch `GET /api/sources/setup/batch` for Sources list; semantic readiness chips, Cookie help + install log + Retry in wizard; live install phase polling (`installPhase` / `installMessage` during POST install), 409 install join + progress poll (parity with fetch job), batch readiness retry banner + 2s poll while any CLI install busy, post-setup test fetch CTA (list + detail), copy diagnostics + installation doc link
 - **Security CI**: [CodeQL](.github/workflows/codeql.yml) (Java + JS/TS) and [dependency review](.github/workflows/dependency-review.yml) on PRs; documented in [SECURITY.md](SECURITY.md); gated by `shared/community-files.test.mjs`
 - **CI norm gates**: `shared/a11y-baseline.test.mjs` (focus trap / reduced-motion / ConfirmDialog); `shared/api-docs-jobs-sync.test.mjs` (JobsController ↔ `docs/api.md` ↔ SPA client)
 - **Privacy / Governance**: root [PRIVACY.md](PRIVACY.md) (self-host data boundary, no phone-home) and [GOVERNANCE.md](GOVERNANCE.md) (single-maintainer decision process)
