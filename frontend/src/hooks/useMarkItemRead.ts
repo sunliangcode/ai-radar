@@ -97,7 +97,7 @@ export function patchUnreadCountsInCache(
   sourceType?: string,
 ) {
   if (delta === 0) return
-  qc.setQueryData<Record<string, number>>(['unread-counts'], (old) => {
+  qc.setQueriesData<Record<string, number>>({ queryKey: ['unread-counts'] }, (old) => {
     if (!old) return old
     const next = { ...old }
     if (typeof next.total === 'number') {
@@ -128,7 +128,7 @@ export function useMarkItemRead() {
       await qc.cancelQueries({ queryKey: ['unread-counts'] })
       const prevFeed = qc.getQueriesData({ queryKey: ['feed'] })
       const prevSearch = qc.getQueriesData({ queryKey: ['feed-search'] })
-      const prevUnread = qc.getQueryData<Record<string, number>>(['unread-counts'])
+      const prevUnread = qc.getQueriesData<Record<string, number>>({ queryKey: ['unread-counts'] })
       patchFeedItemInCache(qc, vars.id, { read: vars.read })
       if (vars.read) {
         patchUnreadCountsInCache(qc, -1, vars.sourceType)
@@ -161,7 +161,9 @@ export function useMarkItemRead() {
       if (ctx?.prevSearch) {
         for (const [key, data] of ctx.prevSearch) qc.setQueryData(key, data)
       }
-      if (ctx?.prevUnread) qc.setQueryData(['unread-counts'], ctx.prevUnread)
+      if (ctx?.prevUnread) {
+        for (const [key, data] of ctx.prevUnread) qc.setQueryData(key, data)
+      }
       pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
     },
     onSettled: () => {

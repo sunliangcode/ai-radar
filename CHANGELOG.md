@@ -6,8 +6,80 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Decisions / Radar / Following / Actions display-none**: empty + restore-all when no display sources selected (parity with Today/Feed)
+- **Feed reader open**: no longer marks read immediately — 1.2s dwell on first open and j/k (peek-safe)
+- **Change Unfollow**: toast Undo re-follows (parity with Following page)
+- **Source enable/disable**: toast Undo restores previous enabled state (list + detail)
+- **Today Following**: inline Unfollow with optimistic strip + toast Undo
+- **Feed mark unread**: drawer + list + `m` toggle; toast Undo; clears drawer close-remove so unread-only lists stay correct
+- **Change detail Dismiss**: Not now + Undo, then return to Today (deck parity)
+- **Feed mark-read (`m`)**: toast Undo restores unread (critical in unread-only list)
+- **Watching query key**: Radar Following + Following page share `watching-timeline` (no stale filter after Follow)
+- **Decision snooze Undo**: `POST …/snooze` accepts `{ revisitAt }`; Decisions list toast restores due row
+- **Pull-to-refresh**: also on Decisions
+- **Decision ignore**: also unfollows (removes watch subscription); optimistic Following strip
+- **Change evidence empty**: display-filter empty offers restore; true empty says no linked articles
+- **Context save**: invalidates Today/changes; toast runs impact job + opens Today
+- **Settings save**: invalidates home/changes (summary language / scoring)
+- **Pack import**: refreshes feed/unread/home; when display is restricted, toast offers restore-all
+- **Mark-all read Undo**: API returns `ids` (cap 2000); Feed + ⌘K toast restores via batch unread
+- **Today display-none**: dedicated empty + restore CTA (not getting-started)
+- **Change hidden by display filter**: Include this change's sources / restore all
+- **Source enable/disable**: invalidates feed / search / watching-saved / changes-list
+- **Feed unsave**: toast Undo
+- **Change detail 404**: not-found empty state (no retry loop); network errors keep Retry
+- **Radar Following empty**: secondary link to Following page; Today fetch also refreshes changes-list / timeline / decisions-due
+- **Actions status**: toast Undo restores previous status
+- **Sources create**: new source joins display allowlist when scope is restricted; toast opens detail; invalidates feed/unread/home
+- **Source detail**: Delete with confirm (list parity); 404 shows not-found empty state (no retry loop)
+- **Today dismiss undo**: `DELETE /api/changes/{id}/dismiss`; toast Undo restores triage; Follow toast links to Following; revisit banner offers Snooze
+- **Today display filter**: home cards include `sourceIds`; unknown map entries no longer hide triage; decisions use `entityMatchesDisplay`
+- **Mark-all read (display scope)**: optimistic badges subtract only in-scope unread — no false inbox-zero / global wipe
+- **Change decision save**: latest decision paints immediately; due revisit offers Snooze on detail (parity with Decisions list)
+- **Decisions Open empty**: when Due has rows, show a short note instead of “no decisions” + Today/Radar CTAs
+- **Source delete**: optimistic list remove, prune display allowlist, invalidate feed/unread/home/watching
+- **Decision kind watch**: also upserts watch subscription so the change appears under Following (parity with Follow); Change detail toast links to Following; optimistic `watched` + home `following`
+- **Following timeline**: `/api/watching/timeline` reads watch subscriptions (same as Follow/Unfollow) — unfollow no longer leaves ghost groups from memory audit rows; tracked list is followed-only (no HIGH/MEDIUM dump)
+- **Feed save**: invalidates `watching-saved` so Following’s Saved section stays fresh
+
+- **Unfollow**: `DELETE /api/watch/{id}`; Change detail Follow/Unfollow; Following page Unfollow on timeline + watched cards (optimistic + undo); change DTO includes `watched`
+- **Mobile More tab**: stays active on Following / Actions / Briefs; Following card promoted in Settings hub
+- **Today**: Following-only day no longer shows “getting started”; deck omitted when major is empty
+- **Pull-to-refresh**: release threshold uses live pull distance (not stale React state)
+- **Sources create**: wait for connectors; client-side required-field validation before submit
+- **Decision form**: delay autofocus until after deep-link scroll
+- **Following (/watching)**: route restored (was redirecting to Home); sidebar + ⌘K + Settings hub; save toast links there; Esc back
+- **Pull-to-refresh**: awaits active `refetchQueries` (indicator matches fresh data); works on Following
+- **Change Decide deep-link**: scrolls to decision form after detail loads (not during skeleton)
+- **Actions**: Watch + Reopen status; step checkboxes persist in localStorage
+- **Today triage**: watch + open decision exclude change from major/minor (no refetch bounce); home returns `following`; major cap 20
+- **Today UX**: Investigate/Decide stay available while watch/dismiss is pending; revisit banner deep-links to the change; Following merges server + session
+- **Decision save**: optimistic strip from Today home cache before invalidate
+- **Feed reader**: j/k works inside the immersive drawer; 1.2s dwell before mark-read on open and navigation
+- **⌘K mark-all**: optimistic feed list + unread badges via shared helper (parity with Radar)
+- **Esc back**: Chat clears draft from anywhere; Context/Source detail/Briefs work during loading/fetch
+- **Source detail**: enable/disable toggle with optimistic toast (list parity)
+- **Deep link**: missing `/radar?item=` shows an error toast
+- **Display-none consistency**: Today unread / Radar empty / nav badges agree when no sources are selected; Radar empty offers restore-all; deck “cleared” only after watch/dismiss (not filter change)
+- **Decisions list**: due rows no longer duplicated under Open
+- **Command palette mark-all**: optimistic unread badges (parity with Feed); open-from-search passes `sourceType`
+- **Actions → related item**: deep-links to `/radar?item={id}` and opens the in-app reader (`GET /api/items/{id}`)
+- **Unread badges / mark-all**: follow display `sourceIds` (国内/国外/自定义源)，不再用粗粒度 sourceType 合计；未读计数排除已 dismiss
+- **Pull-to-refresh**: soft-refetch lists/home/unread（不再误触发完整 fetch job；抓取源仍用「立即更新」）
+- **Change detail**: opening in-app reader marks items read (same loop as Radar); **Update decision** prefills kind / reason / revisit
+- **Today hero**: localized tier badge; evidence slot uses `evidence` (recommendation shown separately)
+- **Today deck**: triage up to 20 major changes (was hard-capped at 5 with no continuation)
+- **Decisions**: due rows offer **一周后再看** snooze (`POST /api/decisions/{id}/snooze`); nav (sidebar + tabs) shows due badge
+- **Feed search**: respects time range / unread / sourceType (same filters as the list); empty state explains stacked filters
+- **Settings hub**: loading skeleton; Escape uses history back when possible
+- **Actions**: optimistic status patch; filter-empty vs truly-empty; localized status in meta; Escape history-back
+- **Chat**: cited chips use localized tier badge (no raw HIGH); Escape history-back
+- **Sources**: enable/disable refreshes unread + Today; display-none CTA restores all sources; Escape history-back
+- **Escape back**: Context / Source detail / System / Briefs prefer history back (fallback to hub)
+- **Focus shortcuts**: `[` / `]` navigate prev/next (was a documented no-op)
+- **Decisions Escape**: history back when possible (not always Home)
 - **Change detail**: shows open **latestDecision** (kind / reason / revisit) with Update CTA instead of blank “record”; stale English impact why/recommendation nudges one-click refresh (`POST /api/changes/{id}/recompute-impact`)
-- **Radar “mark all read”**: respects current time range / sourceType (was wiping global unread); confirm copy matches scope
+- **Radar “mark all read”**: respects current time range / sourceType / display sources (was wiping global unread); confirm copy matches scope; optimistic UI
 - **Feed unread count**: list returns `unreadTotal` so the toolbar isn’t limited to the loaded page
 - **Heuristic impact**: `explicit_ignore` no longer false-positives on the JSON key itself — ignore tokens match title/summary only
 - **CLI/MCP**: `fetch` / `push` / `cluster` / `impact` (and MCP `run_*` jobs) no longer abort at the default 8s client timeout — job POSTs wait for the sync pipeline unless `AI_RADAR_TIMEOUT_MS` is set; docs note abort ≠ cancel and retry → 409
@@ -43,7 +115,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **API**: `GET /api/items/badge` — unread item count for tab badges; `POST /api/items/mark-all-read` optional `sourceType` / `since`; batch PATCH supports `dismissed`
+- **API**: `GET /api/items/badge` / `unread-counts` / `mark-all-read` accept optional `sourceIds` (and badge `since`) so nav badges match display scope; batch PATCH supports `dismissed`
+- **API**: `GET /api/decisions/badge`, `POST /api/decisions/{id}/snooze`; item search accepts `sourceType` / `unread` / `since`
 
 
 - **Docs**: [`mcp/README.md`](mcp/README.md) / [`mcp/README.zh.md`](mcp/README.zh.md) — package quickstart (EN/ZH); full tool reference remains [docs/mcp.md](docs/mcp.md)

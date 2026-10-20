@@ -148,9 +148,13 @@ export default function BriefsPage() {
   ])
 
   const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
     navigate('/')
   }, [navigate])
-  useEscapeBack(goBack, phase === 'idle')
+  useEscapeBack(goBack)
 
   const pushNow = useMutation({
     mutationFn: api.pushJob,

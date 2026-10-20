@@ -65,8 +65,10 @@ export function impactEventMatchesDisplay(
   if (allowlist === null) return true
   if (allowlist.length === 0) return false
   if (eventId == null) return false
+  // Unknown mapping: keep the card (home already returned it). Hiding empties Today.
+  if (!sourceMap.has(eventId)) return true
   const ids = sourceMap.get(eventId) ?? []
-  if (ids.length === 0) return false
+  if (ids.length === 0) return true
   return ids.some((id) => isSourceDisplayed(id, allowlist))
 }
 

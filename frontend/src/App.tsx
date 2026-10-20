@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { PrefsProvider, EmptyState, ListSkeleton, ToastProvider } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -7,11 +8,11 @@ import { Sidebar } from './components/layout/Sidebar'
 import { BottomTabBar } from './components/layout/BottomTabBar'
 import { PullToRefresh } from './components/layout/PullToRefresh'
 import { CommandPalette } from './components/CommandPalette'
-import { useFetchJobWithProgress } from './hooks/useFetchJobWithProgress'
 import { EngagementProvider } from './hooks/useEngagement'
 import { DisplaySourcesProvider } from './hooks/useDisplaySources'
 import { useSources } from './hooks/useSources'
 import { useDisplaySources } from './hooks/useDisplaySources'
+import { useDecisionsDueCount } from './hooks/useDecisionsDueCount'
 import { useUnreadCounts } from './hooks/useUnreadCounts'
 import { useDocumentTitle } from './hooks/useDocumentTitle'
 import { useEscapeBack } from './hooks/useEscapeBack'
@@ -33,6 +34,7 @@ const TodayPage = lazy(() => import('./pages/TodayPage'))
 const AiMonitorPage = lazy(() => import('./pages/AiMonitorPage'))
 const BriefsPage = lazy(() => import('./pages/BriefsPage'))
 const ActionsPage = lazy(() => import('./pages/ActionsPage'))
+const WatchingPage = lazy(() => import('./pages/WatchingPage'))
 
 function NotFoundPage() {
   const { t } = useTranslation()
@@ -83,32 +85,26 @@ function Shell() {
     return () => window.clearTimeout(id)
   }, [location.pathname, location.search])
 
+  const qc = useQueryClient()
   const unread = useUnreadCounts()
+  const { count: decisionsDue } = useDecisionsDueCount()
   const sources = useSources()
-  const { isDisplayed } = useDisplaySources()
-  const { fetchJob, isPending: fetchPending } = useFetchJobWithProgress([
-    ['intelligence-home'],
-    ['feed'],
-    ['watching'],
-    ['sources'],
-    ['changes-watching'],
-  ])
+  const { isDisplayed, noneSelected } = useDisplaySources()
   const canPullRefresh =
-    location.pathname === '/' || location.pathname === '/radar' || location.pathname.startsWith('/radar')
+    location.pathname === '/' ||
+    location.pathname === '/radar' ||
+    location.pathname.startsWith('/radar') ||
+    location.pathname === '/watching' ||
+    location.pathname === '/decisions'
+  const [pullRefreshing, setPullRefreshing] = useState(false)
 
   const visibleSources = useMemo(
     () => (sources.data ?? []).filter((s) => s.enabled && isDisplayed(s.id)),
     [sources.data, isDisplayed],
   )
 
-  const totalUnread = useMemo(() => {
-    const m = unread.data ?? {}
-    const visibleTypes = new Set(visibleSources.map((s) => s.type))
-    return Object.entries(m).reduce(
-      (sum, [type, count]) => sum + (visibleTypes.has(type) ? count : 0),
-      0,
-    )
-  }, [unread.data, visibleSources])
+  // Badge total follows display scope (sourceIds), not a coarse source-type sum.
+  const totalUnread = noneSelected ? 0 : Number(unread.data?.total ?? 0)
 
   const sourceTypes = useMemo(() => {
     const seen = new Map<string, number>()
@@ -117,6 +113,29 @@ function Shell() {
     }
     return Array.from(seen.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [visibleSources])
+
+  const softRefresh = useCallback(async () => {
+    setPullRefreshing(true)
+    try {
+      // Await active refetches so the pull indicator lasts until data is fresh.
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ['intelligence-home'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['feed'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['watching-saved'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['watching-timeline'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['changes'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['changes-list'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['changes-watching'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['decisions'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['decisions-due'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['unread-counts'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['sources'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['actions'], type: 'active' }),
+      ])
+    } finally {
+      setPullRefreshing(false)
+    }
+  }, [qc])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -150,6 +169,7 @@ function Shell() {
       </div>
       <Sidebar
         totalUnread={totalUnread}
+        decisionsDue={decisionsDue}
         unreadByType={unread.data ?? {}}
         sourceTypes={sourceTypes}
         onOpenPalette={() => setPaletteOpen(true)}
@@ -164,15 +184,8 @@ function Shell() {
           <ErrorBoundary>
             <Suspense fallback={<PageFallback />}>
               <PullToRefresh
-                disabled={!canPullRefresh || fetchPending}
-                onRefresh={() =>
-                  new Promise<void>((resolve, reject) => {
-                    fetchJob.mutate(undefined, {
-                      onSuccess: () => resolve(),
-                      onError: (err) => reject(err),
-                    })
-                  })
-                }
+                disabled={!canPullRefresh || pullRefreshing}
+                onRefresh={softRefresh}
               >
               <Routes>
                 <Route path="/monitor" element={<Navigate to="/settings/system" replace />} />
@@ -181,6 +194,7 @@ function Shell() {
                 <Route path="/decisions" element={<DecisionsPage />} />
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/actions" element={<ActionsPage />} />
+                <Route path="/watching" element={<WatchingPage />} />
                 <Route path="/briefs" element={<BriefsPage />} />
                 <Route path="/settings" element={<SettingsHubPage />} />
                 <Route path="/settings/system" element={<AiMonitorPage />} />
@@ -197,7 +211,6 @@ function Shell() {
                 <Route path="/items" element={<Navigate to="/radar" replace />} />
                 <Route path="/events" element={<Navigate to="/radar" replace />} />
                 <Route path="/changes" element={<Navigate to="/radar?view=changes" replace />} />
-                <Route path="/watching" element={<Navigate to="/" replace />} />
                 <Route path="/contexts" element={<Navigate to="/settings/context" replace />} />
                 <Route path="/sources" element={<Navigate to="/settings/sources" replace />} />
                 <Route path="/sources/:id" element={<SourceIdRedirect />} />
@@ -210,7 +223,7 @@ function Shell() {
           </ErrorBoundary>
         </div>
       </main>
-      <BottomTabBar totalUnread={totalUnread} />
+      <BottomTabBar totalUnread={totalUnread} decisionsDue={decisionsDue} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   )

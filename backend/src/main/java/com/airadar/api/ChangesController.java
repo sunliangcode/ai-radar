@@ -5,6 +5,7 @@ import com.airadar.change.ChangeService;
 import com.airadar.decision.DecisionService;
 import com.airadar.impact.ImpactService;
 import com.airadar.watch.WatchSubscriptionService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,12 +54,18 @@ public class ChangesController {
     public Map<String, Object> get(@PathVariable Long id) {
         Map<String, Object> dto = changeService.get(id);
         decisionService.latestOpen(id).ifPresent(d -> dto.put("latestDecision", d));
+        dto.put("watched", watchSubscriptionService.isWatched(id));
         return dto;
     }
 
     @PostMapping("/changes/{id}/dismiss")
     public Map<String, Object> dismiss(@PathVariable Long id) {
         return changeInteractionService.dismiss(id);
+    }
+
+    @DeleteMapping("/changes/{id}/dismiss")
+    public Map<String, Object> undismiss(@PathVariable Long id) {
+        return changeInteractionService.undismiss(id);
     }
 
     @PostMapping("/changes/{id}/decisions")
@@ -78,5 +85,10 @@ public class ChangesController {
     @PutMapping("/watch/{changeId}")
     public Map<String, Object> watch(@PathVariable Long changeId, @RequestBody Map<String, Object> body) {
         return watchSubscriptionService.upsertForChange(changeId, body);
+    }
+
+    @DeleteMapping("/watch/{changeId}")
+    public Map<String, Object> unwatch(@PathVariable Long changeId) {
+        return watchSubscriptionService.removeForChange(changeId);
     }
 }

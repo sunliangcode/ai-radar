@@ -25,12 +25,19 @@ export function TrackedChangesSection({
   error,
   locale,
   onRetry,
+  onUnwatch,
+  unwatchPendingId,
+  watchedIds,
 }: {
   tracked: ChangeCard[]
   loading: boolean
   error: unknown
   locale: string
   onRetry: () => void
+  onUnwatch?: (id: number) => void
+  unwatchPendingId?: number | null
+  /** Only show Unfollow when the change has an active watch subscription. */
+  watchedIds?: Set<number>
 }) {
   const { t } = useTranslation()
   const [drawerId, setDrawerId] = useState<number | null>(null)
@@ -118,9 +125,20 @@ export function TrackedChangesSection({
                 </>
               }
               actions={
-                <MagAction onClick={() => setDrawerId(c.id)} title={t('today.heroOpen')}>
-                  {t('today.heroOpen')}
-                </MagAction>
+                <>
+                  <MagAction onClick={() => setDrawerId(c.id)} title={t('today.heroOpen')}>
+                    {t('today.heroOpen')}
+                  </MagAction>
+                  {onUnwatch && (watchedIds?.has(c.id) ?? true) ? (
+                    <MagAction
+                      onClick={() => onUnwatch(c.id)}
+                      title={t('today.unfollow')}
+                      disabled={unwatchPendingId === c.id}
+                    >
+                      {t('today.unfollow')}
+                    </MagAction>
+                  ) : null}
+                </>
               }
               secondaryActions={
                 <Link

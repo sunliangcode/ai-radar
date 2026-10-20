@@ -63,6 +63,32 @@ public class WatchSubscriptionService {
     }
 
     @Transactional(readOnly = true)
+    public boolean isWatched(Long changeId) {
+        return repository.findFirstByChangeId(changeId).isPresent();
+    }
+
+    /** Remove watch subscription so the change can re-enter Today major triage. */
+    @Transactional
+    public Map<String, Object> removeForChange(Long changeId) {
+        WatchSubscriptionEntity row = repository.findFirstByChangeId(changeId)
+                .orElseThrow(() -> new NoSuchElementException("watch not found: " + changeId));
+        repository.delete(row);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("changeId", changeId);
+        out.put("removed", true);
+        return out;
+    }
+
+    /** Best-effort unfollow (e.g. decision kind ignore) — no error when not watched. */
+    @Transactional
+    public boolean removeIfPresent(Long changeId) {
+        return repository.findFirstByChangeId(changeId).map(row -> {
+            repository.delete(row);
+            return true;
+        }).orElse(false);
+    }
+
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> listAll() {
         return repository.findAllByOrderByUpdatedAtDesc().stream().map(this::toDto).toList();
     }

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { api, type Item } from '../../lib/api'
 import { useToast } from '../../components/ui'
 import {
@@ -10,6 +11,7 @@ import {
 } from '../../hooks/useMarkItemRead'
 import { useEngagement } from '../../hooks/useEngagement'
 import { errorText } from '../../lib/errors'
+import { optimisticMarkAllRead, rollbackMarkAllRead } from './optimisticMarkAllRead'
 
 type PatchVars = {
   id: number
@@ -24,6 +26,7 @@ type PatchVars = {
 
 export function useFeedActions(unreadOnly: boolean) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const engagement = useEngagement()
@@ -38,7 +41,7 @@ export function useFeedActions(unreadOnly: boolean) {
       await qc.cancelQueries({ queryKey: ['unread-counts'] })
       const prevFeed = qc.getQueriesData({ queryKey: ['feed'] })
       const prevSearch = qc.getQueriesData({ queryKey: ['feed-search'] })
-      const prevUnread = qc.getQueryData<Record<string, number>>(['unread-counts'])
+      const prevUnread = qc.getQueriesData<Record<string, number>>({ queryKey: ['unread-counts'] })
 
       if (vars.dismissed) {
         patchFeedItemInCache(qc, vars.id, { dismissed: true, read: true }, { remove: true })
@@ -79,8 +82,53 @@ export function useFeedActions(unreadOnly: boolean) {
         if (vars.saved != null && vars.saved !== vars.wasSaved) {
           void qc.invalidateQueries({ queryKey: ['preference-keywords'] })
           void qc.invalidateQueries({ queryKey: ['actions'] })
-          void qc.invalidateQueries({ queryKey: ['watching'] })
-          if (vars.saved) pushToast('success', t('feed.savedHint'))
+          void qc.invalidateQueries({ queryKey: ['watching-saved'] })
+          if (vars.saved) {
+            pushToast('success', t('feed.savedHint'), {
+              label: t('nav.watching'),
+              onClick: () => navigate('/watching'),
+            })
+          } else {
+            pushToast('success', t('feed.unsavedHint'), {
+              label: t('common.undo'),
+              onClick: () => {
+                void api
+                  .patchItem(vars.id, { saved: true })
+                  .then(() => {
+                    void qc.invalidateQueries({ queryKey: ['feed'] })
+                    void qc.invalidateQueries({ queryKey: ['watching-saved'] })
+                  })
+                  .catch(() => undefined)
+              },
+            })
+          }
+        } else if (vars.read === true && !vars.wasRead) {
+          // Keyboard `m` / explicit mark-read — Undo restores list (esp. unread-only).
+          pushToast('success', t('feed.markedRead'), {
+            label: t('common.undo'),
+            onClick: () => {
+              void api
+                .patchItem(vars.id, { read: false })
+                .then(() => {
+                  void qc.invalidateQueries({ queryKey: ['feed'] })
+                  void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+                })
+                .catch(() => undefined)
+            },
+          })
+        } else if (vars.read === false && vars.wasRead) {
+          pushToast('success', t('feed.markedUnread'), {
+            label: t('common.undo'),
+            onClick: () => {
+              void api
+                .patchItem(vars.id, { read: true })
+                .then(() => {
+                  void qc.invalidateQueries({ queryKey: ['feed'] })
+                  void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+                })
+                .catch(() => undefined)
+            },
+          })
         }
       }
     },
@@ -91,7 +139,9 @@ export function useFeedActions(unreadOnly: boolean) {
       if (ctx?.prevSearch) {
         for (const [key, data] of ctx.prevSearch) qc.setQueryData(key, data)
       }
-      if (ctx?.prevUnread) qc.setQueryData(['unread-counts'], ctx.prevUnread)
+      if (ctx?.prevUnread) {
+        for (const [key, data] of ctx.prevUnread) qc.setQueryData(key, data)
+      }
       pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
     },
     onSettled: () => {
@@ -101,18 +151,42 @@ export function useFeedActions(unreadOnly: boolean) {
 
   const markAll = useMutation({
     mutationFn: (q: string = '') => api.markAllRead(q),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['feed'] })
-      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+    onMutate: async (q: string = '') => {
+      await qc.cancelQueries({ queryKey: ['feed'] })
+      await qc.cancelQueries({ queryKey: ['unread-counts'] })
+      return optimisticMarkAllRead(qc, q, { unreadOnly })
+    },
+    onSuccess: (data, _q, ctx) => {
       engagement.bumpRead(1)
-      if (engagement.claimInboxZero()) {
-        pushToast('success', t(engagement.inboxZeroToastKey()))
+      const ids = data.ids ?? []
+      const msg = engagement.claimInboxZero()
+        ? t(engagement.inboxZeroToastKey())
+        : t('feed.markAllReadDone')
+      if (ids.length > 0 && ctx) {
+        pushToast('success', msg, {
+          label: t('common.undo'),
+          onClick: () => {
+            rollbackMarkAllRead(qc, ctx)
+            void api
+              .batchItems({ ids, read: false })
+              .then(() => {
+                void qc.invalidateQueries({ queryKey: ['feed'] })
+                void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+              })
+              .catch(() => undefined)
+          },
+        })
       } else {
-        pushToast('success', t('feed.markAllReadDone'))
+        pushToast('success', msg)
       }
     },
-    onError: (err) => {
+    onError: (err, _q, ctx) => {
+      if (ctx) rollbackMarkAllRead(qc, ctx)
       pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['feed'] })
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
     },
   })
 
@@ -180,6 +254,19 @@ export function useFeedActions(unreadOnly: boolean) {
     },
     [patch],
   )
+  const markItemUnread = useCallback(
+    (item: Item) => {
+      if (!item.read) return
+      patch.mutate({
+        id: item.id,
+        read: false,
+        wasRead: true,
+        wasSaved: item.saved,
+        sourceType: item.primarySourceType,
+      })
+    },
+    [patch],
+  )
   const dismissItem = useCallback(
     (item: Item) =>
       patch.mutate({
@@ -202,6 +289,7 @@ export function useFeedActions(unreadOnly: boolean) {
     toggleSaved,
     saveItem,
     markItemSelectedRead,
+    markItemUnread,
     dismissItem,
   }
 }

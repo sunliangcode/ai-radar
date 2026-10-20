@@ -23,7 +23,8 @@ public interface RepoStarSnapshotRepository
 
     @Query("""
         select s.primarySourceType as t, count(s) as c from NewsItemEntity s
-        where s.readFlag = false group by s.primarySourceType
+        where s.readFlag = false and s.dismissed = false
+        group by s.primarySourceType
     """)
     List<Object[]> unreadCountsBySourceType();
 }

@@ -5,6 +5,7 @@ import com.airadar.change.EventSourceLookup;
 import com.airadar.event.EventRepository;
 import com.airadar.event.TimelineEntryRepository;
 import com.airadar.memory.MemoryService;
+import com.airadar.watch.WatchSubscriptionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +14,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -29,19 +31,22 @@ public class DecisionService {
     private final TimelineEntryRepository timelineEntryRepository;
     private final MemoryService memoryService;
     private final EventSourceLookup eventSourceLookup;
+    private final WatchSubscriptionService watchSubscriptionService;
 
     public DecisionService(
             DecisionRepository decisionRepository,
             EventRepository eventRepository,
             TimelineEntryRepository timelineEntryRepository,
             MemoryService memoryService,
-            EventSourceLookup eventSourceLookup
+            EventSourceLookup eventSourceLookup,
+            WatchSubscriptionService watchSubscriptionService
     ) {
         this.decisionRepository = decisionRepository;
         this.eventRepository = eventRepository;
         this.timelineEntryRepository = timelineEntryRepository;
         this.memoryService = memoryService;
         this.eventSourceLookup = eventSourceLookup;
+        this.watchSubscriptionService = watchSubscriptionService;
     }
 
     @Transactional
@@ -79,7 +84,11 @@ public class DecisionService {
                         "{\"kind\":\"" + normalized + "\"}"));
 
         if ("watch".equals(normalized)) {
-            memoryService.remember("watch", "change", changeId, row.getReason(), null);
+            // Same product surface as Follow: decision "watch" must appear under Following.
+            watchSubscriptionService.upsertForChange(changeId, Map.of());
+        } else if ("ignore".equals(normalized)) {
+            // Ignore means stop tracking — drop Follow so Following stays truthful.
+            watchSubscriptionService.removeIfPresent(changeId);
         }
 
         return toDto(row, null);
@@ -90,6 +99,18 @@ public class DecisionService {
         return decisionRepository.findByStatusOrderByUpdatedAtDesc("open").stream()
                 .map(d -> toDto(d, null))
                 .toList();
+    }
+
+    /** Change IDs with an open decision — excluded from Today major triage. */
+    @Transactional(readOnly = true)
+    public Set<Long> openChangeIds() {
+        Set<Long> ids = new LinkedHashSet<>();
+        for (DecisionEntity d : decisionRepository.findByStatusOrderByUpdatedAtDesc("open")) {
+            if (d.getChangeId() != null) {
+                ids.add(d.getChangeId());
+            }
+        }
+        return ids;
     }
 
     @Transactional(readOnly = true)
@@ -114,6 +135,34 @@ public class DecisionService {
                     return toDto(d, updates);
                 })
                 .toList();
+    }
+
+    /**
+     * Push revisit out by {@code days}, or restore an absolute {@code revisitAtIso}
+     * (Undo after snooze) without rewriting the decision.
+     */
+    @Transactional
+    public Map<String, Object> snooze(Long decisionId, int days, String revisitAtIso) {
+        DecisionEntity row = decisionRepository.findById(decisionId)
+                .orElseThrow(() -> new NoSuchElementException("decision not found: " + decisionId));
+        if (!"open".equalsIgnoreCase(row.getStatus())) {
+            throw new IllegalArgumentException("decision is not open: " + decisionId);
+        }
+        Instant now = Instant.now();
+        Instant next = parseRevisit(revisitAtIso);
+        if (next == null) {
+            int clamped = Math.max(1, Math.min(days, 90));
+            next = LocalDate.now(ZoneOffset.UTC).plusDays(clamped).atStartOfDay().toInstant(ZoneOffset.UTC);
+        }
+        row.setRevisitAt(next);
+        row.setUpdatedAt(now);
+        decisionRepository.save(row);
+        return toDto(row, null);
+    }
+
+    @Transactional
+    public Map<String, Object> snooze(Long decisionId, int days) {
+        return snooze(decisionId, days, null);
     }
 
     private Map<String, Object> toDto(DecisionEntity d, Long updatesSince) {

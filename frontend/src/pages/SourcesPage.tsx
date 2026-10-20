@@ -9,6 +9,7 @@ import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { useEscapeBack } from '../hooks/useEscapeBack'
 import { useSources } from '../hooks/useSources'
+import { useDisplaySources } from '../hooks/useDisplaySources'
 import { useConnectors } from '../hooks/useConnectors'
 import { findConnectorById } from '../lib/connectors'
 import { dateLocale } from '../i18n'
@@ -23,6 +24,7 @@ export default function SourcesPage() {
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const sources = useSources()
+  const { displaySourceIds, setDisplayedIds, setAllDisplayed } = useDisplaySources()
   const connectors = useConnectors()
   const [open, setOpen] = useState(false)
   const [showMoreTypes, setShowMoreTypes] = useState(false)
@@ -32,9 +34,13 @@ export default function SourcesPage() {
   const locale = dateLocale(i18n.language)
 
   const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
     navigate('/settings')
   }, [navigate])
-  // Create form owns Esc while open; otherwise return to Settings hub
+  // Create form owns Esc while open; otherwise history-back / Settings hub
   useEscapeBack(goBack, !open)
 
   const descriptors = useMemo(() => connectors.data ?? [], [connectors.data])
@@ -50,15 +56,29 @@ export default function SourcesPage() {
 
   const create = useMutation({
     mutationFn: api.createSource,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sources'] })
+    onSuccess: (created) => {
+      qc.setQueryData<Source[]>(['sources'], (old) => {
+        if (!old) return [created]
+        if (old.some((s) => s.id === created.id)) return old
+        return [...old, created]
+      })
+      // Restricted / empty display scope: newly added source must be visible in Feed.
+      if (displaySourceIds !== null) {
+        setDisplayedIds([...new Set([...displaySourceIds, created.id])])
+      }
+      void qc.invalidateQueries({ queryKey: ['sources'] })
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      void qc.invalidateQueries({ queryKey: ['feed'] })
       setOpen(false)
       setName('')
       setFieldValues({})
       setShowMoreTypes(false)
       setType('RSS')
-      pushToast('success', t('sources.created'))
-      // Return focus to Add after form unmounts (next paint)
+      pushToast('success', t('sources.created'), {
+        label: t('sources.openSource'),
+        onClick: () => navigate(`/settings/sources/${created.id}`),
+      })
       queueMicrotask(() => document.getElementById('sources-add-btn')?.focus())
     },
     onError: (e) => pushToast('error', errorText(e, t)),
@@ -79,15 +99,40 @@ export default function SourcesPage() {
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ['sources'] })
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
       const enabled = (vars.body as { enabled?: boolean })?.enabled
-      pushToast(
-        'success',
-        enabled == null
-          ? t('sources.updated')
-          : enabled
-            ? t('sources.enabledToast')
-            : t('sources.disabledToast'),
-      )
+      if (enabled != null) {
+        void qc.invalidateQueries({ queryKey: ['feed'] })
+        void qc.invalidateQueries({ queryKey: ['feed-search'] })
+        void qc.invalidateQueries({ queryKey: ['watching-saved'] })
+        void qc.invalidateQueries({ queryKey: ['changes-list'] })
+      }
+      if (enabled == null) {
+        pushToast('success', t('sources.updated'))
+      } else {
+        pushToast(
+          'success',
+          enabled ? t('sources.enabledToast') : t('sources.disabledToast'),
+          {
+            label: t('common.undo'),
+            onClick: () => {
+              void api
+                .patchSource(vars.id, { enabled: !enabled })
+                .then(() => {
+                  void qc.invalidateQueries({ queryKey: ['sources'] })
+                  void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+                  void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+                  void qc.invalidateQueries({ queryKey: ['feed'] })
+                  void qc.invalidateQueries({ queryKey: ['feed-search'] })
+                  void qc.invalidateQueries({ queryKey: ['watching-saved'] })
+                  void qc.invalidateQueries({ queryKey: ['changes-list'] })
+                })
+                .catch(() => undefined)
+            },
+          },
+        )
+      }
     },
     onError: (e, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(['sources'], ctx.prev)
@@ -96,16 +141,39 @@ export default function SourcesPage() {
   })
   const remove = useMutation({
     mutationFn: api.deleteSource,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ['sources'] })
+      const prev = qc.getQueryData<Source[]>(['sources'])
+      if (prev) qc.setQueryData<Source[]>(['sources'], prev.filter((s) => s.id !== id))
+      if (displaySourceIds?.includes(id)) {
+        const next = displaySourceIds.filter((sid) => sid !== id)
+        if (next.length === 0) setAllDisplayed()
+        else setDisplayedIds(next)
+      }
+      return { prev }
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sources'] })
+      void qc.invalidateQueries({ queryKey: ['sources'] })
+      void qc.invalidateQueries({ queryKey: ['feed'] })
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      void qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+      void qc.invalidateQueries({ queryKey: ['watching-saved'] })
+      void qc.invalidateQueries({ queryKey: ['changes-list'] })
       pushToast('success', t('sources.deleted'))
     },
-    onError: (e) => pushToast('error', errorText(e, t)),
+    onError: (e, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['sources'], ctx.prev)
+      pushToast('error', errorText(e, t))
+    },
   })
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['sources'],
     ['intelligence-home'],
     ['briefs'],
+    ['changes-list'],
+    ['feed'],
+    ['unread-counts'],
   ])
 
   function onTypeChange(next: string) {
@@ -149,10 +217,11 @@ export default function SourcesPage() {
                   openAddForm(true)
                 }
               }}
-              disabled={isPending}
+              disabled={isPending || connectors.isLoading}
               aria-expanded={open}
               aria-controls={open ? 'source-create-form' : undefined}
               aria-label={open ? t('common.cancel') : t('sources.addRss')}
+              title={connectors.isLoading ? t('sources.connectorsNotReady') : undefined}
             >
               {open ? t('common.cancel') : t('sources.addRss')}
             </Button>
@@ -182,6 +251,7 @@ export default function SourcesPage() {
           fieldValues={fieldValues}
           creating={create.isPending}
           createError={create.isError ? create.error : null}
+          connectorsReady={connectors.isSuccess && descriptors.length > 0}
           onNameChange={setName}
           onTypeChange={onTypeChange}
           onShowMoreTypes={() => setShowMoreTypes(true)}

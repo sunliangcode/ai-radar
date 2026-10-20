@@ -29,6 +29,17 @@ public class MemoryService {
         repository.save(e);
     }
 
+    /** Remove all memory rows for a kind/ref (e.g. undo dismiss). */
+    @Transactional
+    public int forget(String kind, String refType, Long refId) {
+        if (refId == null) {
+            return 0;
+        }
+        List<MemoryEntity> rows = repository.findByKindAndRefTypeAndRefId(kind, refType, refId);
+        repository.deleteAll(rows);
+        return rows.size();
+    }
+
     @Transactional(readOnly = true)
     public String recentHints() {
         return repository.findTop20ByOrderByCreatedAtDesc().stream()

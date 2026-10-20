@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { api, type ChangeCard } from '../../lib/api'
-import { ListSkeleton, PageHeader, QueryErrorState, EmptyState, StatusBadge } from '../../components/ui'
+import { Button, ListSkeleton, PageHeader, QueryErrorState, EmptyState, StatusBadge } from '../../components/ui'
 import { useDisplaySources } from '../../hooks/useDisplaySources'
 import { changeMatchesDisplay } from '../../lib/sourceFilter'
 import { errorText } from '../../lib/errors'
@@ -154,10 +154,11 @@ export function RadarChangesPanel({
   onClearSearch?: () => void
 }) {
   const { t } = useTranslation()
-  const { displaySourceIds } = useDisplaySources()
+  const { displaySourceIds, noneSelected, setAllDisplayed } = useDisplaySources()
   const changes = useQuery({ queryKey: ['changes-list'], queryFn: () => api.changes(50) })
   const watching = useQuery({
-    queryKey: ['watching'],
+    // Same key as WatchingPage — Follow/Unfollow invalidations stay in sync.
+    queryKey: ['watching-timeline'],
     queryFn: api.watchingTimeline,
     enabled: followingOnly,
   })
@@ -190,11 +191,13 @@ export function RadarChangesPanel({
   const loading = changes.isLoading || (followingOnly && watching.isLoading)
   const err = changes.error ?? (followingOnly ? watching.error : null)
 
-  const emptyTitle = followingOnly
-    ? t('radar.emptyFollowing')
-    : q
-      ? t('radar.emptySearch')
-      : t('changes.empty')
+  const emptyTitle = noneSelected
+    ? t('sources.displayNoneActive')
+    : followingOnly
+      ? t('radar.emptyFollowing')
+      : q
+        ? t('radar.emptySearch')
+        : t('changes.empty')
 
   return (
     <div aria-busy={changes.isFetching || (followingOnly && watching.isFetching) || undefined}>
@@ -223,9 +226,19 @@ export function RadarChangesPanel({
       {!loading && !err && !rows.length ? (
         <EmptyState
           title={emptyTitle}
-          description={!followingOnly && !q ? t('changes.emptyHint') : undefined}
+          description={
+            noneSelected
+              ? t('radar.displayNoneHint')
+              : !followingOnly && !q
+                ? t('changes.emptyHint')
+                : undefined
+          }
           primary={
-            followingOnly ? (
+            noneSelected ? (
+              <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
+                {t('sources.displayRestoreAll')}
+              </Button>
+            ) : followingOnly ? (
               <Link
                 to="/"
                 className={cn(
@@ -257,6 +270,29 @@ export function RadarChangesPanel({
                 {t('changes.emptyCta')}
               </Link>
             )
+          }
+          secondary={
+            noneSelected ? (
+              <Link
+                to="/settings/sources"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
+                  focusRingClass(),
+                )}
+              >
+                {t('nav.sources')}
+              </Link>
+            ) : followingOnly ? (
+              <Link
+                to="/watching"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
+                  focusRingClass(),
+                )}
+              >
+                {t('nav.watching')}
+              </Link>
+            ) : undefined
           }
         />
       ) : null}

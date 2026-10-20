@@ -71,10 +71,15 @@ export function useFeedList(progressRunning?: boolean) {
   })
 
   const searchQuery = useQuery({
-    queryKey: ['feed-search', q, sourceIdsQuery],
+    queryKey: ['feed-search', q, sourceIdsQuery, range, sourceType, unreadOnly],
     queryFn: () => {
       const ids = sourceIdsQuery ? sourceIdsQuery.replace(/^sourceIds=/, '') : undefined
-      return api.searchItems(q, 60, ids)
+      return api.searchItems(q, 60, {
+        sourceIds: ids,
+        sourceType: sourceType || undefined,
+        unread: unreadOnly || undefined,
+        since: since || undefined,
+      })
     },
     enabled: searchMode && !displayBlocksAll,
   })
@@ -175,6 +180,7 @@ export function useFeedList(progressRunning?: boolean) {
     selectedId,
     setSelectedId,
     hasSources,
+    displayBlocksAll,
     channelTypes,
     searchMode,
     since,
@@ -194,6 +200,7 @@ export function useFeedList(progressRunning?: boolean) {
       const parts: string[] = []
       if (since) parts.push(`since=${encodeURIComponent(since)}`)
       if (sourceType) parts.push(`sourceType=${encodeURIComponent(sourceType)}`)
+      if (sourceIdsQuery) parts.push(sourceIdsQuery)
       return parts.length ? `?${parts.join('&')}` : ''
     })(),
   }

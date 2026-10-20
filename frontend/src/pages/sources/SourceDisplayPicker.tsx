@@ -177,11 +177,22 @@ export function SourceDisplayPicker({ sources }: { sources: Source[] }) {
         ))}
       </div>
       {isRestricted ? (
-        <p className="mt-3 text-xs text-moss" role="status">
-          {noneSelected
-            ? t('sources.displayNoneActive')
-            : t('sources.displayActive', { count: displaySourceIds?.length ?? 0 })}
-        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2" role="status">
+          <p className="text-xs text-moss">
+            {noneSelected
+              ? t('sources.displayNoneActive')
+              : t('sources.displayActive', { count: displaySourceIds?.length ?? 0 })}
+          </p>
+          {noneSelected ? (
+            <button
+              type="button"
+              onClick={setAllDisplayed}
+              className="min-h-9 rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              {t('sources.displayRestoreAll')}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </section>
   )

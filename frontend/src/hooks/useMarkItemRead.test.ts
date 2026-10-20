@@ -47,6 +47,13 @@ describe('patchUnreadCountsInCache', () => {
     expect(qc.getQueryData(['unread-counts'])).toEqual({ total: 4, RSS: 2, GITHUB: 2 })
   })
 
+  it('patches scoped unread-counts query keys', () => {
+    const qc = new QueryClient()
+    qc.setQueryData(['unread-counts', 'sourceIds=1,2'], { total: 3, RSS: 3 })
+    patchUnreadCountsInCache(qc, -1, 'RSS')
+    expect(qc.getQueryData(['unread-counts', 'sourceIds=1,2'])).toEqual({ total: 2, RSS: 2 })
+  })
+
   it('clamps at zero', () => {
     const qc = new QueryClient()
     qc.setQueryData(['unread-counts'], { total: 0, RSS: 0 })

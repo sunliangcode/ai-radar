@@ -57,9 +57,13 @@ export default function ContextsPage() {
   const isDirty = baseline != null && currentKey !== baseline
 
   const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
     navigate('/settings')
   }, [navigate])
-  useEscapeBack(goBack, !isDirty && !settingsDirty && Boolean(payload))
+  useEscapeBack(goBack, !isDirty && !settingsDirty)
 
   useEffect(() => {
     if (!payload || !settings.data || settings.isError) return
@@ -123,7 +127,22 @@ export default function ContextsPage() {
       setPayload(data.payload)
       setRawText(data.rawText ?? rawText)
       setBaseline(JSON.stringify({ payload: data.payload, rawText: data.rawText ?? rawText }))
-      pushToast('success', t('contexts.saved'))
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      void qc.invalidateQueries({ queryKey: ['changes'] })
+      void qc.invalidateQueries({ queryKey: ['changes-list'] })
+      pushToast('success', t('contexts.saved'), {
+        label: t('contexts.refreshToday'),
+        onClick: () => {
+          void api
+            .impactJob()
+            .then(() => {
+              void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+              void qc.invalidateQueries({ queryKey: ['changes'] })
+              navigate('/')
+            })
+            .catch(() => navigate('/'))
+        },
+      })
       queueMicrotask(() =>
         document.getElementById('contexts-page-heading')?.focus({ preventScroll: true }),
       )

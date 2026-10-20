@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { useToast } from '../components/providers/ToastProvider'
+import { useDisplaySources } from './useDisplaySources'
 import { errorText } from '../lib/errors'
 
 /**
@@ -14,14 +15,30 @@ export function useImportPack(options?: {
   const qc = useQueryClient()
   const { push } = useToast()
   const { t } = useTranslation()
+  const { isRestricted, setAllDisplayed } = useDisplaySources()
 
   return useMutation({
     mutationFn: (packId: string) => api.importPack({ packId }),
     onSuccess: () => {
-      for (const key of options?.invalidate ?? [['sources']]) {
+      const keys = options?.invalidate ?? [
+        ['sources'],
+        ['feed'],
+        ['unread-counts'],
+        ['intelligence-home'],
+        ['changes-list'],
+      ]
+      for (const key of keys) {
         void qc.invalidateQueries({ queryKey: key })
       }
-      push('success', t(options?.successMessage ?? 'settings.packImported'))
+      const msg = t(options?.successMessage ?? 'settings.packImported')
+      if (isRestricted) {
+        push('success', msg, {
+          label: t('sources.displayRestoreAll'),
+          onClick: () => setAllDisplayed(),
+        })
+      } else {
+        push('success', msg)
+      }
     },
     onError: (e) => push('error', errorText(e, t)),
   })

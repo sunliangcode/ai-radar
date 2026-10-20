@@ -2,6 +2,7 @@ package com.airadar.event;
 
 import com.airadar.action.ActionService;
 import com.airadar.api.ApiTimes;
+import com.airadar.change.EventSourceLookup;
 import com.airadar.decision.DecisionService;
 import com.airadar.impact.ImpactService;
 import com.airadar.memory.MemoryService;
@@ -27,8 +28,9 @@ import java.util.Set;
 @Service
 public class IntelligenceHomeService {
 
-    private static final int MAJOR_CAP = 5;
+    private static final int MAJOR_CAP = 20;
     private static final int MINOR_CAP = 8;
+    private static final int FOLLOWING_CAP = 12;
 
     private final EventRepository eventRepository;
     private final TimelineEntryRepository timelineEntryRepository;
@@ -41,6 +43,7 @@ public class IntelligenceHomeService {
     private final MemoryService memoryService;
     private final DecisionService decisionService;
     private final WatchSubscriptionService watchSubscriptionService;
+    private final EventSourceLookup eventSourceLookup;
 
     public IntelligenceHomeService(
             EventRepository eventRepository,
@@ -53,7 +56,8 @@ public class IntelligenceHomeService {
             OutcomeService outcomeService,
             MemoryService memoryService,
             DecisionService decisionService,
-            WatchSubscriptionService watchSubscriptionService
+            WatchSubscriptionService watchSubscriptionService,
+            EventSourceLookup eventSourceLookup
     ) {
         this.eventRepository = eventRepository;
         this.timelineEntryRepository = timelineEntryRepository;
@@ -66,6 +70,7 @@ public class IntelligenceHomeService {
         this.memoryService = memoryService;
         this.decisionService = decisionService;
         this.watchSubscriptionService = watchSubscriptionService;
+        this.eventSourceLookup = eventSourceLookup;
     }
 
     @Transactional(readOnly = true)
@@ -76,6 +81,12 @@ public class IntelligenceHomeService {
         int threshold = s.scoreThreshold() != null ? s.scoreThreshold() : 60;
         Instant dismissSince = Instant.now().minus(7, ChronoUnit.DAYS);
         Set<Long> dismissed = memoryService.dismissedChangeIdsSince(dismissSince);
+        Set<Long> watchedIds = watchedChangeIds();
+        Set<Long> decidedIds = decisionService.openChangeIds();
+        // Triage queue excludes dismissed, already-watched, and decided changes.
+        Set<Long> excluded = new LinkedHashSet<>(dismissed);
+        excluded.addAll(watchedIds);
+        excluded.addAll(decidedIds);
 
         List<Map<String, Object>> whatChanged = timelineEntryRepository
                 .findByAtGreaterThanEqualOrderByAtDesc(sinceBrief)
@@ -99,7 +110,7 @@ public class IntelligenceHomeService {
         List<Map<String, Object>> opportunities = opportunityService.listByKind("OPPORTUNITY");
         List<Map<String, Object>> risks = opportunityService.listByKind("RISK");
 
-        List<Map<String, Object>> majorChanges = pickMajor(whyCare, impacts, dismissed);
+        List<Map<String, Object>> majorChanges = pickMajor(whyCare, impacts, excluded);
         Set<Long> majorIds = new LinkedHashSet<>();
         for (Map<String, Object> card : majorChanges) {
             Long id = asLong(card.get("eventId"));
@@ -107,7 +118,8 @@ public class IntelligenceHomeService {
                 majorIds.add(id);
             }
         }
-        List<Map<String, Object>> minorSignals = pickMinor(whyCare, impacts, dismissed, majorIds);
+        List<Map<String, Object>> minorSignals = pickMinor(whyCare, impacts, excluded, majorIds);
+        List<Map<String, Object>> following = followingCards(watchedIds, whyCare, impacts);
 
         List<Map<String, Object>> todayChanges = new ArrayList<>(majorChanges);
 
@@ -151,6 +163,7 @@ public class IntelligenceHomeService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("majorChanges", majorChanges);
         out.put("minorSignals", minorSignals);
+        out.put("following", following);
         out.put("decisionsToRevisit", decisionsToRevisit);
         out.put("proactiveAlerts", proactiveAlerts);
         out.put("stats", stats);
@@ -172,18 +185,18 @@ public class IntelligenceHomeService {
     private List<Map<String, Object>> pickMajor(
             List<Map<String, Object>> whyCare,
             List<Map<String, Object>> impacts,
-            Set<Long> dismissed
+            Set<Long> excluded
     ) {
         List<Map<String, Object>> pool = new ArrayList<>();
         LinkedHashSet<Long> seen = new LinkedHashSet<>();
         for (Map<String, Object> card : whyCare) {
-            addIfMajor(pool, seen, card, dismissed);
+            addIfMajor(pool, seen, card, excluded);
             if (pool.size() >= MAJOR_CAP) {
                 return enrich(pool);
             }
         }
         for (Map<String, Object> card : impacts) {
-            addIfMajor(pool, seen, card, dismissed);
+            addIfMajor(pool, seen, card, excluded);
             if (pool.size() >= MAJOR_CAP) {
                 break;
             }
@@ -195,10 +208,10 @@ public class IntelligenceHomeService {
             List<Map<String, Object>> pool,
             LinkedHashSet<Long> seen,
             Map<String, Object> card,
-            Set<Long> dismissed
+            Set<Long> excluded
     ) {
         Long eventId = asLong(card.get("eventId"));
-        if (eventId == null || !seen.add(eventId) || dismissed.contains(eventId)) {
+        if (eventId == null || !seen.add(eventId) || excluded.contains(eventId)) {
             return;
         }
         String tier = card.get("tier") == null ? "" : card.get("tier").toString().toUpperCase();
@@ -211,7 +224,7 @@ public class IntelligenceHomeService {
     private List<Map<String, Object>> pickMinor(
             List<Map<String, Object>> whyCare,
             List<Map<String, Object>> impacts,
-            Set<Long> dismissed,
+            Set<Long> excluded,
             Set<Long> majorIds
     ) {
         List<Map<String, Object>> pool = new ArrayList<>();
@@ -227,7 +240,7 @@ public class IntelligenceHomeService {
 
         for (Map<String, Object> card : candidates) {
             Long eventId = asLong(card.get("eventId"));
-            if (eventId == null || !seen.add(eventId) || dismissed.contains(eventId)) {
+            if (eventId == null || !seen.add(eventId) || excluded.contains(eventId)) {
                 continue;
             }
             String tier = card.get("tier") == null ? "" : card.get("tier").toString().toUpperCase();
@@ -236,6 +249,51 @@ public class IntelligenceHomeService {
             }
             pool.add(new LinkedHashMap<>(card));
             if (pool.size() >= MINOR_CAP) {
+                break;
+            }
+        }
+        return enrich(pool);
+    }
+
+    /** Watched changes for Today “Following” — survives refetch (unlike session-only UI state). */
+    private List<Map<String, Object>> followingCards(
+            Set<Long> watchedIds,
+            List<Map<String, Object>> whyCare,
+            List<Map<String, Object>> impacts
+    ) {
+        if (watchedIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (Map<String, Object> card : whyCare) {
+            Long id = asLong(card.get("eventId"));
+            if (id != null && watchedIds.contains(id)) {
+                byId.putIfAbsent(id, new LinkedHashMap<>(card));
+            }
+        }
+        for (Map<String, Object> card : impacts) {
+            Long id = asLong(card.get("eventId"));
+            if (id != null && watchedIds.contains(id)) {
+                byId.putIfAbsent(id, new LinkedHashMap<>(card));
+            }
+        }
+        List<Map<String, Object>> pool = new ArrayList<>();
+        for (Long id : watchedIds) {
+            Map<String, Object> card = byId.get(id);
+            if (card == null) {
+                card = eventRepository.findById(id).map(e -> {
+                    Map<String, Object> m = eventSummary(e);
+                    m.put("eventId", e.getId());
+                    m.put("changeId", e.getId());
+                    m.put("title", e.getTitle());
+                    return m;
+                }).orElse(null);
+            }
+            if (card == null) {
+                continue;
+            }
+            pool.add(card);
+            if (pool.size() >= FOLLOWING_CAP) {
                 break;
             }
         }
@@ -269,6 +327,8 @@ public class IntelligenceHomeService {
                 card.put("lastUpdatedAt", ApiTimes.iso(e.getLastUpdatedAt()));
                 card.put("changeSummary", e.getSummary());
             });
+            // Client display-scope filter — avoid depending on a stale changes-list map.
+            card.put("sourceIds", eventSourceLookup.sourceIdsForEvent(eventId));
         }
         return cards;
     }

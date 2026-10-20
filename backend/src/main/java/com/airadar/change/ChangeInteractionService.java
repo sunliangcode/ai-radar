@@ -32,4 +32,18 @@ public class ChangeInteractionService {
         out.put("dismissed", true);
         return out;
     }
+
+    /** Undo dismiss so the change can re-enter Today major triage. */
+    @Transactional
+    public Map<String, Object> undismiss(Long changeId) {
+        if (!eventRepository.existsById(changeId)) {
+            throw new NoSuchElementException("change not found: " + changeId);
+        }
+        int removed = memoryService.forget("dismissed", "change", changeId);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("changeId", changeId);
+        out.put("dismissed", false);
+        out.put("removed", removed);
+        return out;
+    }
 }

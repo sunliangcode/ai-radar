@@ -76,13 +76,16 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/intelligence/home` | Five-question home (changed / why care / impact / do / watch) |
+| GET | `/api/intelligence/home` | Five-question home (changed / why care / impact / do / watch); `majorChanges` excludes dismissed / watched / open decisions; includes `following` |
+| PUT/DELETE | `/api/watch/{changeId}` | Follow / unfollow a change (`GET /api/changes/{id}` includes `watched`) |
+| GET | `/api/watching/timeline` | Followed changes + recent timeline entries (subscriptions, not memory audit) |
 | GET/PUT | `/api/contexts` | Single-user Context profile |
 | GET | `/api/events` | List events (filters: status, scores, limit — see Swagger) |
 | GET | `/api/events/{id}` | Event + timeline / items |
 | GET | `/api/changes` / `/api/changes/{id}` | Change cards (impact why / recommendation; detail includes `latestDecision` when open) |
 | POST | `/api/changes/{id}/recompute-impact` | Refresh one change’s impact scores + copy (current Context / `summaryLanguage`) |
-| POST | `/api/changes/{id}/decisions` | Record a decision on a change |
+| POST | `/api/changes/{id}/decisions` | Record a decision; kind `watch` upserts Follow; kind `ignore` removes Follow if present |
+| POST/DELETE | `/api/changes/{id}/dismiss` | Dismiss from Today triage / undo dismiss (clears dismissed memory rows) |
 
 ---
 
@@ -95,9 +98,13 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | GET | `/api/delivery/channels` | Delivery channel catalog sorted by id case-insensitively (`id` == `channel()`, `displayName`, `settingsKeys`, `enabled`; expect `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`; Swagger tag **Delivery**) |
 | POST | `/api/packs/import` | Body `{"packId":"ai-core\|ai-cn\|ai-signals"}`; optional `"path"` = absolute JSON array file (no jar rebuild). Prefer CLI: `ai-radar pack validate` / `pack import … --path` |
 | GET/PATCH | `/api/items` | Filters: `saved` / `unread` / `sourceType`; list also accepts `cursor` + `limit` (returns `nextCursor` / `hasMore`; `offset` still supported). PATCH `read` / `saved` / `dismissed` |
-| GET | `/api/items/unread-counts` | Unread per `primary_source_type` plus aggregate `total` |
-| GET | `/api/items/badge` | `{ unreadItems, total }` for nav badges |
-| POST | `/api/items/mark-all-read` | Optional query `sourceType` / `since` to scope the update |
+| GET | `/api/items/{id}` | Single item DTO (deep-link / Actions related item) |
+| GET | `/api/items/unread-counts` | Unread per `primary_source_type` plus aggregate `total`; optional `sourceIds` / `sourceType` |
+| GET | `/api/items/badge` | `{ unreadItems, total }` for nav badges; optional `sourceIds` / `sourceType` / `since` |
+| POST | `/api/items/mark-all-read` | Optional query `sourceType` / `since` / `sourceIds`; returns `{ updated, ids }` (`ids` capped at 2000 for Undo) |
+| GET | `/api/items/search` | Also accepts `sourceType` / `unread` / `since` (plus `sourceIds`) so search matches feed filters |
+| GET | `/api/decisions/badge` | `{ due }` count of open decisions past revisit |
+| POST | `/api/decisions/{id}/snooze` | Body optional `{ days }` (default 7, max 90) or `{ revisitAt }` to restore absolute time (Undo) |
 | POST | `/api/items/batch` | Body `ids` + optional `read` / `saved` / `dismissed` |
 | GET | `/api/items/interest-keywords` | Keywords from Interested titles |
 | GET | `/api/briefs` | Brief dates |

@@ -5,8 +5,7 @@ import com.airadar.event.EventEntity;
 import com.airadar.event.EventRepository;
 import com.airadar.event.TimelineEntryEntity;
 import com.airadar.event.TimelineEntryRepository;
-import com.airadar.memory.MemoryEntity;
-import com.airadar.memory.MemoryRepository;
+import com.airadar.watch.WatchSubscriptionService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,26 +16,26 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Aggregates everything the user has explicitly "watch"-ed into a single timeline.
- * Each watched change contributes its newest timeline entries, so the UI can show
- * "what moved on the topics you track" without clicking into each one.
+ * Aggregates everything the user has explicitly followed into a single timeline.
+ * Source of truth is {@link WatchSubscriptionService} (same as Follow / Unfollow),
+ * not memory audit rows — so unfollow cannot leave ghost timeline groups.
  */
 @RestController
 @RequestMapping("/api/watching")
 public class WatchingController {
 
-    private final MemoryRepository memoryRepository;
+    private final WatchSubscriptionService watchSubscriptionService;
     private final EventRepository eventRepository;
     private final TimelineEntryRepository timelineRepository;
     private final EventSourceLookup eventSourceLookup;
 
     public WatchingController(
-            MemoryRepository memoryRepository,
+            WatchSubscriptionService watchSubscriptionService,
             EventRepository eventRepository,
             TimelineEntryRepository timelineRepository,
             EventSourceLookup eventSourceLookup
     ) {
-        this.memoryRepository = memoryRepository;
+        this.watchSubscriptionService = watchSubscriptionService;
         this.eventRepository = eventRepository;
         this.timelineRepository = timelineRepository;
         this.eventSourceLookup = eventSourceLookup;
@@ -44,9 +43,14 @@ public class WatchingController {
 
     @GetMapping("/timeline")
     public Map<String, Object> timeline() {
-        List<MemoryEntity> watched = memoryRepository.findByKindAndRefType("watch", "change");
-        List<Map<String, Object>> groups = watched.stream()
-                .map(m -> eventRepository.findById(m.getRefId()).orElse(null))
+        List<Map<String, Object>> groups = watchSubscriptionService.listAll().stream()
+                .map(sub -> {
+                    Object id = sub.get("changeId");
+                    if (!(id instanceof Number n)) {
+                        return null;
+                    }
+                    return eventRepository.findById(n.longValue()).orElse(null);
+                })
                 .filter(e -> e != null)
                 .distinct()
                 .map(this::toGroup)

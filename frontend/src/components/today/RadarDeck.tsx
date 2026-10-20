@@ -14,6 +14,7 @@ const SWIPE_MAX = 140
 export function RadarDeck({
   cards,
   busy,
+  resetKey,
   onWatch,
   onDismiss,
   onDecide,
@@ -22,11 +23,13 @@ export function RadarDeck({
 }: {
   cards: ImpactCard[]
   busy?: boolean
+  /** When display scope / filters change, reset triage session so filter-empty ≠ celebrate. */
+  resetKey?: string
   onWatch: (card: ImpactCard) => void
   onDismiss: (card: ImpactCard) => void
   onDecide: (card: ImpactCard) => void
   onInvestigate: (card: ImpactCard) => void
-  /** Fired once when the deck first empties after having cards. */
+  /** Fired once when the user empties the deck (watch/dismiss), not when filters hide cards. */
   onCleared?: () => void
 }) {
   const { t } = useTranslation()
@@ -42,6 +45,16 @@ export function RadarDeck({
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
   const axis = useRef<'h' | 'v' | null>(null)
+  /** Only celebrate inbox-zero after an explicit triage action. */
+  const userTriaged = useRef(false)
+
+  useEffect(() => {
+    setEverHad(false)
+    setClearedFired(false)
+    setBaseline(0)
+    setIndex(0)
+    userTriaged.current = false
+  }, [resetKey])
 
   useEffect(() => {
     if (cards.length > 0) {
@@ -58,12 +71,19 @@ export function RadarDeck({
 
   useEffect(() => {
     if (cards.length === 0 && everHad && !clearedFired) {
-      setClearedFired(true)
-      onCleared?.()
+      if (userTriaged.current) {
+        setClearedFired(true)
+        onCleared?.()
+      } else {
+        // Emptied by display filter / refetch — not user completion.
+        setEverHad(false)
+        setBaseline(0)
+      }
     }
   }, [cards.length, everHad, clearedFired, onCleared])
 
   const runExit = useCallback((action: () => void) => {
+    userTriaged.current = true
     if (prefersReducedMotion()) {
       action()
       return
@@ -80,7 +100,7 @@ export function RadarDeck({
       if (isEditableTarget(e.target)) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (isAriaModalOpen()) return
-      if (busy || cards.length === 0 || !card) return
+      if (cards.length === 0 || !card) return
 
       if (e.key === '?') {
         e.preventDefault()
@@ -94,9 +114,11 @@ export function RadarDeck({
         e.preventDefault()
         setIndex((i) => Math.min(cards.length - 1, i + 1))
       } else if (e.key === 'w' || e.key === 'W') {
+        if (busy) return
         e.preventDefault()
         runExit(() => onWatch(card))
       } else if (e.key === 'x' || e.key === 'X') {
+        if (busy) return
         e.preventDefault()
         runExit(() => onDismiss(card))
       } else if (e.key === 'i' || e.key === 'I') {
@@ -330,7 +352,8 @@ export function RadarDeck({
         <HeroFocusCard
           title={card.title}
           why={card.why}
-          evidence={card.recommendation}
+          recommendation={card.recommendation}
+          evidence={card.evidence}
           score={card.score}
           tier={card.tier}
           onOpen={changeId ? () => navigate(`/changes/${changeId}`, { state: { from: '/' } }) : undefined}
@@ -408,7 +431,6 @@ export function RadarDeck({
             size="sm"
             variant="ghost"
             onClick={() => onInvestigate(card)}
-            disabled={busy}
             className="gap-1.5"
             aria-label={`${t('today.investigate')}: ${card.title}`}
             title={`${t('today.investigate')} (i)`}
@@ -420,7 +442,6 @@ export function RadarDeck({
             size="sm"
             variant="ghost"
             onClick={() => onDecide(card)}
-            disabled={busy}
             className="gap-1.5"
             aria-label={`${t('today.decide')}: ${card.title}`}
             title={`${t('today.decide')} (d)`}

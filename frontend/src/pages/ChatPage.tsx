@@ -2,7 +2,15 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, type ChatCitedChange, type ChatMessage } from '../lib/api'
-import { Button, Chip, ConfirmDialog, EmptyState, Input, PageHeader } from '../components/ui'
+import {
+  Button,
+  Chip,
+  ConfirmDialog,
+  EmptyState,
+  Input,
+  PageHeader,
+  StatusBadge,
+} from '../components/ui'
 import { errorText } from '../lib/errors'
 import { isAriaModalOpen, prefersReducedMotion } from '../lib/a11y'
 import { useEscapeBack } from '../hooks/useEscapeBack'
@@ -59,9 +67,27 @@ export default function ChatPage() {
   const abortRef = useRef<AbortController | null>(null)
 
   const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
     navigate('/')
   }, [navigate])
   useEscapeBack(goBack, !streaming && !confirmClear && !input.trim())
+
+  // When focus left the input but a draft remains, Esc still clears (then back).
+  useEffect(() => {
+    if (streaming || confirmClear || !input.trim()) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (isAriaModalOpen()) return
+      e.preventDefault()
+      setInput('')
+      queueMicrotask(() => inputRef.current?.focus())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [streaming, confirmClear, input])
 
   useEffect(() => {
     saveSession({ messages, citedChangeIds, lastCited })
@@ -252,20 +278,22 @@ export default function ChatPage() {
           <ul className="flex flex-wrap gap-2" aria-labelledby="chat-cited-label">
             {lastCited.map((c) => {
               const title = c.title?.slice(0, 36) || t('chat.untitled')
-              const label = [`#${c.id}`, title, c.tier, c.summary].filter(Boolean).join(' · ')
+              const label = [`#${c.id}`, title, c.summary].filter(Boolean).join(' · ')
               return (
                 <li key={c.id}>
                   <Link
                     to={`/changes/${c.id}`}
                     aria-label={label}
                     className={cn(
-                      'inline-flex min-h-9 items-center rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink hover:border-accent',
+                      'inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink hover:border-accent',
                       focusRingClass(),
                     )}
                     title={c.summary}
                   >
-                    #{c.id} {title}
-                    {c.tier ? ` · ${c.tier}` : ''}
+                    <span>
+                      #{c.id} {title}
+                    </span>
+                    {c.tier ? <StatusBadge status={c.tier} /> : null}
                   </Link>
                 </li>
               )

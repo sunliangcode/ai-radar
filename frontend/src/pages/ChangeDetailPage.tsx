@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
+import { ApiError, api, type ChangeCard, type ImpactCard, type IntelligenceHome } from '../lib/api'
 import { FeedbackBar } from '../components/feedback/FeedbackBar'
 import { DecisionForm, type DecisionKind } from '../components/change/DecisionForm'
 import {
@@ -21,6 +21,7 @@ import {
 import { useDisplaySources } from '../hooks/useDisplaySources'
 import { useEngagement } from '../hooks/useEngagement'
 import { useEscapeBack } from '../hooks/useEscapeBack'
+import { useMarkItemRead } from '../hooks/useMarkItemRead'
 import { useSettings } from '../hooks/useSettings'
 import { changeMatchesDisplay, itemMatchesDisplay } from '../lib/sourceFilter'
 import { dateLocale } from '../i18n'
@@ -32,6 +33,23 @@ import { cn, focusRingClass, textLinkClass } from '../lib/cn'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 type LocationState = { from?: string; focus?: 'decision' }
+
+function stripHomeMajor(
+  prev: IntelligenceHome | undefined,
+  eventId: number,
+): IntelligenceHome | undefined {
+  if (!prev) return prev
+  const strip = (list?: ImpactCard[]) =>
+    (list ?? []).filter((c) => c.eventId !== eventId && c.changeId !== eventId)
+  return {
+    ...prev,
+    majorChanges: strip(prev.majorChanges),
+    todayChanges: strip(prev.todayChanges),
+    whyCare: strip(prev.whyCare),
+    impacts: strip(prev.impacts),
+    minorSignals: strip(prev.minorSignals),
+  }
+}
 
 function decisionKindLabel(kind: string, t: (key: string) => string) {
   switch (kind) {
@@ -73,12 +91,17 @@ export default function ChangeDetailPage() {
   const [readerItemId, setReaderItemId] = useState<number | null>(null)
   const focusDecision = (location.state as LocationState | null)?.focus === 'decision'
   const [showDecision, setShowDecision] = useState(focusDecision)
-  const { displaySourceIds } = useDisplaySources()
+  const { displaySourceIds, setAllDisplayed, setDisplayedIds } = useDisplaySources()
   const settings = useSettings()
+  const markItemRead = useMarkItemRead()
   const q = useQuery({
     queryKey: ['change', changeId],
     queryFn: () => api.change(changeId),
     enabled: Number.isFinite(changeId),
+    retry: (count, err) => {
+      if (err instanceof ApiError && err.status === 404) return false
+      return count < 2
+    },
   })
   useDocumentTitle({ title: q.data?.title ?? null })
   const locale = dateLocale(i18n.language)
@@ -105,14 +128,39 @@ export default function ChangeDetailPage() {
   useEffect(() => {
     if (!focusDecision) return
     setShowDecision(true)
-    const reduce = prefersReducedMotion()
-    window.requestAnimationFrame(() => {
-      document.getElementById('change-decision')?.scrollIntoView({
-        block: 'start',
-        behavior: reduce ? 'auto' : 'smooth',
-      })
-    })
   }, [focusDecision, changeId])
+
+  // Scroll after detail loads — skeleton has no #change-decision yet.
+  useEffect(() => {
+    if (!focusDecision || !showDecision || q.isLoading || !q.data) return
+    const reduce = prefersReducedMotion()
+    let tries = 0
+    let raf = 0
+    const scroll = () => {
+      const el = document.getElementById('change-decision')
+      if (el) {
+        el.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' })
+        return
+      }
+      if (tries++ < 12) raf = window.requestAnimationFrame(scroll)
+    }
+    raf = window.requestAnimationFrame(scroll)
+    return () => window.cancelAnimationFrame(raf)
+  }, [focusDecision, showDecision, q.isLoading, q.data, changeId])
+
+  // Same reader loop as Radar: opening in-app detail clears unread.
+  const markReadMutate = markItemRead.mutate
+  useEffect(() => {
+    if (readerItemId == null) return
+    const item = (q.data?.items ?? []).find((i) => i.id === readerItemId)
+    if (!item || item.read) return
+    markReadMutate({
+      id: item.id,
+      read: true,
+      silent: true,
+      sourceType: item.primarySourceType,
+    })
+  }, [readerItemId, q.data?.items, markReadMutate])
 
   const decisionMut = useMutation({
     mutationFn: (body: { kind: DecisionKind; reason: string; revisitAt: string }) =>
@@ -121,24 +169,263 @@ export default function ChangeDetailPage() {
         reason: body.reason.trim() || undefined,
         revisitAt: body.revisitAt || undefined,
       }),
-    onSuccess: async (_data, vars) => {
+    onMutate: async (vars) => {
+      // Leave Today triage immediately so “back to Today” doesn’t show the same card.
+      await qc.cancelQueries({ queryKey: ['intelligence-home'] })
+      await qc.cancelQueries({ queryKey: ['change', changeId] })
+      const prevHome = qc.getQueryData<IntelligenceHome>(['intelligence-home'])
+      const prevChange = qc.getQueryData<ChangeCard>(['change', changeId])
+      qc.setQueryData<IntelligenceHome>(['intelligence-home'], (old) => {
+        const stripped = stripHomeMajor(old, changeId)
+        if (!stripped) return stripped
+        if (vars.kind === 'ignore') {
+          const drop = (list?: ImpactCard[]) =>
+            (list ?? []).filter((c) => (c.eventId ?? c.changeId) !== changeId)
+          return { ...stripped, following: drop(stripped.following) }
+        }
+        if (vars.kind !== 'watch' || !prevChange) return stripped
+        const card: ImpactCard = {
+          id: changeId,
+          eventId: changeId,
+          changeId,
+          title: prevChange.title,
+          summary: prevChange.summary,
+          watched: true,
+        }
+        const following = [
+          card,
+          ...(stripped.following ?? []).filter(
+            (c) => (c.eventId ?? c.changeId) !== changeId,
+          ),
+        ]
+        return { ...stripped, following }
+      })
+      if (vars.kind === 'watch' && prevChange) {
+        qc.setQueryData<ChangeCard>(['change', changeId], { ...prevChange, watched: true })
+      } else if (vars.kind === 'ignore' && prevChange) {
+        qc.setQueryData<ChangeCard>(['change', changeId], { ...prevChange, watched: false })
+      }
+      return { prevHome, prevChange }
+    },
+    onSuccess: async (data, vars) => {
+      qc.setQueryData<ChangeCard>(['change', changeId], (old) =>
+        old
+          ? {
+              ...old,
+              latestDecision: data,
+              watched:
+                vars.kind === 'watch' ? true : vars.kind === 'ignore' ? false : old.watched,
+            }
+          : old,
+      )
+      setShowDecision(false)
+      const touchWatching = vars.kind === 'watch' || vars.kind === 'ignore'
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['decisions'] }),
         qc.invalidateQueries({ queryKey: ['decisions-due'] }),
         qc.invalidateQueries({ queryKey: ['intelligence-home'] }),
         qc.invalidateQueries({ queryKey: ['change', changeId] }),
-        vars.kind === 'watch'
-          ? qc.invalidateQueries({ queryKey: ['watching'] })
+        touchWatching
+          ? Promise.all([
+              qc.invalidateQueries({ queryKey: ['watching-timeline'] }),
+              qc.invalidateQueries({ queryKey: ['changes-watching'] }),
+            ])
           : Promise.resolve(),
       ])
-      setShowDecision(false)
+      const watchCta = vars.kind === 'watch'
       pushToast('success', t(engagement.decisionToastKey()), {
-        label: fromState === '/' ? t('decisions.browseToday') : t('decisions.viewList'),
-        onClick: () => navigate(fromState === '/' ? '/' : '/decisions'),
+        label: watchCta
+          ? t('nav.watching')
+          : fromState === '/'
+            ? t('decisions.browseToday')
+            : t('decisions.viewList'),
+        onClick: () =>
+          navigate(watchCta ? '/watching' : fromState === '/' ? '/' : '/decisions'),
       })
     },
-    onError: (err) => {
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prevHome) qc.setQueryData(['intelligence-home'], ctx.prevHome)
+      if (ctx?.prevChange) qc.setQueryData(['change', changeId], ctx.prevChange)
       pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
+  })
+
+  const snoozeMut = useMutation({
+    mutationFn: (decisionId: number) => api.snoozeDecision(decisionId, 7),
+    onMutate: async (decisionId) => {
+      await qc.cancelQueries({ queryKey: ['change', changeId] })
+      await qc.cancelQueries({ queryKey: ['decisions-due'] })
+      const prevChange = qc.getQueryData<ChangeCard>(['change', changeId])
+      const prevDue = qc.getQueryData(['decisions-due'])
+      const prevRevisit = prevChange?.latestDecision?.revisitAt
+      const nextIso = new Date()
+      nextIso.setUTCDate(nextIso.getUTCDate() + 7)
+      nextIso.setUTCHours(0, 0, 0, 0)
+      qc.setQueryData<ChangeCard>(['change', changeId], (old) => {
+        if (!old?.latestDecision || old.latestDecision.id !== decisionId) return old
+        return {
+          ...old,
+          latestDecision: { ...old.latestDecision, revisitAt: nextIso.toISOString() },
+        }
+      })
+      qc.setQueryData(['decisions-due'], (old: unknown) =>
+        Array.isArray(old) ? old.filter((d: { id?: number }) => d.id !== decisionId) : old,
+      )
+      return { prevChange, prevDue, prevRevisit }
+    },
+    onSuccess: (_data, decisionId, ctx) => {
+      if (ctx?.prevRevisit) {
+        pushToast('success', t('decisions.snoozeDone'), {
+          label: t('common.undo'),
+          onClick: () => {
+            void api
+              .restoreDecisionRevisit(decisionId, ctx.prevRevisit!)
+              .then(() => {
+                if (ctx.prevChange) qc.setQueryData(['change', changeId], ctx.prevChange)
+                if (ctx.prevDue) qc.setQueryData(['decisions-due'], ctx.prevDue)
+                void qc.invalidateQueries({ queryKey: ['change', changeId] })
+                void qc.invalidateQueries({ queryKey: ['decisions-due'] })
+                void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+              })
+              .catch(() => undefined)
+          },
+        })
+      } else {
+        pushToast('success', t('decisions.snoozeDone'))
+      }
+    },
+    onError: (err, _id, ctx) => {
+      if (ctx?.prevChange) qc.setQueryData(['change', changeId], ctx.prevChange)
+      if (ctx?.prevDue) qc.setQueryData(['decisions-due'], ctx.prevDue)
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['change', changeId] })
+      void qc.invalidateQueries({ queryKey: ['decisions'] })
+      void qc.invalidateQueries({ queryKey: ['decisions-due'] })
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+    },
+  })
+
+  const watchMut = useMutation({
+    mutationFn: (watched: boolean) =>
+      watched
+        ? api.putWatch(changeId, { capability: true, api: true })
+        : api.deleteWatch(changeId),
+    onMutate: async (watched) => {
+      await qc.cancelQueries({ queryKey: ['change', changeId] })
+      await qc.cancelQueries({ queryKey: ['intelligence-home'] })
+      await qc.cancelQueries({ queryKey: ['watching-timeline'] })
+      const prev = qc.getQueryData<ChangeCard>(['change', changeId])
+      const prevHome = qc.getQueryData<IntelligenceHome>(['intelligence-home'])
+      const prevTimeline = qc.getQueryData<{ groups: { eventId: number }[]; count: number }>([
+        'watching-timeline',
+      ])
+      if (prev) qc.setQueryData(['change', changeId], { ...prev, watched })
+      if (!watched) {
+        qc.setQueryData<IntelligenceHome>(['intelligence-home'], (old) => {
+          if (!old) return old
+          const drop = (list?: ImpactCard[]) =>
+            (list ?? []).filter((c) => (c.eventId ?? c.changeId) !== changeId)
+          return { ...old, following: drop(old.following) }
+        })
+        qc.setQueryData<{ groups: { eventId: number }[]; count: number }>(
+          ['watching-timeline'],
+          (old) => {
+            if (!old) return old
+            const groups = old.groups.filter((g) => g.eventId !== changeId)
+            return { ...old, groups, count: groups.length }
+          },
+        )
+      } else if (prev) {
+        // Follow: put card into Today following immediately.
+        const card: ImpactCard = {
+          id: changeId,
+          eventId: changeId,
+          changeId,
+          title: prev.title,
+          watched: true,
+        }
+        qc.setQueryData<IntelligenceHome>(['intelligence-home'], (old) => {
+          if (!old) return old
+          const rest = (old.following ?? []).filter(
+            (c) => (c.eventId ?? c.changeId) !== changeId,
+          )
+          return { ...old, following: [card, ...rest] }
+        })
+      }
+      return { prev, prevHome, prevTimeline }
+    },
+    onSuccess: (_data, watched) => {
+      if (watched) {
+        pushToast('success', t('today.followed'), {
+          label: t('nav.watching'),
+          onClick: () => navigate('/watching'),
+        })
+      } else {
+        pushToast('success', t('today.unfollowed'), {
+          label: t('common.undo'),
+          onClick: () => {
+            void api
+              .putWatch(changeId, { capability: true, api: true })
+              .then(() => {
+                void qc.invalidateQueries({ queryKey: ['change', changeId] })
+                void qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+                void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+                void qc.invalidateQueries({ queryKey: ['changes-watching'] })
+              })
+              .catch(() => undefined)
+          },
+        })
+      }
+    },
+    onError: (err, _watched, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['change', changeId], ctx.prev)
+      if (ctx?.prevHome) qc.setQueryData(['intelligence-home'], ctx.prevHome)
+      if (ctx?.prevTimeline) qc.setQueryData(['watching-timeline'], ctx.prevTimeline)
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['change', changeId] })
+      void qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+      void qc.invalidateQueries({ queryKey: ['changes-watching'] })
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+    },
+  })
+
+  const dismissMut = useMutation({
+    mutationFn: () => api.dismissChange(changeId),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['intelligence-home'] })
+      const prevHome = qc.getQueryData<IntelligenceHome>(['intelligence-home'])
+      qc.setQueryData<IntelligenceHome>(['intelligence-home'], (old) =>
+        stripHomeMajor(old, changeId),
+      )
+      return { prevHome }
+    },
+    onSuccess: () => {
+      pushToast('success', t('today.dismissed'), {
+        label: t('common.undo'),
+        onClick: () => {
+          void api
+            .undismissChange(changeId)
+            .then(() => {
+              void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+              void qc.invalidateQueries({ queryKey: ['changes-list'] })
+            })
+            .catch(() => undefined)
+        },
+      })
+      // After dismiss, return to triage surface (Today) — same as deck swipe-left.
+      navigate('/', { replace: false })
+    },
+    onError: (err, _v, ctx) => {
+      if (ctx?.prevHome) qc.setQueryData(['intelligence-home'], ctx.prevHome)
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      void qc.invalidateQueries({ queryKey: ['changes-list'] })
     },
   })
 
@@ -163,15 +450,12 @@ export default function ChangeDetailPage() {
   )
 
   if (q.isLoading) return <ListSkeleton rows={5} />
-  if (q.isError) {
-    return (
-      <QueryErrorState
-        message={t('common.loadFailed', { message: errorText(q.error, t) })}
-        onRetry={() => void q.refetch()}
-      />
-    )
-  }
-  if (!q.data) {
+  const missing =
+    !q.data &&
+    (q.isError
+      ? q.error instanceof ApiError && q.error.status === 404
+      : !q.isFetching)
+  if (missing) {
     return (
       <EmptyState
         title={t('common.notFound')}
@@ -190,6 +474,17 @@ export default function ChangeDetailPage() {
       />
     )
   }
+  if (q.isError) {
+    return (
+      <QueryErrorState
+        message={t('common.loadFailed', { message: errorText(q.error, t) })}
+        onRetry={() => void q.refetch()}
+      />
+    )
+  }
+  if (!q.data) {
+    return <ListSkeleton rows={5} />
+  }
 
   const c = q.data
   if (!changeMatchesDisplay(c, displaySourceIds)) {
@@ -197,6 +492,28 @@ export default function ChangeDetailPage() {
       <EmptyState
         title={t('sources.hiddenByDisplayFilter')}
         primary={
+          <Button
+            onClick={() => {
+              if (c.sourceIds?.length) {
+                setDisplayedIds([
+                  ...new Set([...(displaySourceIds ?? []), ...c.sourceIds]),
+                ])
+              } else {
+                setAllDisplayed()
+              }
+            }}
+            aria-label={
+              c.sourceIds?.length
+                ? t('sources.displayIncludeChange')
+                : t('sources.displayRestoreAll')
+            }
+          >
+            {c.sourceIds?.length
+              ? t('sources.displayIncludeChange')
+              : t('sources.displayRestoreAll')}
+          </Button>
+        }
+        secondary={
           <button
             type="button"
             onClick={goBack}
@@ -215,7 +532,16 @@ export default function ChangeDetailPage() {
   const readerItem = visibleItems.find((i) => i.id === readerItemId)
 
   return (
-    <div aria-busy={q.isFetching || decisionMut.isPending || recomputeMut.isPending || undefined}>
+    <div
+      aria-busy={
+        q.isFetching ||
+        decisionMut.isPending ||
+        recomputeMut.isPending ||
+        watchMut.isPending ||
+        dismissMut.isPending ||
+        undefined
+      }
+    >
       <PageHeader
         titleId="change-detail-heading"
         title={c.title}
@@ -226,6 +552,27 @@ export default function ChangeDetailPage() {
         back={{ label: t('common.backToList'), onClick: goBack }}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant={c.watched ? 'ghost' : 'primary'}
+              loading={watchMut.isPending}
+              disabled={watchMut.isPending || dismissMut.isPending}
+              aria-pressed={Boolean(c.watched)}
+              onClick={() => watchMut.mutate(!c.watched)}
+              aria-label={c.watched ? t('today.unfollow') : t('today.watch')}
+            >
+              {c.watched ? t('today.unfollow') : t('today.watch')}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={dismissMut.isPending}
+              disabled={dismissMut.isPending || watchMut.isPending}
+              onClick={() => dismissMut.mutate()}
+              aria-label={t('today.dismiss')}
+            >
+              {t('today.dismiss')}
+            </Button>
             {!showDecision ? (
               <Button
                 size="sm"
@@ -311,18 +658,36 @@ export default function ChangeDetailPage() {
                 ) : null}
               </div>
             </div>
-            {c.latestDecision.revisitAt ? (
-              <span className="shrink-0 text-xs tabular-nums text-moss">
-                {decisionRevisitLabel(c.latestDecision.revisitAt, locale, t)}
-              </span>
-            ) : null}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {c.latestDecision.revisitAt ? (
+                <span className="text-xs tabular-nums text-moss">
+                  {decisionRevisitLabel(c.latestDecision.revisitAt, locale, t)}
+                </span>
+              ) : null}
+              {c.latestDecision.revisitAt &&
+              (revisitDayDelta(c.latestDecision.revisitAt) ?? 1) <= 0 ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={snoozeMut.isPending}
+                  onClick={() => snoozeMut.mutate(c.latestDecision!.id)}
+                  aria-label={t('decisions.snoozeAria', { title: c.title })}
+                >
+                  {t('decisions.snooze')}
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : (
           <p className="mb-3 text-sm text-muted">{t('decisions.recordHint')}</p>
         )}
         {showDecision ? (
           <DecisionForm
+            key={c.latestDecision?.id ?? 'new-decision'}
             autoFocus={focusDecision || Boolean(c.latestDecision)}
+            defaultKind={c.latestDecision?.kind}
+            defaultReason={c.latestDecision?.reason}
+            defaultRevisitAt={c.latestDecision?.revisitAt}
             loading={decisionMut.isPending}
             onCancel={() => setShowDecision(false)}
             onSubmit={(kind, reason, revisitAt) =>
@@ -440,7 +805,36 @@ export default function ChangeDetailPage() {
         </h2>
         <div className="rounded-xl border border-border bg-surface/70 px-4">
           {visibleItems.length === 0 ? (
-            <EmptyState title={t('sources.noItemsInDisplayFilter')} />
+            <EmptyState
+              title={
+                (c.items?.length ?? 0) > 0
+                  ? t('sources.noItemsInDisplayFilter')
+                  : t('changes.noLinkedItems')
+              }
+              description={
+                (c.items?.length ?? 0) > 0
+                  ? t('sources.noItemsInDisplayFilterHint')
+                  : undefined
+              }
+              primary={
+                (c.items?.length ?? 0) > 0 ? (
+                  <Button
+                    onClick={() => {
+                      if (c.sourceIds?.length) {
+                        setDisplayedIds([
+                          ...new Set([...(displaySourceIds ?? []), ...c.sourceIds]),
+                        ])
+                      } else {
+                        setAllDisplayed()
+                      }
+                    }}
+                    aria-label={t('sources.displayRestoreAll')}
+                  >
+                    {t('sources.displayRestoreAll')}
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : null}
           {visibleItems.map((item) => {
             const zhihu = isZhihuSource(item.primarySourceType)

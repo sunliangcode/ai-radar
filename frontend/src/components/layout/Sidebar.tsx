@@ -2,6 +2,7 @@ import { Link, NavLink, useLocation, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowRight,
+  Bookmark,
   MessageSquare,
   Newspaper,
   Radar,
@@ -18,6 +19,7 @@ const NAV_ICONS = {
   '/': Newspaper,
   '/radar': Radar,
   '/decisions': ArrowRight,
+  '/watching': Bookmark,
   '/chat': MessageSquare,
   '/settings/sources': Rss,
   '/settings': Settings,
@@ -28,11 +30,13 @@ const focusRing =
 
 export function Sidebar({
   totalUnread,
+  decisionsDue = 0,
   unreadByType,
   sourceTypes,
   onOpenPalette,
 }: {
   totalUnread: number
+  decisionsDue?: number
   unreadByType: Record<string, number>
   sourceTypes: [string, number][]
   onOpenPalette: () => void
@@ -50,6 +54,7 @@ export function Sidebar({
     { to: '/decisions', label: t('nav.decisions'), end: false },
   ]
   const secondaryNav = [
+    { to: '/watching', label: t('nav.watching'), end: false },
     { to: '/chat', label: t('nav.chat'), end: false },
     { to: '/settings/sources', label: t('nav.sources'), end: false },
     { to: '/settings', label: t('nav.settings'), end: false },
@@ -130,6 +135,14 @@ export function Sidebar({
                   aria-label={t('feed.unreadInline', { count: totalUnread })}
                 >
                   {formatUnreadBadge(totalUnread)}
+                </span>
+              ) : null}
+              {item.to === '/decisions' && decisionsDue > 0 ? (
+                <span
+                  className="rounded-full bg-ember/15 px-1.5 py-px font-mono text-[10px] text-ember"
+                  aria-label={t('decisions.dueBadge', { count: decisionsDue })}
+                >
+                  {formatUnreadBadge(decisionsDue)}
                 </span>
               ) : null}
             </NavLink>

@@ -135,6 +135,8 @@ export type ImpactCard = {
   firstDetectedAt?: string
   lastUpdatedAt?: string
   watched?: boolean
+  /** Linked news source ids — for display-scope filtering without a separate changes-list map. */
+  sourceIds?: number[]
 }
 
 export type ActionCard = {
@@ -262,6 +264,8 @@ export type ChangeCard = {
   items?: Item[]
   watchNext?: string
   eventImpact?: string
+  /** True when user has an active watch subscription on this change. */
+  watched?: boolean
   /** Open decision for this change, if any. */
   latestDecision?: DecisionRecord
 }
@@ -301,6 +305,8 @@ export type ProactiveAlert = {
 export type IntelligenceHome = {
   majorChanges?: ImpactCard[]
   minorSignals?: ImpactCard[]
+  /** Server-side watched changes for Today Following (survives refetch). */
+  following?: ImpactCard[]
   decisionsToRevisit?: DecisionRecord[]
   proactiveAlerts?: ProactiveAlert[]
   stats?: { majorCount?: number; minorCount?: number; decisionsDue?: number }
@@ -582,13 +588,16 @@ export const api = {
   patchItem: (id: number, body: { read?: boolean; saved?: boolean; dismissed?: boolean; notInterested?: boolean }) =>
     request<Item>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   markAllRead: (q: string = '') =>
-    request<{ updated: number }>(`/api/items/mark-all-read${q}`, { method: 'POST' }),
+    request<{ updated: number; ids?: number[] }>(`/api/items/mark-all-read${q}`, { method: 'POST' }),
   batchItems: (body: { ids: number[]; read?: boolean; saved?: boolean; dismissed?: boolean }) =>
     request<{ updated: number }>('/api/items/batch', { method: 'POST', body: JSON.stringify(body) }),
-  unreadCounts: () => request<Record<string, number>>('/api/items/unread-counts'),
-  badge: () => request<{ unreadItems: number; total: number }>('/api/items/badge'),
+  unreadCounts: (q: string = '') =>
+    request<Record<string, number>>(`/api/items/unread-counts${q}`),
+  badge: (q: string = '') =>
+    request<{ unreadItems: number; total: number }>(`/api/items/badge${q}`),
   watchingTimeline: () =>
     request<{ groups: WatchingGroup[]; count: number }>('/api/watching/timeline'),
+  item: (id: number) => request<Item>(`/api/items/${id}`),
   itemDetail: (id: number) =>
     request<{
       id: number
@@ -605,9 +614,21 @@ export const api = {
       questionId?: number
       comments?: Array<{ author: string; content: string }>
     }>(`/api/items/${id}/detail`),
-  searchItems: async (q: string, limit = 50, sourceIds?: string) => {
+  searchItems: async (
+    q: string,
+    limit = 50,
+    opts?: {
+      sourceIds?: string
+      sourceType?: string
+      unread?: boolean
+      since?: string
+    },
+  ) => {
     const params = new URLSearchParams({ q, limit: String(limit) })
-    if (sourceIds) params.set('sourceIds', sourceIds)
+    if (opts?.sourceIds) params.set('sourceIds', opts.sourceIds)
+    if (opts?.sourceType) params.set('sourceType', opts.sourceType)
+    if (opts?.unread) params.set('unread', 'true')
+    if (opts?.since) params.set('since', opts.since)
     const data = await request<{ items: Item[]; total: number }>(
       `/api/items/search?${params}`,
     )
@@ -675,6 +696,10 @@ export const api = {
     request<Record<string, unknown>>(`/api/changes/${id}/recompute-impact`, { method: 'POST' }),
   dismissChange: (id: number) =>
     request<{ changeId: number; dismissed: boolean }>(`/api/changes/${id}/dismiss`, { method: 'POST' }),
+  undismissChange: (id: number) =>
+    request<{ changeId: number; dismissed: boolean; removed: number }>(`/api/changes/${id}/dismiss`, {
+      method: 'DELETE',
+    }),
   postChangeDecision: (
     id: number,
     body: { kind: string; reason?: string; revisitAt?: string },
@@ -688,8 +713,24 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(rules),
     }),
+  deleteWatch: (changeId: number) =>
+    request<{ changeId: number; removed: boolean }>(`/api/watch/${changeId}`, {
+      method: 'DELETE',
+    }),
   decisions: (revisit?: 'due') =>
     request<DecisionRecord[]>(`/api/decisions${revisit ? '?revisit=due' : ''}`),
+  decisionsBadge: () => request<{ due: number }>('/api/decisions/badge'),
+  snoozeDecision: (id: number, days = 7) =>
+    request<DecisionRecord>(`/api/decisions/${id}/snooze`, {
+      method: 'POST',
+      body: JSON.stringify({ days }),
+    }),
+  /** Restore absolute revisit (Undo after snooze). */
+  restoreDecisionRevisit: (id: number, revisitAt: string) =>
+    request<DecisionRecord>(`/api/decisions/${id}/snooze`, {
+      method: 'POST',
+      body: JSON.stringify({ revisitAt }),
+    }),
   intelligenceHome: () => request<IntelligenceHome>('/api/intelligence/home'),
   getContext: () => request<UserContext>('/api/contexts'),
   saveContext: (body: unknown) =>

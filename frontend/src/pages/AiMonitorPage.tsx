@@ -18,6 +18,10 @@ export default function AiMonitorPage() {
   const [opFilter, setOpFilter] = useState('')
 
   const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
     navigate('/settings')
   }, [navigate])
   useEscapeBack(goBack)

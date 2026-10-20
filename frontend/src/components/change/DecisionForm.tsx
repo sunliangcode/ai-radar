@@ -15,24 +15,44 @@ function defaultRevisit(kind: DecisionKind): string {
   return d.toISOString().slice(0, 10)
 }
 
+function toDateInput(iso?: string): string {
+  if (!iso) return ''
+  const d = iso.slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ''
+}
+
+function asKind(value?: string): DecisionKind | undefined {
+  if (value === 'ignore' || value === 'investigate' || value === 'adopt' || value === 'watch') {
+    return value
+  }
+  return undefined
+}
+
 export function DecisionForm({
   onSubmit,
   onCancel,
   loading,
   defaultKind,
+  defaultReason,
+  defaultRevisitAt,
   autoFocus,
 }: {
   onSubmit: (kind: DecisionKind, reason: string, revisitAt: string) => void
   onCancel: () => void
   loading?: boolean
-  defaultKind?: DecisionKind
+  defaultKind?: DecisionKind | string
+  defaultReason?: string
+  defaultRevisitAt?: string
   /** When opened from Today “Decide”, focus the reason field. */
   autoFocus?: boolean
 }) {
   const { t } = useTranslation()
-  const [kind, setKind] = useState<DecisionKind>(defaultKind ?? 'watch')
-  const [reason, setReason] = useState('')
-  const [revisitAt, setRevisitAt] = useState(() => defaultRevisit(defaultKind ?? 'watch'))
+  const initialKind = asKind(defaultKind) ?? 'watch'
+  const [kind, setKind] = useState<DecisionKind>(initialKind)
+  const [reason, setReason] = useState(defaultReason ?? '')
+  const [revisitAt, setRevisitAt] = useState(
+    () => toDateInput(defaultRevisitAt) || defaultRevisit(initialKind),
+  )
   const formId = useId()
   const reasonId = `${formId}-reason`
   const revisitId = `${formId}-revisit`
@@ -40,7 +60,11 @@ export function DecisionForm({
 
   useEffect(() => {
     if (!autoFocus) return
-    reasonRef.current?.focus({ preventScroll: true })
+    // Defer past scroll-into-view from Change detail deep-link.
+    const id = window.setTimeout(() => {
+      reasonRef.current?.focus({ preventScroll: true })
+    }, 120)
+    return () => window.clearTimeout(id)
   }, [autoFocus])
 
   useEffect(() => {

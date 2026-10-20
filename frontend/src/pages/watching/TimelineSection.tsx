@@ -18,6 +18,8 @@ export function TimelineSection({
   error,
   onRetry,
   onToggleShowAll,
+  onUnwatch,
+  unwatchPendingId,
 }: {
   groups: WatchingGroup[]
   visibleGroups: WatchingGroup[]
@@ -27,6 +29,8 @@ export function TimelineSection({
   error?: unknown
   onRetry?: () => void
   onToggleShowAll: () => void
+  onUnwatch?: (changeId: number) => void
+  unwatchPendingId?: number | null
 }) {
   const { t } = useTranslation()
   if (!loading && !error && groups.length === 0) return null
@@ -70,7 +74,7 @@ export function TimelineSection({
               className="rounded-xl border border-border bg-surface px-4 py-3"
               aria-labelledby={`watching-timeline-title-${g.eventId}`}
             >
-              <div className="flex items-baseline justify-between gap-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <Link
                   id={`watching-timeline-title-${g.eventId}`}
                   to={`/changes/${g.eventId}`}
@@ -82,12 +86,28 @@ export function TimelineSection({
                 >
                   {g.title}
                 </Link>
-                <span
-                  className="shrink-0 font-mono text-[11px] text-muted"
-                  aria-label={t('watching.entryCount', { count: g.entryCount })}
-                >
-                  {g.entryCount}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span
+                    className="font-mono text-[11px] text-muted"
+                    aria-label={t('watching.entryCount', { count: g.entryCount })}
+                  >
+                    {g.entryCount}
+                  </span>
+                  {onUnwatch ? (
+                    <button
+                      type="button"
+                      disabled={unwatchPendingId === g.eventId}
+                      onClick={() => onUnwatch(g.eventId)}
+                      aria-label={`${t('today.unfollow')}: ${g.title}`}
+                      className={cn(
+                        'inline-flex min-h-9 items-center rounded-md px-2 text-xs text-muted hover:bg-border hover:text-ink disabled:opacity-40',
+                        focusRingClass(),
+                      )}
+                    >
+                      {t('today.unfollow')}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <ol className="mt-3 space-y-2 border-l-2 border-border pl-3">
                 {g.entries.map((e) => (

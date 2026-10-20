@@ -4,7 +4,7 @@ import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { errorText } from '../lib/errors'
-import { PageHeader, QueryErrorState } from '../components/ui'
+import { ListSkeleton, PageHeader, QueryErrorState } from '../components/ui'
 import { useEscapeBack } from '../hooks/useEscapeBack'
 import { SystemHealthCard } from './settings/SystemHealthCard'
 import { cn, focusRingClass } from '../lib/cn'
@@ -15,6 +15,10 @@ export default function SettingsHubPage() {
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings })
 
   const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
     navigate('/')
   }, [navigate])
   useEscapeBack(goBack)
@@ -33,6 +37,11 @@ export default function SettingsHubPage() {
           title: t('settingsHub.actions'),
           desc: t('settingsHub.actionsDesc'),
           muted: true,
+        },
+        {
+          to: '/watching',
+          title: t('nav.watching'),
+          desc: t('watching.subtitle'),
         },
       ],
     },
@@ -76,6 +85,12 @@ export default function SettingsHubPage() {
         title={t('settingsHub.title')}
         subtitle={t('settingsHub.subtitle')}
       />
+
+      {settings.isLoading ? (
+        <div className="mb-6">
+          <ListSkeleton rows={2} />
+        </div>
+      ) : null}
 
       {settings.isError ? (
         <div className="mb-6">

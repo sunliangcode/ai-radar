@@ -15,4 +15,6 @@ public interface MemoryRepository extends JpaRepository<MemoryEntity, Long> {
             String refType,
             java.time.Instant since
     );
+
+    List<MemoryEntity> findByKindAndRefTypeAndRefId(String kind, String refType, Long refId);
 }

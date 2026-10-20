@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn, focusRingClass } from '../../lib/cn'
+import { StatusBadge } from '../primitives/Badge'
 import { ScorePill } from '../score/ScorePill'
 import { MagAction } from './MagCard'
 
@@ -9,6 +10,7 @@ export function HeroFocusCard({
   title,
   why,
   evidence,
+  recommendation,
   score,
   tier,
   onOpen,
@@ -18,6 +20,7 @@ export function HeroFocusCard({
   title: string
   why?: string
   evidence?: string
+  recommendation?: string
   score?: number
   tier?: string
   onOpen?: () => void
@@ -60,10 +63,11 @@ export function HeroFocusCard({
         </h2>
         {score != null ? <ScorePill score={score} /> : null}
       </div>
-      {tier ? (
-        <span className="mt-2 inline-block font-mono text-[11px] text-muted">{tier}</span>
-      ) : null}
+      {tier ? <StatusBadge status={tier} className="mt-2" /> : null}
       {why ? <p className="mt-3 text-sm leading-relaxed text-ink/90">{why}</p> : null}
+      {recommendation ? (
+        <p className="mt-2 text-sm leading-relaxed text-ink/80">{recommendation}</p>
+      ) : null}
       {evidence ? <p className="mt-2 text-xs leading-relaxed text-muted">{evidence}</p> : null}
       <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label={title}>
         {onOpen ? (

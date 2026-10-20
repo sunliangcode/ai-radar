@@ -26,6 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -208,6 +210,13 @@ public class ItemsController {
         return out;
     }
 
+    @GetMapping("/{id}")
+    public Map<String, Object> get(@PathVariable Long id) {
+        NewsItemEntity entity = newsItemRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("item not found: " + id));
+        return toDto(entityMapper.toDomain(entity));
+    }
+
     @PatchMapping("/{id}")
     public Map<String, Object> patch(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         NewsItemEntity entity = newsItemRepository.findById(id)
@@ -268,55 +277,101 @@ public class ItemsController {
     @PostMapping("/mark-all-read")
     public Map<String, Object> markAllRead(
             @RequestParam(required = false) String sourceType,
+            @RequestParam(required = false) String sourceIds,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since
     ) {
-        List<NewsItemEntity> unread = newsItemRepository.findByReadFlagFalse();
-        boolean filterType = sourceType != null && !sourceType.isBlank();
-        String wanted = filterType ? sourceType.trim().toUpperCase() : null;
-        List<NewsItemEntity> toUpdate = unread.stream()
-                .filter(e -> !e.isDismissed())
-                .filter(e -> !filterType
-                        || (e.getPrimarySourceType() != null
-                        && wanted.equalsIgnoreCase(e.getPrimarySourceType().name())))
-                .filter(e -> since == null || (e.getCreatedAt() != null && !e.getCreatedAt().isBefore(since)))
-                .toList();
+        Set<Long> sourceIdFilter = parseSourceIdSet(sourceIds);
+        List<NewsItemEntity> toUpdate = unreadEntities(sourceType, sourceIdFilter, since);
+        // Cap ids returned for Undo — full mark still applies to all matched rows.
+        List<Long> undoIds = new ArrayList<>(Math.min(toUpdate.size(), 2000));
         for (NewsItemEntity entity : toUpdate) {
             entity.setReadFlag(true);
+            if (undoIds.size() < 2000 && entity.getId() != null) {
+                undoIds.add(entity.getId());
+            }
         }
         newsItemRepository.saveAll(toUpdate);
-        return Map.of("updated", toUpdate.size());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("updated", toUpdate.size());
+        out.put("ids", undoIds);
+        return out;
     }
 
     @GetMapping("/unread-counts")
-    public Map<String, Object> unreadCounts() {
-        Map<String, Object> out = new LinkedHashMap<>();
-        long total = 0L;
-        for (Object[] row : snapshotRepository.unreadCountsBySourceType()) {
-            Object type = row[0];
-            Object count = row[1];
-            if (type != null) {
-                long n = ((Number) count).longValue();
-                out.put(String.valueOf(type), n);
-                total += n;
+    public Map<String, Object> unreadCounts(
+            @RequestParam(required = false) String sourceIds,
+            @RequestParam(required = false) String sourceType
+    ) {
+        Set<Long> sourceIdFilter = parseSourceIdSet(sourceIds);
+        boolean filterType = sourceType != null && !sourceType.isBlank();
+        if (sourceIdFilter.isEmpty() && !filterType) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            long total = 0L;
+            for (Object[] row : snapshotRepository.unreadCountsBySourceType()) {
+                Object type = row[0];
+                Object count = row[1];
+                if (type != null) {
+                    long n = ((Number) count).longValue();
+                    out.put(String.valueOf(type), n);
+                    total += n;
+                }
             }
+            out.put("total", total);
+            return out;
         }
+        Map<String, Long> byType = new LinkedHashMap<>();
+        long total = 0L;
+        for (NewsItemEntity entity : unreadEntities(sourceType, sourceIdFilter, null)) {
+            String type = entity.getPrimarySourceType() != null
+                    ? entity.getPrimarySourceType().name()
+                    : "UNKNOWN";
+            byType.merge(type, 1L, Long::sum);
+            total++;
+        }
+        Map<String, Object> out = new LinkedHashMap<>(byType);
         out.put("total", total);
         return out;
     }
 
     @GetMapping("/badge")
-    public Map<String, Object> badge() {
-        long unread = newsItemRepository.countByReadFlagFalse();
+    public Map<String, Object> badge(
+            @RequestParam(required = false) String sourceIds,
+            @RequestParam(required = false) String sourceType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since
+    ) {
+        Set<Long> sourceIdFilter = parseSourceIdSet(sourceIds);
+        long unread = unreadEntities(sourceType, sourceIdFilter, since).size();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("unreadItems", unread);
         out.put("total", unread);
         return out;
     }
 
+    private List<NewsItemEntity> unreadEntities(
+            String sourceType,
+            Set<Long> sourceIdFilter,
+            Instant since
+    ) {
+        boolean filterType = sourceType != null && !sourceType.isBlank();
+        String wanted = filterType ? sourceType.trim().toUpperCase() : null;
+        return newsItemRepository.findByReadFlagFalse().stream()
+                .filter(e -> !e.isDismissed())
+                .filter(e -> !filterType
+                        || (e.getPrimarySourceType() != null
+                        && wanted.equalsIgnoreCase(e.getPrimarySourceType().name())))
+                .filter(e -> since == null || (e.getCreatedAt() != null && !e.getCreatedAt().isBefore(since)))
+                .filter(e -> sourceIdFilter.isEmpty()
+                        || ItemSourceMatch.matchesAnySourceId(entityMapper.toDomain(e), sourceIdFilter))
+                .toList();
+    }
+
     @GetMapping("/search")
     public Map<String, Object> search(
             @RequestParam("q") String q,
             @RequestParam(required = false) String sourceIds,
+            @RequestParam(required = false) String sourceType,
+            @RequestParam(required = false) Boolean unread,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since,
             @RequestParam(defaultValue = "50") int limit
     ) {
         String needle = q == null ? "" : q.trim();
@@ -325,10 +380,18 @@ public class ItemsController {
         }
         int lim = Math.max(1, Math.min(limit, 200));
         Set<Long> sourceIdFilter = parseSourceIdSet(sourceIds);
+        boolean filterType = sourceType != null && !sourceType.isBlank();
+        String wantedType = filterType ? sourceType.trim().toUpperCase() : null;
+        boolean unreadOnly = Boolean.TRUE.equals(unread);
         List<Map<String, Object>> results = newsItemRepository
                 .findByTitleContainingIgnoreCaseOrContentSnippetContainingIgnoreCase(needle, needle)
                 .stream()
                 .filter(e -> !e.isDismissed())
+                .filter(e -> !unreadOnly || !e.isReadFlag())
+                .filter(e -> since == null || (e.getCreatedAt() != null && !e.getCreatedAt().isBefore(since)))
+                .filter(e -> !filterType
+                        || (e.getPrimarySourceType() != null
+                        && wantedType.equalsIgnoreCase(e.getPrimarySourceType().name())))
                 .map(entityMapper::toDomain)
                 .filter(i -> sourceIdFilter.isEmpty() || matchesAnySourceId(i, sourceIdFilter))
                 .sorted(Comparator.comparing(NewsItem::getScore,
@@ -390,22 +453,7 @@ public class ItemsController {
     }
 
     private static boolean matchesAnySourceId(NewsItem item, Set<Long> wanted) {
-        if (wanted.isEmpty()) {
-            return true;
-        }
-        Long primary = EventSourceLookup.parseSourceId(item.getPrimarySourceId());
-        if (primary != null && wanted.contains(primary)) {
-            return true;
-        }
-        if (item.getSourceRefs() != null) {
-            for (String ref : item.getSourceRefs()) {
-                Long id = EventSourceLookup.parseSourceId(ref);
-                if (id != null && wanted.contains(id)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return ItemSourceMatch.matchesAnySourceId(item, wanted);
     }
 
     private static Long asLong(Object v) {

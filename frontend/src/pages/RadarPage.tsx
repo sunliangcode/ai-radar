@@ -24,7 +24,7 @@ export default function RadarPage() {
   const [changeQ, setChangeQ] = useState('')
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['changes-list'],
-    ['watching'],
+    ['watching-timeline'],
     ['feed'],
     ['sources'],
     ['intelligence-home'],

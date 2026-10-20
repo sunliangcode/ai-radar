@@ -23,8 +23,9 @@ import {
   MagGrid,
   PageHeader,
   SourceBadge,
+  useToast,
 } from '../components/ui'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { InboxZeroBurst } from '../components/engagement/InboxZeroBurst'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { timeAgo } from '../components/magazine/timeAgo'
@@ -32,13 +33,14 @@ import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
 import { patchFeedItemInCache } from '../hooks/useMarkItemRead'
 import { useEngagement } from '../hooks/useEngagement'
 import { useUnreadCounts } from '../hooks/useUnreadCounts'
+import { useDisplaySources } from '../hooks/useDisplaySources'
 import { dateLocale } from '../i18n'
 import { cn } from '../lib/cn'
 import { FeedToolbar } from './feed/FeedToolbar'
 import { useFeedKeyboard } from './feed/useFeedKeyboard'
 import { useFeedList } from './feed/useFeedList'
 import { useFeedActions } from './feed/useFeedActions'
-import type { Item } from '../lib/api'
+import { api, type Item } from '../lib/api'
 
 function scoreTier(score?: number): string | undefined {
   if (score == null) return undefined
@@ -67,6 +69,7 @@ export default function FeedPage({
   hideTitle?: boolean
 } = {}) {
   const { t, i18n } = useTranslation()
+  const { push: pushToast } = useToast()
   const locale = dateLocale(i18n.language)
   const listRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -75,13 +78,27 @@ export default function FeedPage({
   const [searchParams, setSearchParams] = useSearchParams()
   const engagement = useEngagement()
   const unread = useUnreadCounts()
+  const { noneSelected, setAllDisplayed } = useDisplaySources()
   const qc = useQueryClient()
   const [showInboxZero, setShowInboxZero] = useState(false)
+  /** Item opened via ?item= when it isn’t in the current feed page. */
+  const [pinnedItem, setPinnedItem] = useState<Item | null>(null)
   const prevUnread = useRef<number | null>(null)
   const drawerMarkedId = useRef<number | null>(null)
   const pendingFocusAdvance = useRef(false)
 
   const layoutParam = searchParams.get('layout')
+  const itemParam = searchParams.get('item')
+  const deepLinkItemId = (() => {
+    if (!itemParam) return null
+    const n = Number(itemParam)
+    return Number.isFinite(n) && n > 0 ? n : null
+  })()
+  const deepLinkItem = useQuery({
+    queryKey: ['item', deepLinkItemId],
+    queryFn: () => api.item(deepLinkItemId!),
+    enabled: deepLinkItemId != null,
+  })
   const [exploreView, setExploreView] = useState<ExploreView>(() => {
     if (layoutParam === 'focus') return 'focus'
     if (layoutParam === 'waterfall') return 'waterfall'
@@ -133,7 +150,8 @@ export default function FeedPage({
     ['feed'],
     ['sources'],
     ['intelligence-home'],
-    ['watching'],
+    ['watching-timeline'],
+    ['watching-saved'],
   ])
 
   const list = useFeedList(!!progress?.running)
@@ -160,10 +178,11 @@ export default function FeedPage({
   const focusMode = exploreView === 'focus'
 
   const totalUnread = useMemo(() => {
+    if (noneSelected) return 0
     const m = unread.data ?? {}
     if (typeof m.total === 'number') return m.total
     return Object.entries(m).reduce((a, [k, b]) => (k === 'total' ? a : a + b), 0)
-  }, [unread.data])
+  }, [unread.data, noneSelected])
 
   useEffect(() => {
     if (prevUnread.current != null && prevUnread.current > 0 && totalUnread === 0) {
@@ -203,13 +222,58 @@ export default function FeedPage({
     document.getElementById('feed-search-input')?.focus()
   }, [])
 
-  const openDrawer = useCallback((id: number) => {
-    list.setSelectedId(id)
-    setDrawerOpen(true)
-  }, [list.setSelectedId])
+  const openDrawer = useCallback(
+    (id: number) => {
+      list.setSelectedId(id)
+      setDrawerOpen(true)
+      // Mark-read is dwell-gated in the drawer effect (1.2s), not on open —
+      // accidental taps / quick peeks must not drain unread.
+    },
+    [list.setSelectedId],
+  )
+
+  // Actions “related item” → /radar?item=id opens the in-app reader.
+  useEffect(() => {
+    if (deepLinkItemId == null) return
+    if (deepLinkItem.isError) {
+      pushToast('error', t('feed.deepLinkMissing'))
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('item')
+          return next
+        },
+        { replace: true },
+      )
+      return
+    }
+    const fromList = list.items.find((i) => i.id === deepLinkItemId)
+    const resolved = fromList ?? deepLinkItem.data
+    if (!resolved) return
+    if (!fromList) setPinnedItem(resolved)
+    openDrawer(deepLinkItemId)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('item')
+        return next
+      },
+      { replace: true },
+    )
+  }, [
+    deepLinkItemId,
+    deepLinkItem.data,
+    deepLinkItem.isError,
+    list.items,
+    openDrawer,
+    setSearchParams,
+    pushToast,
+    t,
+  ])
 
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false)
+    setPinnedItem(null)
     // Unread-only: drop the item after the reader closes so the list doesn't jump mid-read.
     const id = drawerMarkedId.current
     if (list.unreadOnly && id != null) {
@@ -218,17 +282,10 @@ export default function FeedPage({
     drawerMarkedId.current = null
   }, [list.unreadOnly, qc])
 
-  const pagePrev = useCallback(() => {
-    /* Infinite feed: previous page is retained in memory; no-op. */
-  }, [])
-
-  const pageNext = useCallback(() => {
-    list.loadMore()
-  }, [list.loadMore])
-
   const selectItem = useCallback(
     (id: number) => {
-      if (focusMode) {
+      // Focus-mode leave-mark only when the immersive reader is closed (drawer uses dwell).
+      if (focusMode && !drawerOpen) {
         const cur = list.items.find((i) => i.id === list.selectedId)
         if (cur && !cur.read && cur.id !== id) {
           actions.markReadOnOpen(cur, { silent: true })
@@ -236,7 +293,14 @@ export default function FeedPage({
       }
       list.setSelectedId(id)
     },
-    [focusMode, list.items, list.selectedId, list.setSelectedId, actions.markReadOnOpen],
+    [
+      focusMode,
+      drawerOpen,
+      list.items,
+      list.selectedId,
+      list.setSelectedId,
+      actions.markReadOnOpen,
+    ],
   )
 
   const goFocusNext = useCallback(() => {
@@ -255,6 +319,10 @@ export default function FeedPage({
     const pid = prevItemId(list.items, list.selectedId)
     if (pid != null) selectItem(pid)
   }, [list.items, list.selectedId, selectItem])
+
+  // `[` / `]` alias focus prev/next (and load more at the end) — not empty page stubs.
+  const pagePrev = goFocusPrev
+  const pageNext = goFocusNext
 
   useEffect(() => {
     if (!pendingFocusAdvance.current || !focusMode) return
@@ -285,7 +353,14 @@ export default function FeedPage({
     onOpenExternal: actions.openExternalAndMarkRead,
     onToggleSaved: actions.toggleSaved,
     onDismiss: (item) => runWithExit(item, 'dismiss', () => actions.dismissItem(item)),
-    onMarkRead: actions.markItemSelectedRead,
+    onMarkRead: (item) => {
+      if (item.read) {
+        drawerMarkedId.current = null
+        actions.markItemUnread(item)
+      } else {
+        actions.markItemSelectedRead(item)
+      }
+    },
     onFocusSearch: focusSearch,
     onPagePrev: pagePrev,
     onPageNext: pageNext,
@@ -305,30 +380,33 @@ export default function FeedPage({
   useEffect(() => {
     if (!focusMode || list.items.length === 0) return
     if (list.selectedId != null && list.items.some((i) => i.id === list.selectedId)) return
+    if (pinnedItem && pinnedItem.id === list.selectedId) return
     const firstUnread = list.items.find((i) => !i.read) ?? list.items[0]
     if (firstUnread) list.setSelectedId(firstUnread.id)
-  }, [focusMode, list.items, list.selectedId, list.setSelectedId])
+  }, [focusMode, list.items, list.selectedId, list.setSelectedId, pinnedItem])
 
-  const selectedItem = list.items.find((i) => i.id === list.selectedId) ?? null
+  const selectedItem =
+    list.items.find((i) => i.id === list.selectedId) ??
+    (pinnedItem && pinnedItem.id === list.selectedId ? pinnedItem : null)
 
   useEffect(() => {
     if (drawerOpen && !selectedItem) setDrawerOpen(false)
   }, [drawerOpen, selectedItem])
 
-  // Viewing the immersive reader counts as reading — clear the unread badge
-  // immediately without a toast (external-open still offers undo).
+  // Drawer open + j/k: dwell before marking so rapid skim / peek doesn’t drain unread.
   const drawerItemId = selectedItem?.id
   const drawerItemRead = selectedItem?.read
   useEffect(() => {
-    if (!drawerOpen) {
-      return
-    }
-    if (drawerItemId == null || drawerItemRead) return
-    const item = list.items.find((i) => i.id === drawerItemId)
-    if (!item || item.read) return
-    drawerMarkedId.current = item.id
-    actions.markReadOnOpen(item, { silent: true })
-  }, [drawerOpen, drawerItemId, drawerItemRead, list.items, actions.markReadOnOpen])
+    if (!drawerOpen) return
+    if (drawerItemId == null || drawerItemRead || !selectedItem) return
+    const item = selectedItem
+    const timer = window.setTimeout(() => {
+      if (item.read) return
+      drawerMarkedId.current = item.id
+      actions.markReadOnOpen(item, { silent: true })
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [drawerOpen, drawerItemId, drawerItemRead, selectedItem, actions.markReadOnOpen])
 
   const runFetch = () => {
     fetchJob.mutate(list.sourceType ? { sourceType: list.sourceType } : undefined, {
@@ -427,7 +505,11 @@ export default function FeedPage({
                 <MagAction onClick={() => actions.markItemSelectedRead(item)} title={t('feed.read')}>
                   {t('feed.read')}
                 </MagAction>
-              ) : null}
+              ) : (
+                <MagAction onClick={() => actions.markItemUnread(item)} title={t('feed.markUnread')}>
+                  {t('feed.markUnread')}
+                </MagAction>
+              )}
             </>
           )
         }
@@ -615,25 +697,38 @@ export default function FeedPage({
       !(list.searchMode && list.searchQuery.isError) ? (
         <EmptyState
           title={
-            list.searchMode
-              ? t('feed.noSearchResult')
-              : list.hasSources && (list.unreadOnly || !!list.sourceType)
-                ? t('feed.filterEmpty')
-                : list.hasSources
-                  ? t('feed.empty')
-                  : t('feed.emptyNoSources')
+            list.displayBlocksAll
+              ? t('sources.displayNoneActive')
+              : list.searchMode
+                ? t('feed.noSearchResult')
+                : list.hasSources && (list.unreadOnly || !!list.sourceType)
+                  ? t('feed.filterEmpty')
+                  : list.hasSources
+                    ? t('feed.empty')
+                    : t('feed.emptyNoSources')
           }
           description={
-            list.searchMode
-              ? t('feed.noSearchResultHint')
-              : list.hasSources && (list.unreadOnly || !!list.sourceType)
-                ? t('feed.filterEmptyHint')
-                : list.hasSources
-                  ? t('feed.emptyHint')
-                  : t('feed.emptyNoSourcesHint')
+            list.displayBlocksAll
+              ? t('feed.displayNoneHint')
+              : list.searchMode
+                ? list.unreadOnly || !!list.sourceType || list.range !== 'all'
+                  ? t('feed.noSearchResultFilteredHint')
+                  : t('feed.noSearchResultHint')
+                : list.hasSources && (list.unreadOnly || !!list.sourceType)
+                  ? t('feed.filterEmptyHint')
+                  : list.hasSources
+                    ? t('feed.emptyHint')
+                    : t('feed.emptyNoSourcesHint')
           }
           primary={
-            list.searchMode ? (
+            list.displayBlocksAll ? (
+              <Button
+                onClick={setAllDisplayed}
+                aria-label={t('sources.displayRestoreAll')}
+              >
+                {t('sources.displayRestoreAll')}
+              </Button>
+            ) : list.searchMode ? (
               <Button variant="ghost" aria-label={t('feed.clearSearch')} onClick={list.clearSearch}>
                 {t('feed.clearSearch')}
               </Button>
@@ -659,7 +754,28 @@ export default function FeedPage({
             )
           }
           secondary={
-            list.hasSources && (list.unreadOnly || !!list.sourceType) && !list.searchMode ? (
+            list.displayBlocksAll ? (
+              <Link
+                to="/settings/sources"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md border border-border px-3 py-2 text-sm text-accent hover:border-accent/50',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                )}
+              >
+                {t('nav.sources')}
+              </Link>
+            ) : list.searchMode && (list.unreadOnly || !!list.sourceType) ? (
+              <Button
+                variant="ghost"
+                aria-label={t('feed.clearFilters')}
+                onClick={() => {
+                  list.setUnreadOnly(false)
+                  list.onSourceTypeChange('')
+                }}
+              >
+                {t('feed.clearFilters')}
+              </Button>
+            ) : list.hasSources && (list.unreadOnly || !!list.sourceType) && !list.searchMode ? (
               <Link
                 to="/"
                 className={cn(
@@ -833,7 +949,7 @@ export default function FeedPage({
               <kbd aria-hidden>/</kbd> {t('feed.keySearch')}
             </span>
             <span>
-              <kbd aria-hidden>[</kbd>/<kbd aria-hidden>]</kbd> {t('feed.keyPage')}
+              <kbd aria-hidden>[</kbd>/<kbd aria-hidden>]</kbd> {t('feed.keyFocusNav')}
             </span>
             <span>
               <kbd aria-hidden>⌘K</kbd> {t('nav.search')}
@@ -888,7 +1004,17 @@ export default function FeedPage({
                 <MagAction onClick={() => actions.markItemSelectedRead(selectedItem)} title={t('feed.read')}>
                   {t('feed.read')}
                 </MagAction>
-              ) : null}
+              ) : (
+                <MagAction
+                  onClick={() => {
+                    drawerMarkedId.current = null
+                    actions.markItemUnread(selectedItem)
+                  }}
+                  title={t('feed.markUnread')}
+                >
+                  {t('feed.markUnread')}
+                </MagAction>
+              )}
               <MagAction
                 onClick={() =>
                   runWithExit(selectedItem, 'dismiss', () => {

@@ -4,8 +4,9 @@ import { isAriaModalOpen, isEditableTarget } from '../../lib/a11y'
 
 /**
  * Feed keyboard: j/k (n/p in focus) move; Enter / o open in-app reader;
- * s save; x not-interested (advance); m read; / search; [ ] page.
- * When the drawer is open, j/k still advances selection (drawer content follows).
+ * s save; x not-interested (advance); m toggle read/unread; / search; [ ] page.
+ * When the drawer is open, j/k still advances selection (drawer content follows);
+ * Escape is owned by ImmersiveDrawer's focus trap.
  */
 export function useFeedKeyboard({
   items,
@@ -42,14 +43,10 @@ export function useFeedKeyboard({
     const onKey = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
-      // Modal dialogs (⌘K, confirm, immersive) own the keyboard
-      if (isAriaModalOpen()) return
-
-      if (e.key === 'Escape' && drawerOpen) {
-        e.preventDefault()
-        onCloseDrawer()
-        return
-      }
+      // Other modals (⌘K, confirm) own the keyboard; feed drawer allows j/k nav.
+      if (isAriaModalOpen() && !drawerOpen) return
+      // Drawer Esc is handled by ImmersiveDrawer focus trap (capture phase).
+      if (e.key === 'Escape' && drawerOpen) return
 
       const idx = items.findIndex((i) => i.id === selectedId)
       const goNext = () => {
@@ -92,7 +89,7 @@ export function useFeedKeyboard({
         }
       } else if (e.key === 'm') {
         const cur = items[idx]
-        if (cur && !cur.read) onMarkRead(cur)
+        if (cur) onMarkRead(cur)
       } else if (e.key === '/') {
         e.preventDefault()
         onFocusSearch()

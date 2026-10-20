@@ -20,7 +20,7 @@ import { useSources } from '../hooks/useSources'
 import { useDisplaySources } from '../hooks/useDisplaySources'
 import { useChangeSourceMap } from '../hooks/useChangeSourceMap'
 import { useUnreadCounts } from '../hooks/useUnreadCounts'
-import { impactEventMatchesDisplay } from '../lib/sourceFilter'
+import { entityMatchesDisplay, impactEventMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { dateLocale } from '../i18n'
 import { cn, focusRingClass, textLinkClass } from '../lib/cn'
@@ -69,16 +69,19 @@ export default function TodayPage() {
   const home = useQuery({ queryKey: ['intelligence-home'], queryFn: api.intelligenceHome })
   const sources = useSources()
   const unread = useUnreadCounts()
-  const { displaySourceIds } = useDisplaySources()
+  const { displaySourceIds, noneSelected, sourceIdsQuery, setAllDisplayed } = useDisplaySources()
   const changeSourceMap = useChangeSourceMap()
 
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['intelligence-home'],
     ['changes-watching'],
+    ['changes-list'],
     ['feed'],
-    ['watching'],
+    ['watching-timeline'],
+    ['unread-counts'],
     ['sources'],
     ['decisions'],
+    ['decisions-due'],
   ])
   /** Cards watched this session — shown under Following after optimistic deck removal. */
   const [sessionWatched, setSessionWatched] = useState<ImpactCard[]>([])
@@ -109,8 +112,19 @@ export default function TodayPage() {
       removeMajorOptimistic(changeId)
       return { prev }
     },
-    onSuccess: () => {
-      pushToast('success', t('today.dismissed'))
+    onSuccess: (_data, changeId, ctx) => {
+      pushToast('success', t('today.dismissed'), {
+        label: t('common.undo'),
+        onClick: () => {
+          void api
+            .undismissChange(changeId)
+            .then(() => {
+              if (ctx?.prev) qc.setQueryData(['intelligence-home'], ctx.prev)
+              void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+            })
+            .catch(() => undefined)
+        },
+      })
     },
     onError: (err, _id, ctx) => {
       if (ctx?.prev) qc.setQueryData(['intelligence-home'], ctx.prev)
@@ -130,8 +144,12 @@ export default function TodayPage() {
       return { prev }
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['watching'] })
-      pushToast('success', t('today.followed'))
+      await qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+      await qc.invalidateQueries({ queryKey: ['changes-watching'] })
+      pushToast('success', t('today.followed'), {
+        label: t('nav.watching'),
+        onClick: () => navigate('/watching'),
+      })
     },
     onError: (err, changeId, ctx) => {
       if (ctx?.prev) qc.setQueryData(['intelligence-home'], ctx.prev)
@@ -142,6 +160,118 @@ export default function TodayPage() {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+    },
+  })
+
+  const unfollowMut = useMutation({
+    mutationFn: (changeId: number) => api.deleteWatch(changeId),
+    onMutate: async (changeId) => {
+      await qc.cancelQueries({ queryKey: ['intelligence-home'] })
+      await qc.cancelQueries({ queryKey: ['watching-timeline'] })
+      const prevHome = qc.getQueryData<IntelligenceHome>(['intelligence-home'])
+      const prevTimeline = qc.getQueryData<{ groups: { eventId: number }[]; count: number }>([
+        'watching-timeline',
+      ])
+      const prevSession = sessionWatched
+      setSessionWatched((prev) =>
+        prev.filter((x) => (x.eventId ?? x.changeId) !== changeId),
+      )
+      qc.setQueryData<IntelligenceHome>(['intelligence-home'], (old) => {
+        if (!old?.following) return old
+        return {
+          ...old,
+          following: old.following.filter(
+            (c) => (c.eventId ?? c.changeId) !== changeId,
+          ),
+        }
+      })
+      qc.setQueryData<{ groups: { eventId: number }[]; count: number }>(
+        ['watching-timeline'],
+        (old) => {
+          if (!old) return old
+          const groups = old.groups.filter((g) => g.eventId !== changeId)
+          return { ...old, groups, count: groups.length }
+        },
+      )
+      return { prevHome, prevTimeline, prevSession }
+    },
+    onSuccess: (_data, changeId) => {
+      pushToast('success', t('today.unfollowed'), {
+        label: t('common.undo'),
+        onClick: () => {
+          void api
+            .putWatch(changeId, { capability: true, api: true })
+            .then(() => {
+              void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+              void qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+              void qc.invalidateQueries({ queryKey: ['changes-watching'] })
+            })
+            .catch(() => undefined)
+        },
+      })
+    },
+    onError: (err, _id, ctx) => {
+      if (ctx?.prevHome) qc.setQueryData(['intelligence-home'], ctx.prevHome)
+      if (ctx?.prevTimeline) qc.setQueryData(['watching-timeline'], ctx.prevTimeline)
+      if (ctx?.prevSession) setSessionWatched(ctx.prevSession)
+      pushToast('error', errorText(err, t))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      void qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+      void qc.invalidateQueries({ queryKey: ['changes-watching'] })
+    },
+  })
+
+  const snoozeRevisitMut = useMutation({
+    mutationFn: (decisionId: number) => api.snoozeDecision(decisionId, 7),
+    onMutate: async (decisionId) => {
+      await qc.cancelQueries({ queryKey: ['intelligence-home'] })
+      await qc.cancelQueries({ queryKey: ['decisions-due'] })
+      const prevHome = qc.getQueryData<IntelligenceHome>(['intelligence-home'])
+      const prevDue = qc.getQueryData(['decisions-due'])
+      const removed = prevHome?.decisionsToRevisit?.find((d) => d.id === decisionId)
+      qc.setQueryData<IntelligenceHome>(['intelligence-home'], (old) => {
+        if (!old?.decisionsToRevisit) return old
+        return {
+          ...old,
+          decisionsToRevisit: old.decisionsToRevisit.filter((d) => d.id !== decisionId),
+        }
+      })
+      qc.setQueryData(['decisions-due'], (old: unknown) =>
+        Array.isArray(old) ? old.filter((d: { id?: number }) => d.id !== decisionId) : old,
+      )
+      return { prevHome, prevDue, prevRevisit: removed?.revisitAt }
+    },
+    onSuccess: (_data, decisionId, ctx) => {
+      if (ctx?.prevRevisit) {
+        pushToast('success', t('decisions.snoozeDone'), {
+          label: t('common.undo'),
+          onClick: () => {
+            void api
+              .restoreDecisionRevisit(decisionId, ctx.prevRevisit!)
+              .then(() => {
+                if (ctx.prevHome) qc.setQueryData(['intelligence-home'], ctx.prevHome)
+                if (ctx.prevDue) qc.setQueryData(['decisions-due'], ctx.prevDue)
+                void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+                void qc.invalidateQueries({ queryKey: ['decisions-due'] })
+              })
+              .catch(() => undefined)
+          },
+        })
+      } else {
+        pushToast('success', t('decisions.snoozeDone'))
+      }
+    },
+    onError: (err, _id, ctx) => {
+      if (ctx?.prevHome) qc.setQueryData(['intelligence-home'], ctx.prevHome)
+      if (ctx?.prevDue) qc.setQueryData(['decisions-due'], ctx.prevDue)
+      pushToast('error', errorText(err, t))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      void qc.invalidateQueries({ queryKey: ['decisions'] })
+      void qc.invalidateQueries({ queryKey: ['decisions-due'] })
     },
   })
 
@@ -170,29 +300,43 @@ export default function TodayPage() {
   const data = home.data
   const sourceCount = sources.data?.length ?? 0
   const hasSources = sourceCount > 0
+  // Match shell badges: display-none → 0, ignore stale unread-counts cache.
   const feedUnread = (() => {
+    if (noneSelected) return 0
     const m = unread.data ?? {}
     if (typeof m.total === 'number') return m.total
     return Object.entries(m).reduce((sum, [k, n]) => (k === 'total' ? sum : sum + n), 0)
   })()
   const hasFeed = feedUnread > 0
   const filterCard = (card: ImpactCard) =>
-    impactEventMatchesDisplay(card.eventId, changeSourceMap, displaySourceIds)
+    entityMatchesDisplay(card, changeSourceMap, displaySourceIds)
 
-  const major = (data?.majorChanges ?? data?.todayChanges ?? []).filter(filterCard).slice(0, 5)
+  // Full major queue for triage (soft cap avoids pathological home payloads).
+  const major = (data?.majorChanges ?? data?.todayChanges ?? []).filter(filterCard).slice(0, 20)
   const minor = (data?.minorSignals ?? []).filter(filterCard).slice(0, 8)
-  const following = sessionWatched.filter((c) =>
-    impactEventMatchesDisplay(c.eventId, changeSourceMap, displaySourceIds),
-  )
+  // Server following + session watches (instant UX before home refetch).
+  const following = (() => {
+    const byKey = new Map<number, ImpactCard>()
+    for (const c of data?.following ?? []) {
+      const key = c.eventId ?? c.changeId
+      if (key != null && filterCard(c)) byKey.set(key, c)
+    }
+    for (const c of sessionWatched) {
+      const key = c.eventId ?? c.changeId
+      if (key != null && filterCard(c)) byKey.set(key, c)
+    }
+    return Array.from(byKey.values()).slice(0, 12)
+  })()
   const revisit = (data?.decisionsToRevisit ?? [])
-    .filter((d) => impactEventMatchesDisplay(d.changeId, changeSourceMap, displaySourceIds))
+    .filter((d) => entityMatchesDisplay(d, changeSourceMap, displaySourceIds))
     .slice(0, 1)
   const alerts = (data?.proactiveAlerts ?? []).filter((a) =>
     impactEventMatchesDisplay(a.changeId, changeSourceMap, displaySourceIds),
   )
   const majorCount = major.length
-  const ready = major.length > 0 || minor.length > 0
-  const deckBusy = dismissMut.isPending || followMut.isPending
+  // Following alone is still a valid Today surface (don't show "getting started").
+  const ready = major.length > 0 || minor.length > 0 || following.length > 0
+  const deckBusy = dismissMut.isPending || followMut.isPending || unfollowMut.isPending
   const locale = dateLocale(i18n.language)
   const dateLabel = new Date().toLocaleDateString(locale, {
     weekday: 'short',
@@ -246,7 +390,31 @@ export default function TodayPage() {
         />
       ) : null}
 
-      {!home.isLoading && !home.isError && !ready ? (
+      {!home.isLoading && !home.isError && !ready && noneSelected ? (
+        <EmptyState
+          title={t('sources.displayNoneActive')}
+          description={t('today.displayNoneHint')}
+          primary={
+            <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
+              {t('sources.displayRestoreAll')}
+            </Button>
+          }
+          secondary={
+            <Link
+              to="/settings/sources"
+              aria-label={t('nav.sources')}
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md border border-border px-3 py-2 text-sm text-accent hover:border-accent/50',
+                focusRingClass(),
+              )}
+            >
+              {t('nav.sources')}
+            </Link>
+          }
+        />
+      ) : null}
+
+      {!home.isLoading && !home.isError && !ready && !noneSelected ? (
         <EmptyState
           title={
             !hasSources
@@ -356,50 +524,87 @@ export default function TodayPage() {
               updates: revisit[0].updatesSinceDecision ?? 0,
             })}
           </p>
-          <Link
-            to="/decisions"
-            aria-label={t('today.openDecisions')}
-            className={`mt-2 inline-flex min-h-9 items-center text-xs ${textLinkClass('moss')}`}
-          >
-            {t('today.openDecisions')}
-          </Link>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            {revisit[0].changeId ? (
+              <Link
+                to={`/changes/${revisit[0].changeId}`}
+                state={{ from: '/', focus: 'decision' }}
+                aria-label={t('today.reviewChange')}
+                className={`inline-flex min-h-9 items-center text-xs ${textLinkClass('moss')}`}
+              >
+                {t('today.reviewChange')}
+              </Link>
+            ) : null}
+            {revisit[0].id != null ? (
+              <button
+                type="button"
+                disabled={snoozeRevisitMut.isPending}
+                onClick={() => snoozeRevisitMut.mutate(revisit[0].id)}
+                aria-label={t('decisions.snoozeAria', {
+                  title: revisit[0].changeTitle ?? '',
+                })}
+                className={cn(
+                  'inline-flex min-h-9 items-center text-xs',
+                  textLinkClass('moss'),
+                  focusRingClass(),
+                )}
+              >
+                {t('decisions.snooze')}
+              </button>
+            ) : null}
+            <Link
+              to="/decisions"
+              aria-label={t('today.openDecisions')}
+              className={`inline-flex min-h-9 items-center text-xs ${textLinkClass('moss')}`}
+            >
+              {t('today.openDecisions')}
+            </Link>
+          </div>
         </div>
       ) : null}
 
       {ready ? (
         <>
-          <p
-            id="today-attention-count"
-            tabIndex={-1}
-            className="mb-4 text-base font-medium text-ink outline-none"
-            aria-live="polite"
-          >
-            {t('today.attentionCount', { count: majorCount })}
-          </p>
+          {majorCount > 0 || minor.length > 0 ? (
+            <p
+              id="today-attention-count"
+              tabIndex={-1}
+              className="mb-4 text-base font-medium text-ink outline-none"
+              aria-live="polite"
+            >
+              {t('today.attentionCount', { count: majorCount })}
+            </p>
+          ) : null}
 
-          <RadarDeck
-            cards={major}
-            busy={deckBusy}
-            onWatch={(c) => {
-              const id = c.eventId ?? c.changeId
-              if (!id) return
-              setSessionWatched((prev) => {
-                const key = c.eventId ?? c.changeId
-                return [c, ...prev.filter((x) => (x.eventId ?? x.changeId) !== key)]
-              })
-              followMut.mutate(id)
-            }}
-            onDismiss={(c) => {
-              const id = c.eventId ?? c.changeId
-              if (id) dismissMut.mutate(id)
-            }}
-            onInvestigate={onInvestigate}
-            onDecide={onDecide}
-            onCleared={onDeckCleared}
-          />
+          {major.length > 0 ? (
+            <RadarDeck
+              cards={major}
+              resetKey={sourceIdsQuery ?? 'all'}
+              busy={deckBusy}
+              onWatch={(c) => {
+                const id = c.eventId ?? c.changeId
+                if (!id) return
+                setSessionWatched((prev) => {
+                  const key = c.eventId ?? c.changeId
+                  return [c, ...prev.filter((x) => (x.eventId ?? x.changeId) !== key)]
+                })
+                followMut.mutate(id)
+              }}
+              onDismiss={(c) => {
+                const id = c.eventId ?? c.changeId
+                if (id) dismissMut.mutate(id)
+              }}
+              onInvestigate={onInvestigate}
+              onDecide={onDecide}
+              onCleared={onDeckCleared}
+            />
+          ) : null}
 
           {following.length > 0 ? (
-            <section className="mt-8" aria-labelledby="today-following-heading">
+            <section
+              className={major.length > 0 || minor.length > 0 ? 'mt-8' : undefined}
+              aria-labelledby="today-following-heading"
+            >
               <h2
                 id="today-following-heading"
                 className="font-mono text-[10px] uppercase tracking-wider text-faint"
@@ -407,16 +612,34 @@ export default function TodayPage() {
                 {t('today.followingSection')}
               </h2>
               <ul className="mt-2 space-y-1.5">
-                {following.map((card) => (
-                  <li key={`follow-${card.eventId}`}>
-                    <Link
-                      to={`/changes/${card.changeId ?? card.eventId}`}
-                      className={`inline-flex min-h-9 items-center text-sm ${textLinkClass()}`}
+                {following.map((card) => {
+                  const id = card.changeId ?? card.eventId
+                  const pending =
+                    unfollowMut.isPending && unfollowMut.variables === id
+                  return (
+                    <li
+                      key={`follow-${card.eventId}`}
+                      className="flex items-center justify-between gap-3"
                     >
-                      {card.title}
-                    </Link>
-                  </li>
-                ))}
+                      <Link
+                        to={`/changes/${id}`}
+                        className={`min-w-0 flex-1 truncate inline-flex min-h-9 items-center text-sm ${textLinkClass()}`}
+                      >
+                        {card.title}
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        loading={pending}
+                        disabled={unfollowMut.isPending}
+                        onClick={() => id != null && unfollowMut.mutate(id)}
+                        aria-label={`${t('today.unfollow')}: ${card.title}`}
+                      >
+                        {t('today.unfollow')}
+                      </Button>
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           ) : null}

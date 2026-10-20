@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ConnectorDescriptor } from '../../lib/api'
 import { Button, Input, Select } from '../../components/ui'
@@ -22,6 +22,7 @@ export function SourceCreateForm({
   fieldValues,
   creating,
   createError,
+  connectorsReady,
   onNameChange,
   onTypeChange,
   onShowMoreTypes,
@@ -38,6 +39,8 @@ export function SourceCreateForm({
   fieldValues: Record<string, string>
   creating: boolean
   createError: unknown
+  /** False while /api/connectors is still loading — blocks opaque submit errors. */
+  connectorsReady?: boolean
   onNameChange: (name: string) => void
   onTypeChange: (type: string) => void
   onShowMoreTypes: () => void
@@ -47,6 +50,7 @@ export function SourceCreateForm({
 }) {
   const { t } = useTranslation()
   const nameRef = useRef<HTMLInputElement>(null)
+  const [clientError, setClientError] = useState<string | null>(null)
 
   useEffect(() => {
     nameRef.current?.focus()
@@ -78,9 +82,28 @@ export function SourceCreateForm({
     )
   }, [descriptors, type])
 
+  const missingRequired = useMemo(() => {
+    if (!selected) return [] as string[]
+    return selected.configFields
+      .filter((f) => f.required && !(fieldValues[f.key] ?? '').trim())
+      .map((f) => f.label || f.key)
+  }, [selected, fieldValues])
+
+  const canSubmit =
+    Boolean(connectorsReady !== false && selected && name.trim()) && missingRequired.length === 0
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const sourceType = selected?.id ?? type
+    setClientError(null)
+    if (connectorsReady === false || !selected) {
+      setClientError(t('sources.connectorsNotReady'))
+      return
+    }
+    if (missingRequired.length > 0) {
+      setClientError(t('sources.requiredFields', { fields: missingRequired.join(', ') }))
+      return
+    }
+    const sourceType = selected.id ?? type
     onSubmit(buildSourceConfig(selected, fieldValues), sourceType)
   }
 
@@ -173,9 +196,15 @@ export function SourceCreateForm({
         <Button
           type="submit"
           loading={creating}
-          disabled={creating || !name.trim()}
+          disabled={creating || !canSubmit}
           aria-label={creating ? t('common.saving') : t('sources.create')}
-          title={!name.trim() ? t('sources.name') : undefined}
+          title={
+            !name.trim()
+              ? t('sources.name')
+              : missingRequired.length
+                ? t('sources.requiredFields', { fields: missingRequired.join(', ') })
+                : undefined
+          }
         >
           {creating ? t('common.saving') : t('sources.create')}
         </Button>
@@ -190,9 +219,9 @@ export function SourceCreateForm({
             {t('common.cancel')}
           </Button>
         ) : null}
-        {createError ? (
+        {clientError || createError ? (
           <span role="alert" aria-live="assertive" className="text-sm text-ember">
-            {errorText(createError, t)}
+            {clientError ?? errorText(createError, t)}
           </span>
         ) : null}
       </div>

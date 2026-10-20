@@ -19,6 +19,10 @@ export function useSaveSettings() {
     mutationFn: api.saveSettings,
     onSuccess: (data) => {
       qc.setQueryData(['settings'], data)
+      // summaryLanguage / threshold affect Today cards and change copy.
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      void qc.invalidateQueries({ queryKey: ['changes'] })
+      void qc.invalidateQueries({ queryKey: ['changes-list'] })
       push('success', t('settings.saved'))
     },
     onError: (e) => push('error', errorText(e, t)),

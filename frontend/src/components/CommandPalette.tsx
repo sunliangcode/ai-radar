@@ -10,6 +10,10 @@ import { useMarkItemRead } from '../hooks/useMarkItemRead'
 import { useDisplaySources } from '../hooks/useDisplaySources'
 import { useFocusTrap } from './layout/useFocusTrap'
 import { useToast } from './ui'
+import {
+  optimisticMarkAllRead,
+  rollbackMarkAllRead,
+} from '../pages/feed/optimisticMarkAllRead'
 
 type Command = {
   id: string
@@ -42,7 +46,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     (item: Item) => {
       if (!item.canonicalUrl) return
       window.open(item.canonicalUrl, '_blank', 'noopener')
-      if (!item.read) markItemReadMutate({ id: item.id, read: true })
+      if (!item.read) {
+        markItemReadMutate({
+          id: item.id,
+          read: true,
+          sourceType: item.primarySourceType,
+        })
+      }
     },
     [markItemReadMutate],
   )
@@ -77,6 +87,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'today', label: t('nav.today'), hint: '/', run: () => navigate('/') },
       { id: 'radar', label: t('nav.radar'), hint: '/radar', run: () => navigate('/radar') },
       { id: 'decisions', label: t('nav.decisions'), hint: '/decisions', run: () => navigate('/decisions') },
+      { id: 'watching', label: t('nav.watching'), hint: '/watching', run: () => navigate('/watching') },
       { id: 'chat', label: t('nav.chat'), hint: '/chat', run: () => navigate('/chat') },
       { id: 'actions', label: t('nav.actions'), hint: '/actions', run: () => navigate('/actions') },
       {
@@ -116,7 +127,12 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       },
       {
         id: 'mark-all-read',
-        label: armed === 'mark-all-read' ? t('feed.markAllReadConfirmGlobal') : t('feed.markAllRead'),
+        label:
+          armed === 'mark-all-read'
+            ? sourceIdsQuery
+              ? t('feed.markAllReadConfirm')
+              : t('feed.markAllReadConfirmGlobal')
+            : t('feed.markAllRead'),
         hint: armed === 'mark-all-read' ? t('common.confirm') : t('nav.radar'),
         run: () => {
           if (armed !== 'mark-all-read') {
@@ -124,27 +140,54 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             return false
           }
           setArmed(null)
+          const markQ = sourceIdsQuery ? `?${sourceIdsQuery}` : ''
+          void qc.cancelQueries({ queryKey: ['feed'] })
+          void qc.cancelQueries({ queryKey: ['unread-counts'] })
+          const snapshot = optimisticMarkAllRead(qc, markQ)
           void api
-            .markAllRead()
-            .then(() => {
+            .markAllRead(markQ)
+            .then((data) => {
               void qc.invalidateQueries({ queryKey: ['feed'] })
               void qc.invalidateQueries({ queryKey: ['unread-counts'] })
               void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
               navigate('/radar?view=signals')
-              pushToast('success', t('feed.markAllReadDoneGlobal'))
+              const msg = sourceIdsQuery
+                ? t('feed.markAllReadDone')
+                : t('feed.markAllReadDoneGlobal')
+              const ids = data.ids ?? []
+              if (ids.length > 0) {
+                pushToast('success', msg, {
+                  label: t('common.undo'),
+                  onClick: () => {
+                    rollbackMarkAllRead(qc, snapshot)
+                    void api
+                      .batchItems({ ids, read: false })
+                      .then(() => {
+                        void qc.invalidateQueries({ queryKey: ['feed'] })
+                        void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+                      })
+                      .catch(() => undefined)
+                  },
+                })
+              } else {
+                pushToast('success', msg)
+              }
             })
-            .catch((err) => pushToast('error', t('common.loadFailed', { message: errorText(err, t) })))
+            .catch((err) => {
+              rollbackMarkAllRead(qc, snapshot)
+              pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+            })
         },
       },
     ],
-    [armed, navigate, pushToast, qc, t],
+    [armed, navigate, pushToast, qc, sourceIdsQuery, t],
   )
 
   const searchQuery = useQuery({
     queryKey: ['palette-search', q, sourceIdsQuery],
     queryFn: () => {
       const ids = sourceIdsQuery ? sourceIdsQuery.replace(/^sourceIds=/, '') : undefined
-      return api.searchItems(q, 8, ids)
+      return api.searchItems(q, 8, { sourceIds: ids })
     },
     enabled: open && q.trim().length > 1,
   })

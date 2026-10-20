@@ -2,11 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
-import { EmptyState, FormSaveBar, ListSkeleton, PageHeader, QueryErrorState, ScoreBar, useToast } from '../components/ui'
+import { ApiError, api, type Source } from '../lib/api'
+import {
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  FormSaveBar,
+  ListSkeleton,
+  PageHeader,
+  QueryErrorState,
+  ScoreBar,
+  useToast,
+} from '../components/ui'
 import { errorText } from '../lib/errors'
 import { cn, focusRingClass, textLinkClass } from '../lib/cn'
 import { useConnectors } from '../hooks/useConnectors'
+import { useDisplaySources } from '../hooks/useDisplaySources'
 import { findConnectorById } from '../lib/connectors'
 import { useEscapeBack } from '../hooks/useEscapeBack'
 import { SourceConfigFieldInput } from './sources/SourceConfigFieldInput'
@@ -33,10 +44,16 @@ export default function SourceDetailPage() {
   const { id } = useParams()
   const sourceId = Number(id)
   const connectors = useConnectors()
+  const { displaySourceIds, setDisplayedIds, setAllDisplayed } = useDisplaySources()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const q = useQuery({
     queryKey: ['source', sourceId],
     queryFn: () => api.source(sourceId),
     enabled: Number.isFinite(sourceId),
+    retry: (count, err) => {
+      if (err instanceof ApiError && err.status === 404) return false
+      return count < 2
+    },
   })
   useDocumentTitle({ title: q.data?.name ?? null })
 
@@ -58,32 +75,121 @@ export default function SourceDetailPage() {
 
   const patch = useMutation({
     mutationFn: (body: unknown) => api.patchSource(sourceId, body),
-    onSuccess: () => {
-      setOverrides({})
+    onMutate: async (body) => {
+      const enabled = (body as { enabled?: boolean })?.enabled
+      if (enabled == null) return undefined
+      await qc.cancelQueries({ queryKey: ['source', sourceId] })
+      await qc.cancelQueries({ queryKey: ['sources'] })
+      const prevSource = qc.getQueryData<Source>(['source', sourceId])
+      const prevSources = qc.getQueryData<Source[]>(['sources'])
+      if (prevSource) {
+        qc.setQueryData<Source>(['source', sourceId], { ...prevSource, enabled })
+      }
+      if (prevSources) {
+        qc.setQueryData<Source[]>(
+          ['sources'],
+          prevSources.map((s) => (s.id === sourceId ? { ...s, enabled } : s)),
+        )
+      }
+      return { prevSource, prevSources }
+    },
+    onSuccess: (_data, body) => {
+      const enabled = (body as { enabled?: boolean })?.enabled
+      if (enabled == null) setOverrides({})
       void qc.invalidateQueries({ queryKey: ['source', sourceId] })
       void qc.invalidateQueries({ queryKey: ['sources'] })
-      pushToast('success', t('sources.updated'))
-      queueMicrotask(() => document.getElementById('source-detail-heading')?.focus({ preventScroll: true }))
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      if (enabled != null) {
+        void qc.invalidateQueries({ queryKey: ['feed'] })
+        void qc.invalidateQueries({ queryKey: ['feed-search'] })
+        void qc.invalidateQueries({ queryKey: ['watching-saved'] })
+        void qc.invalidateQueries({ queryKey: ['changes-list'] })
+      }
+      if (enabled == null) {
+        pushToast('success', t('sources.updated'))
+      } else {
+        pushToast(
+          'success',
+          enabled ? t('sources.enabledToast') : t('sources.disabledToast'),
+          {
+            label: t('common.undo'),
+            onClick: () => {
+              void api
+                .patchSource(sourceId, { enabled: !enabled })
+                .then(() => {
+                  void qc.invalidateQueries({ queryKey: ['source', sourceId] })
+                  void qc.invalidateQueries({ queryKey: ['sources'] })
+                  void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+                  void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+                  void qc.invalidateQueries({ queryKey: ['feed'] })
+                  void qc.invalidateQueries({ queryKey: ['feed-search'] })
+                  void qc.invalidateQueries({ queryKey: ['watching-saved'] })
+                  void qc.invalidateQueries({ queryKey: ['changes-list'] })
+                })
+                .catch(() => undefined)
+            },
+          },
+        )
+      }
+      queueMicrotask(() =>
+        document.getElementById('source-detail-heading')?.focus({ preventScroll: true }),
+      )
     },
-    onError: (e) => pushToast('error', errorText(e, t)),
+    onError: (e, _body, ctx) => {
+      if (ctx?.prevSource) qc.setQueryData(['source', sourceId], ctx.prevSource)
+      if (ctx?.prevSources) qc.setQueryData(['sources'], ctx.prevSources)
+      pushToast('error', errorText(e, t))
+    },
+  })
+
+  const remove = useMutation({
+    mutationFn: () => api.deleteSource(sourceId),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['sources'] })
+      const prev = qc.getQueryData<Source[]>(['sources'])
+      if (prev) qc.setQueryData<Source[]>(['sources'], prev.filter((s) => s.id !== sourceId))
+      if (displaySourceIds?.includes(sourceId)) {
+        const next = displaySourceIds.filter((sid) => sid !== sourceId)
+        if (next.length === 0) setAllDisplayed()
+        else setDisplayedIds(next)
+      }
+      return { prev }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['sources'] })
+      void qc.invalidateQueries({ queryKey: ['feed'] })
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+      void qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+      void qc.invalidateQueries({ queryKey: ['watching-saved'] })
+      void qc.invalidateQueries({ queryKey: ['changes-list'] })
+      pushToast('success', t('sources.deleted'))
+      navigate('/settings/sources', { replace: true })
+    },
+    onError: (e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['sources'], ctx.prev)
+      pushToast('error', errorText(e, t))
+    },
   })
 
   const isDirty = Object.keys(overrides).length > 0
   const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
     navigate('/settings/sources')
   }, [navigate])
-  useEscapeBack(goBack, !isDirty && Boolean(q.data))
+  useEscapeBack(goBack, !isDirty && !confirmDelete)
 
   if (q.isLoading) return <ListSkeleton rows={4} />
-  if (q.isError) {
-    return (
-      <QueryErrorState
-        message={t('common.loadFailed', { message: errorText(q.error, t) })}
-        onRetry={() => void q.refetch()}
-      />
-    )
-  }
-  if (!q.data) {
+  const missing =
+    !q.data &&
+    (q.isError
+      ? q.error instanceof ApiError && q.error.status === 404
+      : !q.isFetching)
+  if (missing) {
     return (
       <EmptyState
         title={t('sources.notFound')}
@@ -100,6 +206,17 @@ export default function SourceDetailPage() {
         }
       />
     )
+  }
+  if (q.isError) {
+    return (
+      <QueryErrorState
+        message={t('common.loadFailed', { message: errorText(q.error, t) })}
+        onRetry={() => void q.refetch()}
+      />
+    )
+  }
+  if (!q.data) {
+    return <ListSkeleton rows={4} />
   }
 
   const s = q.data
@@ -118,6 +235,44 @@ export default function SourceDetailPage() {
         title={s.name}
         subtitle={`${s.type} · ${s.enabled ? t('sources.statusEnabled') : t('sources.statusDisabled')}`}
         back={{ label: t('common.backToList'), to: '/settings/sources' }}
+        actions={
+          <>
+            <Button
+              size="sm"
+              variant={s.enabled ? 'ghost' : 'primary'}
+              loading={patch.isPending && (patch.variables as { enabled?: boolean })?.enabled != null}
+              disabled={patch.isPending || remove.isPending}
+              onClick={() => patch.mutate({ enabled: !s.enabled })}
+              aria-pressed={s.enabled}
+              aria-label={`${s.name}: ${s.enabled ? t('sources.disable') : t('sources.enable')}`}
+            >
+              {s.enabled ? t('sources.disable') : t('sources.enable')}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={patch.isPending || remove.isPending}
+              onClick={() => setConfirmDelete(true)}
+              aria-label={t('sources.delete')}
+            >
+              {t('sources.delete')}
+            </Button>
+          </>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={t('sources.deleteConfirm', { name: s.name })}
+        description={t('sources.deleteConfirmHint')}
+        confirmLabel={t('sources.delete')}
+        cancelLabel={t('common.cancel')}
+        danger
+        pending={remove.isPending}
+        onConfirm={() => remove.mutate()}
+        onCancel={() => {
+          if (!remove.isPending) setConfirmDelete(false)
+        }}
       />
 
       <section

@@ -20,11 +20,13 @@ export function PullToRefresh({
 }) {
   const { t } = useTranslation()
   const startY = useRef<number | null>(null)
+  const pullRef = useRef(0)
   const [pull, setPull] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
 
   const reset = () => {
     startY.current = null
+    pullRef.current = 0
     setPull(0)
   }
 
@@ -39,13 +41,16 @@ export function PullToRefresh({
     const y = e.touches[0]?.clientY ?? startY.current
     const dy = Math.max(0, y - startY.current)
     if (dy > 8 && window.scrollY <= 0) {
-      setPull(Math.min(100, dy * 0.45))
+      const next = Math.min(100, dy * 0.45)
+      pullRef.current = next
+      setPull(next)
     }
   }
 
   const onTouchEnd = useCallback(async () => {
     if (startY.current == null) return
-    const shouldRefresh = pull >= THRESHOLD && !disabled && !refreshing
+    // Use ref — React `pull` state can be stale on touchend vs last touchmove.
+    const shouldRefresh = pullRef.current >= THRESHOLD && !disabled && !refreshing
     reset()
     if (!shouldRefresh) return
     setRefreshing(true)
@@ -54,7 +59,7 @@ export function PullToRefresh({
     } finally {
       setRefreshing(false)
     }
-  }, [pull, disabled, refreshing, onRefresh])
+  }, [disabled, refreshing, onRefresh])
 
   const ready = pull >= THRESHOLD
   const hint =
