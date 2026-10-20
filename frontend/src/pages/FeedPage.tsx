@@ -23,18 +23,18 @@ import {
   MagGrid,
   PageHeader,
   SourceBadge,
-  isZhihuSource,
 } from '../components/ui'
+import { useQueryClient } from '@tanstack/react-query'
 import { InboxZeroBurst } from '../components/engagement/InboxZeroBurst'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { timeAgo } from '../components/magazine/timeAgo'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
+import { patchFeedItemInCache } from '../hooks/useMarkItemRead'
 import { useEngagement } from '../hooks/useEngagement'
 import { useUnreadCounts } from '../hooks/useUnreadCounts'
 import { dateLocale } from '../i18n'
-import { PAGE } from './feed/feedQuery'
+import { cn } from '../lib/cn'
 import { FeedToolbar } from './feed/FeedToolbar'
-import { FeedPagination } from './feed/FeedPagination'
 import { useFeedKeyboard } from './feed/useFeedKeyboard'
 import { useFeedList } from './feed/useFeedList'
 import { useFeedActions } from './feed/useFeedActions'
@@ -53,6 +53,12 @@ function nextItemId(items: Item[], selectedId: number | null): number | null {
   return next?.id ?? null
 }
 
+function prevItemId(items: Item[], selectedId: number | null): number | null {
+  const idx = items.findIndex((i) => i.id === selectedId)
+  if (idx <= 0) return items[0]?.id ?? null
+  return items[idx - 1]?.id ?? null
+}
+
 export default function FeedPage({
   forceUnread,
   hideTitle,
@@ -63,18 +69,28 @@ export default function FeedPage({
   const { t, i18n } = useTranslation()
   const locale = dateLocale(i18n.language)
   const listRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const engagement = useEngagement()
   const unread = useUnreadCounts()
+  const qc = useQueryClient()
   const [showInboxZero, setShowInboxZero] = useState(false)
   const prevUnread = useRef<number | null>(null)
+  const drawerMarkedId = useRef<number | null>(null)
+  const pendingFocusAdvance = useRef(false)
 
   const layoutParam = searchParams.get('layout')
-  const [exploreView, setExploreView] = useState<ExploreView>(() =>
-    layoutParam === 'focus' ? 'focus' : loadExploreView(),
-  )
+  const [exploreView, setExploreView] = useState<ExploreView>(() => {
+    if (layoutParam === 'focus') return 'focus'
+    if (layoutParam === 'waterfall') return 'waterfall'
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      return 'focus'
+    }
+    return loadExploreView()
+  })
+  const [exiting, setExiting] = useState<{ id: number; dir: 'dismiss' | 'save' } | null>(null)
 
   const setView = useCallback(
     (v: ExploreView) => {
@@ -95,7 +111,23 @@ export default function FeedPage({
 
   useEffect(() => {
     if (layoutParam === 'focus' && exploreView !== 'focus') setExploreView('focus')
+    if (layoutParam === 'waterfall' && exploreView !== 'waterfall') setExploreView('waterfall')
   }, [layoutParam, exploreView])
+
+  const runWithExit = useCallback(
+    (item: Item, dir: 'dismiss' | 'save', action: () => void) => {
+      if (prefersReducedMotion() || exiting?.id === item.id) {
+        action()
+        return
+      }
+      setExiting({ id: item.id, dir })
+      window.setTimeout(() => {
+        action()
+        setExiting(null)
+      }, 200)
+    },
+    [exiting?.id],
+  )
 
   const { fetchJob, retryFailed, phase, progress, dismiss, isPending } = useFetchJobWithProgress([
     ['feed'],
@@ -110,13 +142,27 @@ export default function FeedPage({
     if (forceUnread) list.setUnreadOnly(true)
   }, [forceUnread, list.setUnreadOnly])
 
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || list.searchMode || !list.hasMore) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) list.loadMore()
+      },
+      { rootMargin: '240px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [list.searchMode, list.hasMore, list.loadMore])
+
   const actions = useFeedActions(list.unreadOnly)
   const filteredSource = Boolean(list.sourceType)
   const focusMode = exploreView === 'focus'
 
   const totalUnread = useMemo(() => {
     const m = unread.data ?? {}
-    return Object.values(m).reduce((a, b) => a + b, 0)
+    if (typeof m.total === 'number') return m.total
+    return Object.entries(m).reduce((a, [k, b]) => (k === 'total' ? a : a + b), 0)
   }, [unread.data])
 
   useEffect(() => {
@@ -162,34 +208,83 @@ export default function FeedPage({
     setDrawerOpen(true)
   }, [list.setSelectedId])
 
-  const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false)
+    // Unread-only: drop the item after the reader closes so the list doesn't jump mid-read.
+    const id = drawerMarkedId.current
+    if (list.unreadOnly && id != null) {
+      patchFeedItemInCache(qc, id, { read: true }, { remove: true })
+    }
+    drawerMarkedId.current = null
+  }, [list.unreadOnly, qc])
 
   const pagePrev = useCallback(() => {
-    if (list.page <= 1) return
-    list.changePage(list.page - 1)
-    const reduce = prefersReducedMotion()
-    listRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
-  }, [list.page, list.changePage])
+    /* Infinite feed: previous page is retained in memory; no-op. */
+  }, [])
 
   const pageNext = useCallback(() => {
-    const totalPages = Math.ceil(list.total / PAGE)
-    if (list.page >= totalPages) return
-    list.changePage(list.page + 1)
-    const reduce = prefersReducedMotion()
-    listRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
-  }, [list.page, list.total, list.changePage])
+    list.loadMore()
+  }, [list.loadMore])
+
+  const selectItem = useCallback(
+    (id: number) => {
+      if (focusMode) {
+        const cur = list.items.find((i) => i.id === list.selectedId)
+        if (cur && !cur.read && cur.id !== id) {
+          actions.markReadOnOpen(cur, { silent: true })
+        }
+      }
+      list.setSelectedId(id)
+    },
+    [focusMode, list.items, list.selectedId, list.setSelectedId, actions.markReadOnOpen],
+  )
+
+  const goFocusNext = useCallback(() => {
+    const nid = nextItemId(list.items, list.selectedId)
+    if (nid != null && nid !== list.selectedId) {
+      selectItem(nid)
+      return
+    }
+    if (list.hasMore) {
+      pendingFocusAdvance.current = true
+      list.loadMore()
+    }
+  }, [list.items, list.selectedId, list.hasMore, list.loadMore, selectItem])
+
+  const goFocusPrev = useCallback(() => {
+    const pid = prevItemId(list.items, list.selectedId)
+    if (pid != null) selectItem(pid)
+  }, [list.items, list.selectedId, selectItem])
+
+  useEffect(() => {
+    if (!pendingFocusAdvance.current || !focusMode) return
+    const nid = nextItemId(list.items, list.selectedId)
+    if (nid != null && nid !== list.selectedId) {
+      pendingFocusAdvance.current = false
+      selectItem(nid)
+    } else if (!list.isFetchingNextPage && !list.hasMore) {
+      pendingFocusAdvance.current = false
+    }
+  }, [
+    focusMode,
+    list.items,
+    list.selectedId,
+    list.isFetchingNextPage,
+    list.hasMore,
+    selectItem,
+  ])
 
   useFeedKeyboard({
     items: list.items,
     selectedId: list.selectedId,
     drawerOpen,
     focusMode,
-    onSelect: list.setSelectedId,
+    onSelect: selectItem,
     onOpenDrawer: openDrawer,
     onCloseDrawer: closeDrawer,
     onOpenExternal: actions.openExternalAndMarkRead,
     onToggleSaved: actions.toggleSaved,
-    onDismiss: actions.dismissItem,
+    onDismiss: (item) => runWithExit(item, 'dismiss', () => actions.dismissItem(item)),
     onMarkRead: actions.markItemSelectedRead,
     onFocusSearch: focusSearch,
     onPagePrev: pagePrev,
@@ -220,6 +315,21 @@ export default function FeedPage({
     if (drawerOpen && !selectedItem) setDrawerOpen(false)
   }, [drawerOpen, selectedItem])
 
+  // Viewing the immersive reader counts as reading — clear the unread badge
+  // immediately without a toast (external-open still offers undo).
+  const drawerItemId = selectedItem?.id
+  const drawerItemRead = selectedItem?.read
+  useEffect(() => {
+    if (!drawerOpen) {
+      return
+    }
+    if (drawerItemId == null || drawerItemRead) return
+    const item = list.items.find((i) => i.id === drawerItemId)
+    if (!item || item.read) return
+    drawerMarkedId.current = item.id
+    actions.markReadOnOpen(item, { silent: true })
+  }, [drawerOpen, drawerItemId, drawerItemRead, list.items, actions.markReadOnOpen])
+
   const runFetch = () => {
     fetchJob.mutate(list.sourceType ? { sourceType: list.sourceType } : undefined, {
       onSuccess: () => list.resetList(),
@@ -235,7 +345,6 @@ export default function FeedPage({
 
   const renderCard = (item: Item, opts?: { focus?: boolean }) => {
     const displayTitle = item.titleDisplay || item.title
-    const zhihu = isZhihuSource(item.primarySourceType)
     const lead = cleanFeedLead(item.summary || item.scoreReason, displayTitle)
     return (
       <MagCard
@@ -255,15 +364,12 @@ export default function FeedPage({
         unread={!item.read}
         selected={item.id === list.selectedId}
         dimmed={!opts?.focus && drawerOpen && item.id !== list.selectedId}
-        href={zhihu ? undefined : item.canonicalUrl}
-        onSelect={() => list.setSelectedId(item.id)}
-        onOpen={
-          zhihu
-            ? () => openDrawer(item.id)
-            : () => actions.markReadOnOpen(item)
-        }
-        onSwipeSave={() => actions.saveItem(item)}
-        onSwipeDismiss={() => actions.dismissItem(item)}
+        onSelect={() => selectItem(item.id)}
+        onOpen={() => openDrawer(item.id)}
+        onSwipeSave={() => runWithExit(item, 'save', () => actions.saveItem(item))}
+        onSwipeDismiss={() => runWithExit(item, 'dismiss', () => actions.dismissItem(item))}
+        exiting={exiting?.id === item.id}
+        exitDirection={exiting?.id === item.id ? exiting.dir : undefined}
         meta={
           <>
             <span className="tabular-nums">
@@ -283,47 +389,47 @@ export default function FeedPage({
             {item.saved ? <span className="text-moss">★</span> : null}
           </>
         }
+        // Focus mode uses the dedicated control bar below the card — avoid duplicate CTAs.
         actions={
-          <>
-            <MagAction
-              onClick={() => actions.toggleSaved(item)}
-              tone="moss"
-              title={item.saved ? t('feed.unsave') : t('feed.save')}
-            >
-              {item.saved ? t('feed.unsave') : t('feed.save')}
-            </MagAction>
-            <MagAction
-              onClick={() => actions.dismissItem(item)}
-              tone="ember"
-              title={t('feed.notInterested')}
-            >
-              {t('feed.notInterested')}
-            </MagAction>
-          </>
+          opts?.focus ? undefined : (
+            <>
+              <MagAction
+                onClick={() => actions.toggleSaved(item)}
+                tone="moss"
+                title={item.saved ? t('feed.unsave') : t('feed.save')}
+              >
+                {item.saved ? t('feed.unsave') : t('feed.save')}
+              </MagAction>
+              <MagAction
+                onClick={() => runWithExit(item, 'dismiss', () => actions.dismissItem(item))}
+                tone="ember"
+                title={t('feed.notInterested')}
+              >
+                {t('feed.notInterested')}
+              </MagAction>
+            </>
+          )
         }
         secondaryActions={
-          <>
-            {zhihu ? (
-              <MagAction onClick={() => openDrawer(item.id)} tone="accent" title={t('feed.expand')}>
-                {t('feed.expand')}
-              </MagAction>
-            ) : (
-              <MagAction
-                onClick={() => {
-                  list.setSelectedId(item.id)
-                  openDrawer(item.id)
-                }}
-                title={t('feed.expand')}
-              >
-                {t('feed.expand')}
-              </MagAction>
-            )}
-            {!item.read ? (
-              <MagAction onClick={() => actions.markItemSelectedRead(item)} title={t('feed.read')}>
-                {t('feed.read')}
-              </MagAction>
-            ) : null}
-          </>
+          opts?.focus ? undefined : (
+            <>
+              {item.canonicalUrl ? (
+                <MagAction
+                  href={item.canonicalUrl}
+                  onClick={() => actions.markReadOnOpen(item)}
+                  tone="accent"
+                  title={t('feed.openOriginal')}
+                >
+                  {t('feed.openOriginal')} ↗
+                </MagAction>
+              ) : null}
+              {!item.read ? (
+                <MagAction onClick={() => actions.markItemSelectedRead(item)} title={t('feed.read')}>
+                  {t('feed.read')}
+                </MagAction>
+              ) : null}
+            </>
+          )
         }
       />
     )
@@ -415,12 +521,17 @@ export default function FeedPage({
       <ConfirmDialog
         open={actions.confirmMarkAllOpen}
         title={t('feed.markAllReadConfirm')}
+        description={
+          list.unreadCount > 0
+            ? t('feed.markAllReadConfirmHint', { count: list.unreadCount })
+            : undefined
+        }
         confirmLabel={t('common.confirm')}
         cancelLabel={t('common.cancel')}
         danger
         pending={actions.markAll.isPending}
         onConfirm={() => {
-          actions.markAll.mutate(undefined, {
+          actions.markAll.mutate(list.markAllQuery, {
             onSuccess: () => {
               actions.setConfirmMarkAllOpen(false)
               queueMicrotask(() => {
@@ -483,7 +594,7 @@ export default function FeedPage({
         onExploreViewChange={setView}
       />
 
-      {list.feedQuery.isLoading && !list.searchMode ? <ListSkeleton rows={6} /> : null}
+      {list.feedQuery.isPending && !list.searchMode ? <ListSkeleton rows={6} /> : null}
       {list.searchMode && list.searchQuery.isLoading ? <ListSkeleton rows={4} /> : null}
       {!list.searchMode && list.feedQuery.isError ? (
         <QueryErrorState
@@ -498,7 +609,7 @@ export default function FeedPage({
         />
       ) : null}
       {list.items.length === 0 &&
-      !list.feedQuery.isLoading &&
+      !list.feedQuery.isPending &&
       !list.searchQuery.isLoading &&
       !list.feedQuery.isError &&
       !(list.searchMode && list.searchQuery.isError) ? (
@@ -547,25 +658,59 @@ export default function FeedPage({
               </Link>
             )
           }
+          secondary={
+            list.hasSources && (list.unreadOnly || !!list.sourceType) && !list.searchMode ? (
+              <Link
+                to="/"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md border border-border px-3 py-2 text-sm text-accent hover:border-accent/50',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                )}
+              >
+                {t('decisions.browseToday')}
+              </Link>
+            ) : null
+          }
         />
       ) : null}
 
       {list.items.length > 0 && focusMode && selectedItem ? (
         <div ref={listRef} className="mx-auto max-w-lg">
-          {renderCard(selectedItem, { focus: true })}
+          {(() => {
+            const idx = list.items.findIndex((i) => i.id === selectedItem.id)
+            const current = idx >= 0 ? idx + 1 : 1
+            const total = Math.max(list.total, list.items.length)
+            return (
+              <p
+                className="mb-3 text-center font-mono text-[11px] uppercase tracking-widest text-muted"
+                aria-live="polite"
+              >
+                {t('feed.focusProgress', { current, total })}
+                {list.hasMore && current >= list.items.length ? (
+                  <span className="ml-2 normal-case tracking-normal text-faint">
+                    · {t('feed.focusLoadHint')}
+                  </span>
+                ) : null}
+              </p>
+            )
+          })()}
+          <div key={selectedItem.id} className="deck-slide-in motion-reduce:animate-none">
+            {renderCard(selectedItem, { focus: true })}
+          </div>
           <div
             className="mt-3 flex flex-wrap items-center justify-center gap-1 rounded-xl border border-border bg-surface px-3 py-2"
             role="group"
             aria-label={selectedItem.titleDisplay || selectedItem.title}
           >
-            {!selectedItem.read ? (
-              <MagAction
-                onClick={() => actions.markItemSelectedRead(selectedItem)}
-                title={t('feed.read')}
-              >
-                {t('feed.read')}
-              </MagAction>
-            ) : null}
+            <MagAction onClick={goFocusPrev} title={t('feed.prevItem')}>
+              {t('feed.prevItem')}
+            </MagAction>
+            <MagAction
+              onClick={() => openDrawer(selectedItem.id)}
+              title={t('feed.expand')}
+            >
+              {t('feed.expand')}
+            </MagAction>
             <MagAction
               onClick={() => actions.toggleSaved(selectedItem)}
               tone="moss"
@@ -574,20 +719,29 @@ export default function FeedPage({
               {selectedItem.saved ? t('feed.unsave') : t('feed.save')}
             </MagAction>
             <MagAction
-              href={selectedItem.canonicalUrl}
-              onClick={() => actions.markReadOnOpen(selectedItem)}
-              tone="accent"
-              title={t('feed.openOriginal')}
-            >
-              {t('feed.openOriginal')} ↗
-            </MagAction>
-            <MagAction
               onClick={() => {
-                const nid = nextItemId(list.items, list.selectedId)
-                if (nid != null) list.setSelectedId(nid)
+                const nid = nextItemId(list.items, selectedItem.id)
+                runWithExit(selectedItem, 'dismiss', () => {
+                  actions.dismissItem(selectedItem)
+                  if (nid != null && nid !== selectedItem.id) selectItem(nid)
+                })
               }}
-              title={t('feed.nextItem')}
+              tone="ember"
+              title={t('feed.notInterested')}
             >
+              {t('feed.notInterested')}
+            </MagAction>
+            {selectedItem.canonicalUrl ? (
+              <MagAction
+                href={selectedItem.canonicalUrl}
+                onClick={() => actions.markReadOnOpen(selectedItem)}
+                tone="accent"
+                title={t('feed.openOriginal')}
+              >
+                {t('feed.openOriginal')} ↗
+              </MagAction>
+            ) : null}
+            <MagAction onClick={goFocusNext} title={t('feed.nextItem')}>
               {t('feed.nextItem')}
             </MagAction>
           </div>
@@ -606,17 +760,32 @@ export default function FeedPage({
         </div>
       ) : null}
 
-      {!list.searchMode ? (
-        <FeedPagination
-          page={list.page}
-          total={list.total}
-          pageSize={PAGE}
-          onChange={(next) => {
-            list.changePage(next)
-            const reduce = prefersReducedMotion()
-            listRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
-          }}
-        />
+      {!list.searchMode && list.hasMore ? (
+        <div className="mt-6 flex flex-col items-center gap-3">
+          {list.isFetchingNextPage ? (
+            <div className="w-full max-w-lg">
+              <ListSkeleton rows={2} />
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => list.loadMore()}
+              aria-label={t('feed.loadMore')}
+            >
+              {t('feed.loadMore')}
+            </Button>
+          )}
+          <div ref={sentinelRef} className="h-4 w-full" aria-hidden />
+        </div>
+      ) : null}
+
+      {!list.searchMode &&
+      list.items.length > 0 &&
+      !list.hasMore &&
+      !list.feedQuery.isPending ? (
+        <p className="mt-8 text-center text-xs text-faint" aria-live="polite">
+          {t('feed.endOfList')}
+        </p>
       ) : null}
 
       <div className="mt-4">
@@ -646,10 +815,10 @@ export default function FeedPage({
               </span>
             ) : null}
             <span>
-              <kbd aria-hidden>Enter</kbd> {t('feed.keyOpen')}
+              <kbd aria-hidden>Enter</kbd>/<kbd aria-hidden>o</kbd> {t('feed.keyOpen')}
             </span>
             <span>
-              <kbd aria-hidden>o</kbd> {t('feed.keyExpand')}
+              <kbd aria-hidden>u</kbd> {t('feed.keyOriginal')}
             </span>
             <span>
               <kbd aria-hidden>s</kbd> {t('feed.keySave')}
@@ -720,7 +889,16 @@ export default function FeedPage({
                   {t('feed.read')}
                 </MagAction>
               ) : null}
-              <MagAction onClick={() => actions.dismissItem(selectedItem)} tone="ember" title={t('feed.notInterested')}>
+              <MagAction
+                onClick={() =>
+                  runWithExit(selectedItem, 'dismiss', () => {
+                    actions.dismissItem(selectedItem)
+                    closeDrawer()
+                  })
+                }
+                tone="ember"
+                title={t('feed.notInterested')}
+              >
                 {t('feed.notInterested')}
               </MagAction>
               <MagAction

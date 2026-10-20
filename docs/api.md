@@ -80,6 +80,9 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | GET/PUT | `/api/contexts` | Single-user Context profile |
 | GET | `/api/events` | List events (filters: status, scores, limit — see Swagger) |
 | GET | `/api/events/{id}` | Event + timeline / items |
+| GET | `/api/changes` / `/api/changes/{id}` | Change cards (impact why / recommendation; detail includes `latestDecision` when open) |
+| POST | `/api/changes/{id}/recompute-impact` | Refresh one change’s impact scores + copy (current Context / `summaryLanguage`) |
+| POST | `/api/changes/{id}/decisions` | Record a decision on a change |
 
 ---
 
@@ -91,7 +94,11 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | GET | `/api/connectors` | Connector catalog sorted by id case-insensitively (Swagger tag **Connectors**; expect `FIXTURE`/`path`, `RSS`/`feedUrl`, `DAILY_HOT`/`route`, `WEB`/`url`, `TELEGRAM`/`channels`, `HACKER_NEWS`/`query`, `GOOGLE_NEWS`/`query`, `GDELT`/`query`, `REDDIT`/`subreddits`, `V2EX`/`nodes`, `GITHUB`/`query`, `TWITTER`/`users`, `OSS_INSIGHT`/`keywords`, `GITHUB_TRENDING`/`since`, `PRODUCT_HUNT`/`maxItems`, `EMAIL`/`maxMessages`, `ZHIHU`/`cliPath`, `WEIBO`/`cliPath`, `BILIBILI`/`cliPath`; field types: `text`/`path`/`secret`/`textarea`) |
 | GET | `/api/delivery/channels` | Delivery channel catalog sorted by id case-insensitively (`id` == `channel()`, `displayName`, `settingsKeys`, `enabled`; expect `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`; Swagger tag **Delivery**) |
 | POST | `/api/packs/import` | Body `{"packId":"ai-core\|ai-cn\|ai-signals"}`; optional `"path"` = absolute JSON array file (no jar rebuild). Prefer CLI: `ai-radar pack validate` / `pack import … --path` |
-| GET/PATCH | `/api/items` | Filters: `saved` / `unread` / `sourceType`; PATCH `read` / `saved` |
+| GET/PATCH | `/api/items` | Filters: `saved` / `unread` / `sourceType`; list also accepts `cursor` + `limit` (returns `nextCursor` / `hasMore`; `offset` still supported). PATCH `read` / `saved` / `dismissed` |
+| GET | `/api/items/unread-counts` | Unread per `primary_source_type` plus aggregate `total` |
+| GET | `/api/items/badge` | `{ unreadItems, total }` for nav badges |
+| POST | `/api/items/mark-all-read` | Optional query `sourceType` / `since` to scope the update |
+| POST | `/api/items/batch` | Body `ids` + optional `read` / `saved` / `dismissed` |
 | GET | `/api/items/interest-keywords` | Keywords from Interested titles |
 | GET | `/api/briefs` | Brief dates |
 | GET | `/api/briefs/{date}` | Brief for a date |
@@ -116,7 +123,8 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | GET | `/api/health` (includes `version` + `translate.status`: up/down/disabled) |
 | POST | `/api/jobs/fetch`, `/api/jobs/push` |
 | CRUD | `/api/sources` |
-| GET/PATCH | `/api/items` (`saved` / `unread` / `sourceType` filters; PATCH `read` / `saved`) |
+| GET/PATCH | `/api/items` (`saved` / `unread` / `sourceType`; `cursor` / `hasMore` / `nextCursor`; PATCH `read` / `saved` / `dismissed`) |
+| GET | `/api/items/unread-counts`, `/api/items/badge` |
 | GET | `/api/items/interest-keywords` (keywords from Interested titles) |
 | GET | `/api/briefs`, `/api/briefs/{date}` |
 | GET/PUT | `/api/settings` |
@@ -166,7 +174,8 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | GET | `/api/delivery/channels`（投递渠道目录，按 id 忽略大小写排序；`id` == `channel()`；需有 `outbox`/`radar.delivery.outbox-enabled`, `webhook`/`WEBHOOK_URL`, `email`/`SMTP_HOST`, `email`/`SMTP_TO`, `feishu`/`FEISHU_WEBHOOK_URL`；CLI `delivery-channels` / MCP `list_delivery_channels`） |
 | POST | `/api/jobs/fetch`, `/api/jobs/push` |
 | CRUD | `/api/sources` |
-| GET/PATCH | `/api/items`（`saved` / `unread` / `sourceType` 过滤；`PATCH` 可设 `read` / `saved`） |
+| GET/PATCH | `/api/items`（`saved` / `unread` / `sourceType`；`cursor` / `hasMore` / `nextCursor`；`PATCH` 可设 `read` / `saved` / `dismissed`） |
+| GET | `/api/items/unread-counts`、`/api/items/badge` |
 | GET | `/api/items/interest-keywords`（从感兴趣标题提取的关键词） |
 | GET | `/api/briefs`, `/api/briefs/{date}` |
 | GET/PUT | `/api/settings` |

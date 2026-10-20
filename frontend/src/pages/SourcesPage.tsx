@@ -223,20 +223,21 @@ export default function SourcesPage() {
 
       {!isEmpty && sources.data ? (
         <>
-        <SourceDisplayPicker sources={sources.data} />
-        <SourceList
-          sources={sources.data}
-          locale={locale}
-          fetchPending={isPending}
-          testingSourceType={
-            isPending ? (fetchJob.variables?.sourceType ?? '*') : null
-          }
-          patchPendingId={patch.isPending ? (patch.variables?.id ?? null) : null}
-          removePending={remove.isPending}
-          onTestFetch={(sourceType) => fetchJob.mutate({ sourceType })}
-          onToggleEnabled={(id, enabled) => patch.mutate({ id, body: { enabled } })}
-          onDelete={(id) => remove.mutate(id)}
-        />
+          <p className="mb-4 text-sm text-muted">{t('sources.listLead')}</p>
+          <SourceDisplayPicker sources={sources.data} />
+          <SourceList
+            sources={sources.data}
+            locale={locale}
+            fetchPending={isPending}
+            testingSourceType={
+              isPending ? (fetchJob.variables?.sourceType ?? '*') : null
+            }
+            patchPendingId={patch.isPending ? (patch.variables?.id ?? null) : null}
+            removePending={remove.isPending}
+            onTestFetch={(sourceType) => fetchJob.mutate({ sourceType })}
+            onToggleEnabled={(id, enabled) => patch.mutate({ id, body: { enabled } })}
+            onDelete={(id) => remove.mutate(id)}
+          />
         </>
       ) : null}
     </div>

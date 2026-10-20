@@ -98,13 +98,14 @@ export default function ChatPage() {
     errorDismissRef.current?.focus({ preventScroll: true })
   }, [error])
 
-  async function send(text: string) {
+  async function send(text: string, baseMessages?: ChatMessage[]) {
     const content = text.trim()
     if (!content || streaming) return
 
     setError(null)
     setInput('')
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content }]
+    const history = baseMessages ?? messages
+    const nextMessages: ChatMessage[] = [...history, { role: 'user', content }]
     setMessages([...nextMessages, { role: 'assistant', content: '' }])
     setStreaming(true)
 
@@ -294,6 +295,17 @@ export default function ChatPage() {
                   role="group"
                   aria-label={t('chat.emptyTitle')}
                 >
+                  {pendingSeed == null ? (
+                    <Link
+                      to="/"
+                      className={cn(
+                        'inline-flex min-h-10 items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90',
+                        focusRingClass(),
+                      )}
+                    >
+                      {t('chat.goToday')}
+                    </Link>
+                  ) : null}
                   {suggestions.map((s) => (
                     <Chip key={s} shape="pill" disabled={streaming} onClick={() => void send(s)}>
                       {s}
@@ -308,20 +320,32 @@ export default function ChatPage() {
               }
             />
           ) : (
-            messages.map((m, i) => (
-              <article
-                key={`${m.role}-${i}`}
-                data-role={m.role}
-                aria-label={m.role === 'user' ? t('chat.roleUser') : t('chat.roleAssistant')}
-                className={`max-w-[90%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                  m.role === 'user'
-                    ? 'ml-auto bg-accent-soft text-ink'
-                    : 'mr-auto bg-border/40 text-ink'
-                }`}
-              >
-                {m.content || (streaming && i === messages.length - 1 ? '…' : '')}
-              </article>
-            ))
+            messages.map((m, i) => {
+              const isStreamingTail =
+                streaming && i === messages.length - 1 && m.role === 'assistant' && !m.content
+              return (
+                <article
+                  key={`${m.role}-${i}`}
+                  data-role={m.role}
+                  aria-label={m.role === 'user' ? t('chat.roleUser') : t('chat.roleAssistant')}
+                  className={`max-w-[90%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                    m.role === 'user'
+                      ? 'ml-auto bg-accent-soft text-ink'
+                      : 'mr-auto bg-border/40 text-ink'
+                  }`}
+                >
+                  {isStreamingTail ? (
+                    <span className="inline-flex items-center gap-1 text-muted" aria-label={t('chat.waiting')}>
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted" />
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted [animation-delay:120ms]" />
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted [animation-delay:240ms]" />
+                    </span>
+                  ) : (
+                    m.content
+                  )}
+                </article>
+              )
+            })
           )}
           <div ref={bottomRef} />
         </div>
@@ -329,24 +353,46 @@ export default function ChatPage() {
         {error ? (
           <div
             role="alert"
-            className="flex items-start justify-between gap-3 border-t border-border px-4 py-2 text-sm text-ember"
+            className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-2 text-sm text-ember"
           >
             <p className="min-w-0 flex-1">{error}</p>
-            <button
-              ref={errorDismissRef}
-              type="button"
-              onClick={() => {
-                setError(null)
-                queueMicrotask(() => inputRef.current?.focus())
-              }}
-              aria-label={t('common.dismiss')}
-              className={cn(
-                'inline-flex min-h-9 shrink-0 items-center rounded-sm px-2 text-xs text-muted hover:text-ink',
-                focusRingClass(),
-              )}
-            >
-              {t('common.dismiss')}
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  const base = [...messages]
+                  if (base[base.length - 1]?.role === 'assistant') base.pop()
+                  const lastUser = base[base.length - 1]
+                  if (lastUser?.role === 'user' && lastUser.content) {
+                    base.pop()
+                    void send(lastUser.content, base)
+                    return
+                  }
+                  setError(null)
+                  queueMicrotask(() => inputRef.current?.focus())
+                }}
+                aria-label={t('common.retry')}
+              >
+                {t('common.retry')}
+              </Button>
+              <button
+                ref={errorDismissRef}
+                type="button"
+                onClick={() => {
+                  setError(null)
+                  queueMicrotask(() => inputRef.current?.focus())
+                }}
+                aria-label={t('common.dismiss')}
+                className={cn(
+                  'inline-flex min-h-9 shrink-0 items-center rounded-sm px-2 text-xs text-muted hover:text-ink',
+                  focusRingClass(),
+                )}
+              >
+                {t('common.dismiss')}
+              </button>
+            </div>
           </div>
         ) : null}
 

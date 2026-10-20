@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Eye, Search, SkipForward, X } from 'lucide-react'
@@ -7,6 +7,9 @@ import { Button, HeroFocusCard } from '../ui'
 import { InboxZeroBurst } from '../engagement/InboxZeroBurst'
 import { isAriaModalOpen, isEditableTarget, prefersReducedMotion } from '../../lib/a11y'
 import { cn, focusRingClass } from '../../lib/cn'
+
+const SWIPE_TRIGGER = 72
+const SWIPE_MAX = 140
 
 export function RadarDeck({
   cards,
@@ -34,6 +37,11 @@ export function RadarDeck({
   const [everHad, setEverHad] = useState(false)
   const [baseline, setBaseline] = useState(0)
   const [clearedFired, setClearedFired] = useState(false)
+  const [dx, setDx] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+  const startX = useRef<number | null>(null)
+  const startY = useRef<number | null>(null)
+  const axis = useRef<'h' | 'v' | null>(null)
 
   useEffect(() => {
     if (cards.length > 0) {
@@ -87,7 +95,7 @@ export function RadarDeck({
         setIndex((i) => Math.min(cards.length - 1, i + 1))
       } else if (e.key === 'w' || e.key === 'W') {
         e.preventDefault()
-        onWatch(card)
+        runExit(() => onWatch(card))
       } else if (e.key === 'x' || e.key === 'X') {
         e.preventDefault()
         runExit(() => onDismiss(card))
@@ -134,6 +142,51 @@ export function RadarDeck({
   if (!card) return null
 
   const changeId = card.eventId ?? card.changeId
+  const watchHint = dx > 28
+  const dismissHint = dx < -28
+
+  const onTouchStart = (e: TouchEvent) => {
+    if (busy || prefersReducedMotion()) return
+    const touch = e.touches[0]
+    if (!touch) return
+    startX.current = touch.clientX
+    startY.current = touch.clientY
+    axis.current = null
+    setSwiping(true)
+  }
+
+  const onTouchMove = (e: TouchEvent) => {
+    if (startX.current == null || startY.current == null) return
+    const touch = e.touches[0]
+    if (!touch) return
+    const rawX = touch.clientX - startX.current
+    const rawY = touch.clientY - startY.current
+    if (axis.current == null) {
+      if (Math.abs(rawX) < 10 && Math.abs(rawY) < 10) return
+      axis.current = Math.abs(rawX) > Math.abs(rawY) ? 'h' : 'v'
+      if (axis.current === 'v') {
+        startX.current = null
+        setDx(0)
+        setSwiping(false)
+        return
+      }
+    }
+    if (axis.current !== 'h') return
+    e.preventDefault()
+    setDx(Math.max(-SWIPE_MAX, Math.min(SWIPE_MAX, rawX)))
+  }
+
+  const finishSwipe = () => {
+    if (Math.abs(dx) >= SWIPE_TRIGGER && !busy) {
+      if (dx > 0) runExit(() => onWatch(card))
+      else runExit(() => onDismiss(card))
+    }
+    startX.current = null
+    startY.current = null
+    axis.current = null
+    setDx(0)
+    setSwiping(false)
+  }
 
   return (
     <section
@@ -209,6 +262,7 @@ export function RadarDeck({
           <span>
             <kbd aria-hidden>d</kbd> {t('today.decide')}
           </span>
+          <span>{t('today.deckSwipeHint')}</span>
         </p>
       ) : null}
 
@@ -240,7 +294,39 @@ export function RadarDeck({
         </div>
       ) : null}
 
-      <div className={cn(exiting ? 'deck-slide-out' : 'deck-slide-in')}>
+      <div
+        className={cn(
+          'relative touch-pan-y',
+          exiting ? 'deck-slide-out' : 'deck-slide-in',
+          swiping && 'mag-card--swiping',
+        )}
+        style={
+          dx
+            ? { transform: `translateX(${dx}px) rotate(${dx * 0.03}deg)`, transition: 'none' }
+            : undefined
+        }
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={finishSwipe}
+        onTouchCancel={finishSwipe}
+      >
+        {watchHint || dismissHint ? (
+          <div
+            className={cn(
+              'pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center',
+            )}
+            aria-hidden
+          >
+            <span
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-medium text-white shadow',
+                watchHint ? 'bg-moss' : 'bg-ember',
+              )}
+            >
+              {watchHint ? t('today.watch') : t('today.dismiss')}
+            </span>
+          </div>
+        ) : null}
         <HeroFocusCard
           title={card.title}
           why={card.why}
@@ -297,7 +383,7 @@ export function RadarDeck({
         >
           <Button
             size="sm"
-            onClick={() => onWatch(card)}
+            onClick={() => runExit(() => onWatch(card))}
             disabled={busy}
             className="gap-1.5"
             aria-label={`${t('today.watch')}: ${card.title}`}

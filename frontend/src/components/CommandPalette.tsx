@@ -116,7 +116,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       },
       {
         id: 'mark-all-read',
-        label: armed === 'mark-all-read' ? t('feed.markAllReadConfirm') : t('feed.markAllRead'),
+        label: armed === 'mark-all-read' ? t('feed.markAllReadConfirmGlobal') : t('feed.markAllRead'),
         hint: armed === 'mark-all-read' ? t('common.confirm') : t('nav.radar'),
         run: () => {
           if (armed !== 'mark-all-read') {
@@ -131,7 +131,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               void qc.invalidateQueries({ queryKey: ['unread-counts'] })
               void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
               navigate('/radar?view=signals')
-              pushToast('success', t('feed.markAllReadDone'))
+              pushToast('success', t('feed.markAllReadDoneGlobal'))
             })
             .catch((err) => pushToast('error', t('common.loadFailed', { message: errorText(err, t) })))
         },

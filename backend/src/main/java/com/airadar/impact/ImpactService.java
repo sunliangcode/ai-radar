@@ -9,9 +9,11 @@ import com.airadar.opportunity.OpportunityService;
 import com.airadar.provider.ai.AiService;
 import com.airadar.provider.ai.ImpactAnalysisResult;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,20 +57,7 @@ public class ImpactService {
         int computed = 0;
         int high = 0;
         for (EventEntity event : events) {
-            Long eventId = event.getId();
-            String title = event.getTitle();
-            String summary = event.getSummary();
-            String impactText = event.getImpact();
-
-            ImpactAnalysisResult analysis = aiService.analyzeImpact(
-                    contextJson,
-                    title,
-                    summary,
-                    impactText,
-                    memory
-            );
-
-            ImpactEntity impact = transactionTemplate.execute(status -> persistAnalysis(eventId, title, analysis));
+            ImpactEntity impact = analyzeAndPersist(event, contextJson, memory);
             computed++;
             if (impact != null && "HIGH".equalsIgnoreCase(impact.getTier())) {
                 high++;
@@ -79,6 +68,34 @@ public class ImpactService {
         result.put("computed", computed);
         result.put("high", high);
         return result;
+    }
+
+    /** Recompute impact copy/scores for one change (event). */
+    public Map<String, Object> recomputeOne(long eventId) {
+        EventEntity event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "change not found"));
+        contextService.getOrSeed();
+        ImpactEntity impact = analyzeAndPersist(event, contextService.payloadJson(), memoryService.recentHints());
+        if (impact == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "impact persist failed");
+        }
+        if ("HIGH".equalsIgnoreCase(impact.getTier())) {
+            opportunityService.ensureForImpact(impact);
+        }
+        return toDto(impact);
+    }
+
+    private ImpactEntity analyzeAndPersist(EventEntity event, String contextJson, String memory) {
+        Long eventId = event.getId();
+        String title = event.getTitle();
+        ImpactAnalysisResult analysis = aiService.analyzeImpact(
+                contextJson,
+                title,
+                event.getSummary(),
+                event.getImpact(),
+                memory
+        );
+        return transactionTemplate.execute(status -> persistAnalysis(eventId, title, analysis));
     }
 
     private ImpactEntity persistAnalysis(Long eventId, String title, ImpactAnalysisResult analysis) {

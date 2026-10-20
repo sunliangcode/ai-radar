@@ -40,6 +40,8 @@ export function MagCard({
   onOpen,
   onSwipeSave,
   onSwipeDismiss,
+  exiting,
+  exitDirection,
   className,
 }: {
   title: string
@@ -78,6 +80,9 @@ export function MagCard({
   onSwipeSave?: () => void
   /** Touch: swipe left past threshold → not interested. */
   onSwipeDismiss?: () => void
+  /** Play exit animation before list removal. */
+  exiting?: boolean
+  exitDirection?: 'dismiss' | 'save'
   className?: string
 }) {
   const { t } = useTranslation()
@@ -171,7 +176,11 @@ export function MagCard({
   const showChip = !hideSourceChip && Boolean(label)
   const saveHint = dx > 28
   const dismissHint = dx < -28
-  const describedBy = [unread ? unreadId : null, lead ? leadId : null].filter(Boolean).join(' ') || undefined
+  // Keep AT descriptions short — full lead stays visible; SR gets a clipped teaser.
+  const leadAria =
+    lead && lead.length > 140 ? `${lead.slice(0, 140).replace(/\s+\S*$/, '').trim()}…` : lead
+  const describedBy =
+    [unread ? unreadId : null, leadAria ? leadId : null].filter(Boolean).join(' ') || undefined
 
   return (
     <article
@@ -183,6 +192,7 @@ export function MagCard({
         unread === false && 'is-read',
         dimmed && !selected && 'is-dimmed',
         swiping && 'mag-card--swiping',
+        exiting && (exitDirection === 'save' ? 'mag-card--exit-save' : 'mag-card--exit'),
         className,
       )}
       data-mag-id={dataId}
@@ -265,9 +275,18 @@ export function MagCard({
           </p>
         ) : null}
         {lead ? (
-          <p id={leadId} className="mt-2 text-[13px] leading-relaxed text-ink/75 line-clamp-3" title={lead}>
-            {lead}
-          </p>
+          <>
+            <p id={leadId} className="sr-only">
+              {leadAria}
+            </p>
+            <p
+              className="mt-2 text-[13px] leading-relaxed text-ink/75 line-clamp-3"
+              title={lead}
+              aria-hidden
+            >
+              {lead}
+            </p>
+          </>
         ) : null}
         {meta ? (
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted">

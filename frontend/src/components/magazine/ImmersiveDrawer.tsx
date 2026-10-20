@@ -1,11 +1,14 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode, type TouchEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useFocusTrap } from '../layout/useFocusTrap'
+import { prefersReducedMotion } from '../../lib/a11y'
 import { cn, focusRingClass } from '../../lib/cn'
 
+const SHEET_DISMISS_PX = 80
+
 /**
- * Immersive focus panel: centered modal on all breakpoints.
- * Esc / backdrop closes; focus is trapped while open.
+ * Immersive reader: bottom sheet on small screens, centered modal on md+.
+ * Esc / backdrop / drag-down (sheet) closes; focus is trapped while open.
  */
 export function ImmersiveDrawer({
   open,
@@ -38,6 +41,8 @@ export function ImmersiveDrawer({
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const generatedTitleId = useId()
   const titleId = labelledById ?? generatedTitleId
+  const [dragY, setDragY] = useState(0)
+  const startY = useRef<number | null>(null)
 
   useFocusTrap({ open, onClose, containerRef: panelRef, initialFocusRef: closeRef })
 
@@ -49,6 +54,7 @@ export function ImmersiveDrawer({
       document.body.style.overflow = ''
       returnFocusRef.current?.focus?.({ preventScroll: true })
       returnFocusRef.current = null
+      setDragY(0)
     }
     return () => {
       document.body.style.overflow = ''
@@ -57,9 +63,37 @@ export function ImmersiveDrawer({
 
   if (!open) return null
 
+  const onHandleTouchStart = (e: TouchEvent) => {
+    if (prefersReducedMotion()) return
+    const touch = e.touches[0]
+    if (!touch) return
+    startY.current = touch.clientY
+  }
+
+  const onHandleTouchMove = (e: TouchEvent) => {
+    if (startY.current == null) return
+    const touch = e.touches[0]
+    if (!touch) return
+    const dy = Math.max(0, touch.clientY - startY.current)
+    setDragY(dy)
+  }
+
+  const onHandleTouchEnd = () => {
+    if (dragY >= SHEET_DISMISS_PX) onClose()
+    startY.current = null
+    setDragY(0)
+  }
+
+  const sheetStyle =
+    dragY > 0
+      ? { transform: `translateY(${dragY}px)`, transition: 'none' }
+      : prefersReducedMotion()
+        ? undefined
+        : { transition: 'transform 200ms ease-out' }
+
   return (
     <div
-      className="fixed inset-0 z-[50] flex items-center justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]"
+      className="fixed inset-0 z-[50] flex items-end justify-center md:items-center md:px-4 md:pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-[max(1rem,env(safe-area-inset-top))]"
       role="presentation"
     >
       <button
@@ -76,9 +110,27 @@ export function ImmersiveDrawer({
         aria-labelledby={title ? titleId : undefined}
         aria-label={title ? undefined : t('magazine.drawerFallback')}
         className={cn(
-          'mag-drawer relative flex w-full max-w-2xl max-h-[85vh] flex-col rounded-2xl border border-border bg-surface shadow-2xl',
+          'mag-drawer relative flex w-full flex-col border border-border bg-surface shadow-2xl',
+          /* Mobile: full-bleed bottom sheet */
+          'max-h-[min(96dvh,100%)] rounded-t-2xl border-b-0 md:max-h-[85vh] md:max-w-2xl md:rounded-2xl md:border-b',
         )}
+        style={sheetStyle}
       >
+        {/* Sheet drag handle — mobile only */}
+        <div
+          className="flex shrink-0 justify-center pt-2 pb-1 md:hidden"
+          onTouchStart={onHandleTouchStart}
+          onTouchMove={onHandleTouchMove}
+          onTouchEnd={onHandleTouchEnd}
+          onTouchCancel={onHandleTouchEnd}
+        >
+          <div
+            className="h-1.5 w-10 rounded-full bg-border"
+            aria-hidden
+          />
+          <span className="sr-only">{t('magazine.sheetDragHint')}</span>
+        </div>
+
         <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3 md:px-5">
           <div className="min-w-0 flex-1">
             {title ? (

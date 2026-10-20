@@ -31,6 +31,22 @@ public interface NewsItemRepository extends JpaRepository<NewsItemEntity, Long> 
             nativeQuery = true)
     List<NewsItemEntity> findByCreatedSinceNative(@Param("since") String since);
 
+    /** Feed window: exclude dismissed, prefer unread then score — used for list pagination. */
+    @Query(value = """
+            SELECT * FROM news_items
+            WHERE dismissed = 0 AND created_at >= :since
+            ORDER BY read_flag ASC, score DESC, id DESC
+            """, nativeQuery = true)
+    List<NewsItemEntity> findFeedSinceNative(@Param("since") String since);
+
+    @Query(value = """
+            SELECT * FROM news_items
+            WHERE dismissed = 0 AND primary_source_type = :type AND created_at >= :since
+            ORDER BY read_flag ASC, score DESC, id DESC
+            """, nativeQuery = true)
+    List<NewsItemEntity> findFeedBySourceTypeSinceNative(
+            @Param("type") String type, @Param("since") String since);
+
     List<NewsItemEntity> findByUpdatedAtGreaterThanEqualOrderByScoreDesc(Instant since);
 
     List<NewsItemEntity> findByReadFlagFalse();

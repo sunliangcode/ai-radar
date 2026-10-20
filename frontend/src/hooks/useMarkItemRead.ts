@@ -1,11 +1,39 @@
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { api, type Item } from '../lib/api'
 import { useToast } from '../components/ui'
 import { useEngagement } from './useEngagement'
 import { errorText } from '../lib/errors'
+import type { FeedPage } from '../pages/feed/useFeedList'
 
-type FeedPageData = { items: Item[]; total: number; offset?: number; limit?: number }
+type FlatFeed = { items: Item[]; total: number; offset?: number; limit?: number }
+
+export type MarkItemReadVars = {
+  id: number
+  read: boolean
+  /** Skip success toast (e.g. auto-read when opening the drawer). */
+  silent?: boolean
+  /** Optional source type for optimistic unread badge adjustment. */
+  sourceType?: string
+}
+
+function isInfiniteFeed(old: unknown): old is InfiniteData<FeedPage> {
+  return Boolean(old && typeof old === 'object' && Array.isArray((old as InfiniteData<FeedPage>).pages))
+}
+
+function isFlatFeed(old: unknown): old is FlatFeed {
+  return Boolean(
+    old &&
+      typeof old === 'object' &&
+      Array.isArray((old as FlatFeed).items) &&
+      !('pages' in (old as object)),
+  )
+}
 
 /** Update item fields in cached feed lists without refetching (avoids unread-first reorder jump). */
 export function patchFeedItemInCache(
@@ -14,17 +42,41 @@ export function patchFeedItemInCache(
   patch: Partial<Item>,
   opts?: { remove?: boolean },
 ) {
-  qc.setQueriesData<FeedPageData>({ queryKey: ['feed'] }, (old) => {
-    if (!old?.items) return old
-    if (opts?.remove) {
-      const items = old.items.filter((i) => i.id !== id)
-      return { ...old, items, total: Math.max(0, (old.total ?? items.length) - 1) }
+  qc.setQueriesData<InfiniteData<FeedPage> | FlatFeed>({ queryKey: ['feed'] }, (old) => {
+    if (!old) return old
+    if (isInfiniteFeed(old)) {
+      return {
+        ...old,
+        pages: old.pages.map((page) => {
+          if (!page?.items) return page
+          if (opts?.remove) {
+            const items = page.items.filter((i) => i.id !== id)
+            return {
+              ...page,
+              items,
+              total: Math.max(0, (page.total ?? items.length) - 1),
+            }
+          }
+          return {
+            ...page,
+            items: page.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+          }
+        }),
+      }
     }
-    return {
-      ...old,
-      items: old.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+    if (isFlatFeed(old)) {
+      if (opts?.remove) {
+        const items = old.items.filter((i) => i.id !== id)
+        return { ...old, items, total: Math.max(0, (old.total ?? items.length) - 1) }
+      }
+      return {
+        ...old,
+        items: old.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+      }
     }
+    return old
   })
+
   qc.setQueriesData<{ items: Item[]; total: number }>({ queryKey: ['feed-search'] }, (old) => {
     if (!old?.items) return old
     if (opts?.remove) {
@@ -38,9 +90,29 @@ export function patchFeedItemInCache(
   })
 }
 
+/** Adjust sidebar / tab unread badges immediately when read state flips. */
+export function patchUnreadCountsInCache(
+  qc: QueryClient,
+  delta: number,
+  sourceType?: string,
+) {
+  if (delta === 0) return
+  qc.setQueryData<Record<string, number>>(['unread-counts'], (old) => {
+    if (!old) return old
+    const next = { ...old }
+    if (typeof next.total === 'number') {
+      next.total = Math.max(0, next.total + delta)
+    }
+    if (sourceType && typeof next[sourceType] === 'number') {
+      next[sourceType] = Math.max(0, next[sourceType] + delta)
+    }
+    return next
+  })
+}
+
 /**
  * Mark an item as read (e.g. when the user opens the original source).
- * Updates list in place so order stays stable; shows an undo toast on success.
+ * Optimistic cache update so the unread dot clears instantly; undo toast unless silent.
  */
 export function useMarkItemRead() {
   const qc = useQueryClient()
@@ -49,12 +121,25 @@ export function useMarkItemRead() {
   const engagement = useEngagement()
 
   return useMutation({
-    mutationFn: ({ id, read }: { id: number; read: boolean }) => api.patchItem(id, { read }),
-    onSuccess: async (_data, vars) => {
+    mutationFn: ({ id, read }: MarkItemReadVars) => api.patchItem(id, { read }),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ['feed'] })
+      await qc.cancelQueries({ queryKey: ['feed-search'] })
+      await qc.cancelQueries({ queryKey: ['unread-counts'] })
+      const prevFeed = qc.getQueriesData({ queryKey: ['feed'] })
+      const prevSearch = qc.getQueriesData({ queryKey: ['feed-search'] })
+      const prevUnread = qc.getQueryData<Record<string, number>>(['unread-counts'])
       patchFeedItemInCache(qc, vars.id, { read: vars.read })
-      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
-      if (!vars.read) return
-      engagement.bumpRead(1)
+      if (vars.read) {
+        patchUnreadCountsInCache(qc, -1, vars.sourceType)
+      } else {
+        patchUnreadCountsInCache(qc, 1, vars.sourceType)
+      }
+      return { prevFeed, prevSearch, prevUnread }
+    },
+    onSuccess: (_data, vars) => {
+      if (vars.read) engagement.bumpRead(1)
+      if (vars.silent || !vars.read) return
       pushToast('success', t('feed.markedRead'), {
         label: t('common.undo'),
         onClick: () => {
@@ -62,14 +147,25 @@ export function useMarkItemRead() {
             .patchItem(vars.id, { read: false })
             .then(() => {
               patchFeedItemInCache(qc, vars.id, { read: false })
+              patchUnreadCountsInCache(qc, 1, vars.sourceType)
               void qc.invalidateQueries({ queryKey: ['unread-counts'] })
             })
             .catch(() => undefined)
         },
       })
     },
-    onError: (err) => {
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prevFeed) {
+        for (const [key, data] of ctx.prevFeed) qc.setQueryData(key, data)
+      }
+      if (ctx?.prevSearch) {
+        for (const [key, data] of ctx.prevSearch) qc.setQueryData(key, data)
+      }
+      if (ctx?.prevUnread) qc.setQueryData(['unread-counts'], ctx.prevUnread)
       pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['unread-counts'] })
     },
   })
 }

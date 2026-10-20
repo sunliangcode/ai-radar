@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next'
 import { PrefsProvider, EmptyState, ListSkeleton, ToastProvider } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Sidebar } from './components/layout/Sidebar'
+import { BottomTabBar } from './components/layout/BottomTabBar'
+import { PullToRefresh } from './components/layout/PullToRefresh'
 import { CommandPalette } from './components/CommandPalette'
+import { useFetchJobWithProgress } from './hooks/useFetchJobWithProgress'
 import { EngagementProvider } from './hooks/useEngagement'
 import { DisplaySourcesProvider } from './hooks/useDisplaySources'
 import { useSources } from './hooks/useSources'
@@ -74,7 +77,6 @@ function Shell() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     mainRef.current?.focus({ preventScroll: true })
-    // Announce after title hook / detail pages update document.title.
     const id = window.setTimeout(() => {
       setRouteAnnounce(document.title)
     }, 50)
@@ -84,6 +86,15 @@ function Shell() {
   const unread = useUnreadCounts()
   const sources = useSources()
   const { isDisplayed } = useDisplaySources()
+  const { fetchJob, isPending: fetchPending } = useFetchJobWithProgress([
+    ['intelligence-home'],
+    ['feed'],
+    ['watching'],
+    ['sources'],
+    ['changes-watching'],
+  ])
+  const canPullRefresh =
+    location.pathname === '/' || location.pathname === '/radar' || location.pathname.startsWith('/radar')
 
   const visibleSources = useMemo(
     () => (sources.data ?? []).filter((s) => s.enabled && isDisplayed(s.id)),
@@ -147,11 +158,22 @@ function Shell() {
         id="main-content"
         ref={mainRef}
         tabIndex={-1}
-        className="px-4 py-5 outline-none md:px-8 md:py-7"
+        className="route-enter px-4 py-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] outline-none md:px-8 md:py-7 md:pb-7"
       >
         <div className="mx-auto max-w-6xl">
           <ErrorBoundary>
             <Suspense fallback={<PageFallback />}>
+              <PullToRefresh
+                disabled={!canPullRefresh || fetchPending}
+                onRefresh={() =>
+                  new Promise<void>((resolve, reject) => {
+                    fetchJob.mutate(undefined, {
+                      onSuccess: () => resolve(),
+                      onError: (err) => reject(err),
+                    })
+                  })
+                }
+              >
               <Routes>
                 <Route path="/monitor" element={<Navigate to="/settings/system" replace />} />
                 <Route path="/" element={<TodayPage />} />
@@ -183,10 +205,12 @@ function Shell() {
                 {/* Unknown URLs used to render a blank main area with no explanation. */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
+              </PullToRefresh>
             </Suspense>
           </ErrorBoundary>
         </div>
       </main>
+      <BottomTabBar totalUnread={totalUnread} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   )

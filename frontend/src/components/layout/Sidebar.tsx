@@ -10,6 +10,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { useEngagement } from '../../hooks/useEngagement'
+import { formatUnreadBadge } from '../../lib/format'
 import { LanguageSwitcher, ThemeDensityControls } from './PrefsControls'
 import { cn } from '../../lib/cn'
 
@@ -41,6 +42,7 @@ export function Sidebar({
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const activeSourceType = searchParams.get('sourceType') ?? ''
+  const typeLabel = (type: string) => t(`sourceType.${type}`, { defaultValue: type })
 
   const primaryNav = [
     { to: '/', label: t('nav.today'), end: true },
@@ -86,12 +88,23 @@ export function Sidebar({
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 md:hidden">
+          <button
+            type="button"
+            onClick={onOpenPalette}
+            aria-label={t('nav.search')}
+            className={cn(
+              'inline-flex min-h-9 min-w-9 items-center justify-center rounded-md text-muted hover:bg-border hover:text-ink',
+              focusRing,
+            )}
+          >
+            <Search size={16} aria-hidden />
+          </button>
           <LanguageSwitcher />
           <ThemeDensityControls />
         </div>
       </div>
       <nav
-        className="-mx-1 flex gap-1 overflow-x-auto scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory px-1 md:mx-0 md:flex-col md:overflow-visible md:snap-none md:px-0"
+        className="hidden md:mx-0 md:flex md:flex-col md:overflow-visible md:px-0"
         aria-label={t('nav.main')}
       >
         {primaryNav.map((item) => {
@@ -116,7 +129,7 @@ export function Sidebar({
                   className="rounded-full bg-moss/15 px-1.5 py-px font-mono text-[10px] text-moss"
                   aria-label={t('feed.unreadInline', { count: totalUnread })}
                 >
-                  {totalUnread}
+                  {formatUnreadBadge(totalUnread)}
                 </span>
               ) : null}
             </NavLink>
@@ -177,13 +190,14 @@ export function Sidebar({
             {sourceTypes.slice(0, 8).map(([type]) => {
               const count = unreadByType[type] ?? 0
               const active = activeSourceType === type
+              const label = typeLabel(type)
               return (
                 <Link
                   key={`m-${type}`}
                   to={`/radar?view=signals&sourceType=${encodeURIComponent(type)}`}
                   aria-current={active ? 'page' : undefined}
                   aria-label={
-                    count > 0 ? `${type}, ${t('feed.unreadInline', { count })}` : type
+                    count > 0 ? `${label}, ${t('feed.unreadInline', { count })}` : label
                   }
                   className={cn(
                     'snap-start flex min-h-9 shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] transition motion-reduce:transition-none',
@@ -193,10 +207,10 @@ export function Sidebar({
                       : 'border-border text-muted hover:border-accent/40 hover:text-ink',
                   )}
                 >
-                  {type}
+                  {label}
                   {count > 0 ? (
                     <span className="ml-1 font-mono text-[10px] text-moss" aria-hidden>
-                      {count}
+                      {formatUnreadBadge(count)}
                     </span>
                   ) : null}
                 </Link>
@@ -211,13 +225,14 @@ export function Sidebar({
               {sourceTypes.slice(0, 10).map(([type]) => {
                 const count = unreadByType[type] ?? 0
                 const active = activeSourceType === type
+                const label = typeLabel(type)
                 return (
                   <Link
                     key={type}
                     to={`/radar?view=signals&sourceType=${encodeURIComponent(type)}`}
                     aria-current={active ? 'page' : undefined}
                     aria-label={
-                      count > 0 ? `${type}, ${t('feed.unreadInline', { count })}` : type
+                      count > 0 ? `${label}, ${t('feed.unreadInline', { count })}` : label
                     }
                     className={cn(
                       'flex min-h-9 items-center gap-2 rounded px-2.5 py-1 text-xs transition motion-reduce:transition-none',
@@ -229,10 +244,10 @@ export function Sidebar({
                           : 'text-faint hover:bg-border',
                     )}
                   >
-                    <span className="flex-1 truncate">{type}</span>
+                    <span className="flex-1 truncate">{label}</span>
                     {count > 0 ? (
                       <span className="font-mono text-[10px] text-moss" aria-hidden>
-                        {count}
+                        {formatUnreadBadge(count)}
                       </span>
                     ) : null}
                   </Link>

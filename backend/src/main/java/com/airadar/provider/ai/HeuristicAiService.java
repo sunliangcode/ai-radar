@@ -381,40 +381,55 @@ public class HeuristicAiService implements AiService {
 
     @Override
     public ImpactAnalysisResult analyzeImpact(String contextJson, String title, String summary, String eventImpact, String memoryHints) {
-        String blob = ((title == null ? "" : title) + " " + (summary == null ? "" : summary)
-                + " " + (contextJson == null ? "" : contextJson)).toLowerCase(Locale.ROOT);
+        boolean zh = !"en".equalsIgnoreCase(properties.getSummaryLanguage());
+        String contentBlob = ((title == null ? "" : title) + " " + (summary == null ? "" : summary))
+                .toLowerCase(Locale.ROOT);
+        String contextLower = contextJson == null ? "" : contextJson.toLowerCase(Locale.ROOT);
+        // Interest hits may use context keywords; ignore matching must NOT scan contextJson
+        // itself (otherwise keys like "explicit_ignore" always "match").
+        String interestBlob = (contentBlob + " " + contextLower).trim();
         List<String> interestKeywords = parseInterestKeywords(interestSignals.effectiveInterestProfile());
         int hits = 0;
         for (String kw : interestKeywords) {
-            if (blob.contains(kw.toLowerCase(Locale.ROOT))) {
+            if (interestBlob.contains(kw.toLowerCase(Locale.ROOT))) {
                 hits++;
             }
         }
-        hits += countHits(blob, AI_KEYWORDS);
+        hits += countHits(interestBlob, AI_KEYWORDS);
         double relevance = Math.min(95, 35 + hits * 12);
         double impact = Math.min(90, 30 + hits * 10);
         double urgency = title != null && title.toLowerCase(Locale.ROOT).contains("release") ? 70 : 45;
         String tier = relevance >= 75 ? "HIGH" : relevance >= 55 ? "MEDIUM" : relevance >= 40 ? "LOW" : "IGNORE";
         String why = hits > 0
-                ? "Matches your Context keywords (" + hits + " hits)."
-                : "Limited overlap with your Context; monitor lightly.";
+                ? (zh ? "命中你的 Context 关键词（" + hits + " 处）。" : "Matches your Context keywords (" + hits + " hits).")
+                : (zh ? "与你的 Context 重叠不多，先轻量留意即可。" : "Limited overlap with your Context; monitor lightly.");
         if (memoryHints != null && memoryHints.toLowerCase(Locale.ROOT).contains("rejected")) {
             relevance = Math.max(20, relevance - 15);
             if ("HIGH".equals(tier)) {
                 tier = "MEDIUM";
             }
-            why += " Adjusted by Memory (past rejects).";
+            why += zh ? " 已根据历史忽略做了降权。" : " Adjusted by Memory (past rejects).";
         }
-        if (contextJson != null && contextJson.toLowerCase(Locale.ROOT).contains("explicit_ignore")) {
-            for (String token : contextJson.toLowerCase(Locale.ROOT).split("[^a-z0-9+#.-]+")) {
-                if (token.length() >= 4 && blob.contains(token)) {
+        if (!contextLower.isBlank() && contextLower.contains("explicit_ignore")) {
+            for (String token : contextLower.split("[^a-z0-9+#.\u4e00-\u9fff-]+")) {
+                if (token.length() < 4) {
+                    continue;
+                }
+                // Skip JSON/schema noise tokens from the ignore list key itself.
+                if ("explicit".equals(token) || "ignore".equals(token) || "explicit_ignore".equals(token)) {
+                    continue;
+                }
+                if (contentBlob.contains(token)) {
                     relevance = Math.max(15, relevance - 20);
                     tier = "IGNORE";
-                    why = "Topic matches explicit_ignore in your Context.";
+                    why = zh ? "命中你在 Context 里设的忽略主题。" : "Topic matches an ignored theme in your Context.";
                     break;
                 }
             }
         }
+        String recommendation = zh
+                ? "看一眼证据，决定要不要做个小试验。"
+                : "Review and decide whether to run a small experiment.";
         return new ImpactAnalysisResult(
                 relevance,
                 impact,
@@ -423,7 +438,7 @@ public class HeuristicAiService implements AiService {
                 40,
                 why,
                 eventImpact == null || eventImpact.isBlank() ? truncate(summary == null ? "" : summary, 200) : eventImpact,
-                "Review and decide whether to run a small experiment.",
+                recommendation,
                 tier
         );
     }

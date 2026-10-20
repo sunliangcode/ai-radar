@@ -1,3 +1,22 @@
+/** Compact unread badge text (caps large counts so the UI stays calm). */
+export function formatUnreadBadge(count: number, cap = 99): string {
+  if (!Number.isFinite(count) || count <= 0) return ''
+  const n = Math.floor(count)
+  if (n > cap) return `${cap}+`
+  return String(n)
+}
+
+/** Calendar-day delta for revisit dates (local midnight). */
+export function revisitDayDelta(iso: string, now: number = Date.now()): number | null {
+  const t = Date.parse(iso)
+  if (Number.isNaN(t)) return null
+  const start = (ms: number) => {
+    const d = new Date(ms)
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  }
+  return Math.round((start(t) - start(now)) / 86_400_000)
+}
+
 /** Human-readable "in X minutes / in 2 hours" for schedule next-run times. */
 export function formatRelativeInstant(iso?: string | null, now: number = Date.now()): string | null {
   if (!iso) return null

@@ -262,6 +262,8 @@ export type ChangeCard = {
   items?: Item[]
   watchNext?: string
   eventImpact?: string
+  /** Open decision for this change, if any. */
+  latestDecision?: DecisionRecord
 }
 
 export type FeedbackKind = 'useful' | 'irrelevant' | 'watch' | 'ignore' | 'tried'
@@ -552,25 +554,39 @@ export const api = {
   health: () => request<Health>('/api/health'),
   llmProbe: () => request<LlmProbe>('/api/health/llm'),
   items: async (q: string = '') => {
-    const data = await request<Item[] | { items: Item[]; total: number; offset?: number; limit?: number }>(
-      `/api/items${q}`,
-    )
+    const data = await request<
+      | Item[]
+      | {
+          items: Item[]
+          total: number
+          unreadTotal?: number
+          offset?: number
+          limit?: number
+          nextCursor?: string | null
+          hasMore?: boolean
+        }
+    >(`/api/items${q}`)
     if (Array.isArray(data)) {
-      return { items: data, total: data.length }
+      return { items: data, total: data.length, hasMore: false }
     }
     return {
       items: data.items ?? [],
       total: data.total ?? data.items?.length ?? 0,
+      unreadTotal: data.unreadTotal,
       offset: data.offset,
       limit: data.limit,
+      nextCursor: data.nextCursor ?? null,
+      hasMore: Boolean(data.hasMore),
     }
   },
   patchItem: (id: number, body: { read?: boolean; saved?: boolean; dismissed?: boolean; notInterested?: boolean }) =>
     request<Item>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  markAllRead: () => request<{ updated: number }>('/api/items/mark-all-read', { method: 'POST' }),
-  batchItems: (body: { ids: number[]; read?: boolean; saved?: boolean }) =>
+  markAllRead: (q: string = '') =>
+    request<{ updated: number }>(`/api/items/mark-all-read${q}`, { method: 'POST' }),
+  batchItems: (body: { ids: number[]; read?: boolean; saved?: boolean; dismissed?: boolean }) =>
     request<{ updated: number }>('/api/items/batch', { method: 'POST', body: JSON.stringify(body) }),
   unreadCounts: () => request<Record<string, number>>('/api/items/unread-counts'),
+  badge: () => request<{ unreadItems: number; total: number }>('/api/items/badge'),
   watchingTimeline: () =>
     request<{ groups: WatchingGroup[]; count: number }>('/api/watching/timeline'),
   itemDetail: (id: number) =>
@@ -655,6 +671,8 @@ export const api = {
     return request<ChangeCard[]>(`/api/changes?${params}`)
   },
   change: (id: number) => request<ChangeCard>(`/api/changes/${id}`),
+  recomputeChangeImpact: (id: number) =>
+    request<Record<string, unknown>>(`/api/changes/${id}/recompute-impact`, { method: 'POST' }),
   dismissChange: (id: number) =>
     request<{ changeId: number; dismissed: boolean }>(`/api/changes/${id}/dismiss`, { method: 'POST' }),
   postChangeDecision: (

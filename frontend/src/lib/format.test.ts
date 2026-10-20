@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { formatDuration, formatRelativeInstant, progressPercent } from './format'
+import {
+  formatDuration,
+  formatRelativeInstant,
+  formatUnreadBadge,
+  progressPercent,
+  revisitDayDelta,
+} from './format'
+
+describe('formatUnreadBadge', () => {
+  it('caps large counts and skips non-positive', () => {
+    expect(formatUnreadBadge(0)).toBe('')
+    expect(formatUnreadBadge(12)).toBe('12')
+    expect(formatUnreadBadge(99)).toBe('99')
+    expect(formatUnreadBadge(100)).toBe('99+')
+    expect(formatUnreadBadge(4868)).toBe('99+')
+    expect(formatUnreadBadge(1200, 999)).toBe('999+')
+  })
+})
+
+describe('revisitDayDelta', () => {
+  it('counts local calendar days', () => {
+    const now = Date.parse('2026-10-20T15:00:00')
+    expect(revisitDayDelta('2026-10-20T08:00:00', now)).toBe(0)
+    expect(revisitDayDelta('2026-10-27T12:00:00', now)).toBe(7)
+    expect(revisitDayDelta('2026-10-18T12:00:00', now)).toBe(-2)
+  })
+})
 
 describe('formatDuration', () => {
   it('formats milliseconds and seconds', () => {

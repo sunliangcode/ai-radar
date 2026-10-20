@@ -440,6 +440,41 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+@media (max-width: 767px) {
+  .mag-drawer {
+    animation: mag-sheet-in 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+@keyframes mag-sheet-in {
+  from { transform: translateY(100%); opacity: 1; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.mag-card--exit {
+  animation: mag-card-exit 200ms ease-in forwards;
+  pointer-events: none;
+}
+.mag-card--exit-save {
+  animation: mag-card-exit-save 220ms ease-in forwards;
+  pointer-events: none;
+}
+.route-enter {
+  animation: route-fade-in 180ms ease-out;
+}
+@keyframes route-fade-in {
+  from { opacity: 0.72; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-enter {
+    animation: none;
+  }
+}
+@keyframes mag-card-exit {
+  to { transform: translateX(-28%) scale(0.96); opacity: 0; }
+}
+@keyframes mag-card-exit-save {
+  to { transform: translateX(28%) scale(0.96); opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   .mag-card,
   .mag-grid-dimmed,
@@ -456,6 +491,8 @@ body {
   .mag-drawer-backdrop,
   .deck-slide-in,
   .deck-slide-out,
+  .mag-card--exit,
+  .mag-card--exit-save,
   .inbox-zero-particle,
   .fetch-step-done::before,
   .monitor-cursor {

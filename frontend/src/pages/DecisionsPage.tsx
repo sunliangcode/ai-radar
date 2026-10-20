@@ -8,6 +8,7 @@ import { useDisplaySources } from '../hooks/useDisplaySources'
 import { useEscapeBack } from '../hooks/useEscapeBack'
 import { changeMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
+import { revisitDayDelta } from '../lib/format'
 import { dateLocale } from '../i18n'
 import { cn, focusRingClass } from '../lib/cn'
 
@@ -26,6 +27,19 @@ function kindLabel(kind: string, t: (key: string) => string) {
   }
 }
 
+function revisitLabel(
+  iso: string,
+  locale: string,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+) {
+  const days = revisitDayDelta(iso)
+  if (days == null) return new Date(iso).toLocaleDateString(locale)
+  if (days < 0) return t('decisions.revisitOverdue', { count: Math.abs(days) })
+  if (days === 0) return t('decisions.revisitToday')
+  if (days <= 7) return t('decisions.revisitIn', { count: days })
+  return new Date(iso).toLocaleDateString(locale)
+}
+
 function DecisionRow({
   d,
   locale,
@@ -36,64 +50,56 @@ function DecisionRow({
   emphasize?: boolean
 }) {
   const { t } = useTranslation()
-  const labelParts = [
-    d.changeTitle ?? t('decisions.untitled'),
-    kindLabel(d.kind, t),
-  ]
+  const title = d.changeTitle ?? t('decisions.untitled')
+  const kind = kindLabel(d.kind, t)
+  const revisit = d.revisitAt ? revisitLabel(d.revisitAt, locale, t) : null
+  const days = d.revisitAt ? revisitDayDelta(d.revisitAt) : null
+  const overdue = days != null && days < 0
+  const labelParts = [title, kind]
   if (d.reason) labelParts.push(d.reason)
-  if (d.revisitAt) labelParts.push(new Date(d.revisitAt).toLocaleDateString(locale))
+  if (revisit) labelParts.push(revisit)
   return (
     <li>
       <Link
         to={`/changes/${d.changeId}`}
-        state={{ from: '/decisions' }}
+        state={{ from: '/decisions', focus: 'decision' }}
         aria-label={labelParts.join(' · ')}
         className={cn(
           'block px-4 py-3 transition motion-reduce:transition-none hover:border-accent/40',
           focusRingClass(),
-          emphasize
+          emphasize || overdue
             ? 'rounded-xl border border-moss/30 bg-moss/5'
             : 'rounded-lg border border-border bg-surface',
         )}
       >
-        <p className="font-medium text-ink">{d.changeTitle ?? t('decisions.untitled')}</p>
-        <dl className="mt-2 grid gap-1 text-sm sm:grid-cols-[5rem_1fr]">
-          <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">
-            {t('decisions.fieldDecision')}
-          </dt>
-          <dd className="text-ink">{kindLabel(d.kind, t)}</dd>
-          {d.reason ? (
-            <>
-              <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">
-                {t('decisions.fieldWhy')}
-              </dt>
-              <dd className="text-muted">{d.reason}</dd>
-            </>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium text-ink">{title}</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-md bg-border/70 px-1.5 py-0.5 text-xs font-medium text-ink">
+                {kind}
+              </span>
+              {d.reason ? (
+                <span className="line-clamp-2 text-muted">{d.reason}</span>
+              ) : null}
+            </div>
+            {emphasize && (d.updatesSinceDecision ?? 0) > 0 ? (
+              <p className="mt-1.5 text-xs text-muted">
+                {t('decisions.updatesSince', { count: d.updatesSinceDecision ?? 0 })}
+              </p>
+            ) : null}
+          </div>
+          {revisit ? (
+            <span
+              className={cn(
+                'shrink-0 text-xs tabular-nums',
+                overdue || emphasize ? 'font-medium text-moss' : 'text-muted',
+              )}
+            >
+              {revisit}
+            </span>
           ) : null}
-          {d.revisitAt ? (
-            <>
-              <dt className="font-mono text-[10px] uppercase tracking-wider text-faint">
-                {t('decisions.fieldReview')}
-              </dt>
-              <dd className={emphasize ? 'text-moss' : 'text-muted'}>
-                {new Date(d.revisitAt).toLocaleDateString(locale)}
-              </dd>
-            </>
-          ) : null}
-        </dl>
-        {emphasize && (d.updatesSinceDecision ?? 0) > 0 ? (
-          <p className="mt-2 text-xs text-muted">
-            {t('decisions.updatesSince', { count: d.updatesSinceDecision ?? 0 })}
-          </p>
-        ) : null}
-        <span
-          className={cn(
-            'mt-2 inline-block text-sm',
-            emphasize ? 'text-moss' : 'text-accent',
-          )}
-        >
-          {t('decisions.relatedChange')} →
-        </span>
+        </div>
       </Link>
     </li>
   )
@@ -190,6 +196,17 @@ export default function DecisionsPage() {
               title={t('decisions.empty')}
               description={t('decisions.emptyHint')}
               primary={
+                <Link
+                  to="/"
+                  className={cn(
+                    'inline-flex min-h-10 items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90',
+                    focusRingClass(),
+                  )}
+                >
+                  {t('decisions.browseToday')}
+                </Link>
+              }
+              secondary={
                 <Link
                   to="/radar"
                   className={cn(

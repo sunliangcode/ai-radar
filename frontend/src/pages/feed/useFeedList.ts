@@ -1,11 +1,21 @@
-import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, type Item } from '../../lib/api'
 import { useSources } from '../../hooks/useSources'
 import { useDisplaySources } from '../../hooks/useDisplaySources'
 import { itemMatchesDisplay } from '../../lib/sourceFilter'
 import { PAGE, sinceIso, sortChannelTypes, type Range } from './feedQuery'
+
+export type FeedPage = {
+  items: Item[]
+  total: number
+  unreadTotal?: number
+  nextCursor?: string | null
+  hasMore?: boolean
+  offset?: number
+  limit?: number
+}
 
 export function useFeedList(progressRunning?: boolean) {
   const [range, setRange] = useState<Range>('24h')
@@ -14,7 +24,6 @@ export function useFeedList(progressRunning?: boolean) {
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [q, setQ] = useState('')
   const [inputQ, setInputQ] = useState('')
-  const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const sources = useSources()
@@ -32,7 +41,6 @@ export function useFeedList(progressRunning?: boolean) {
 
   const searchMode = q.trim().length > 1
   const since = sinceIso(range)
-  const offset = (page - 1) * PAGE
 
   useEffect(() => {
     const trimmed = inputQ.trim()
@@ -44,16 +52,20 @@ export function useFeedList(progressRunning?: boolean) {
     return () => window.clearTimeout(id)
   }, [inputQ])
 
-  const feedQuery = useQuery({
-    queryKey: ['feed', range, sourceType, unreadOnly, page, sourceIdsQuery],
-    queryFn: () => {
-      const parts = [`sort=score`, `limit=${PAGE}`, `offset=${offset}`]
+  const feedQuery = useInfiniteQuery({
+    queryKey: ['feed', range, sourceType, unreadOnly, sourceIdsQuery],
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => {
+      const parts = [`sort=score`, `limit=${PAGE}`]
       if (since) parts.push(`since=${encodeURIComponent(since)}`)
       if (unreadOnly) parts.push('unread=true')
       if (sourceType) parts.push(`sourceType=${encodeURIComponent(sourceType)}`)
       if (sourceIdsQuery) parts.push(sourceIdsQuery)
+      if (pageParam) parts.push(`cursor=${encodeURIComponent(pageParam)}`)
+      else parts.push('offset=0')
       return api.items(`?${parts.join('&')}`)
     },
+    getNextPageParam: (last) => (last.hasMore && last.nextCursor ? last.nextCursor : undefined),
     enabled: !displayBlocksAll,
     refetchInterval: () => (progressRunning ? 1500 : false),
   })
@@ -69,18 +81,26 @@ export function useFeedList(progressRunning?: boolean) {
 
   const items: Item[] = useMemo(() => {
     if (displayBlocksAll) return []
-    const raw = searchMode ? (searchQuery.data?.items ?? []) : (feedQuery.data?.items ?? [])
+    if (searchMode) {
+      const raw = searchQuery.data?.items ?? []
+      if (displaySourceIds === null) return raw
+      return raw.filter((item) => itemMatchesDisplay(item, displaySourceIds))
+    }
+    const raw = feedQuery.data?.pages.flatMap((p) => p.items) ?? []
     if (displaySourceIds === null) return raw
     return raw.filter((item) => itemMatchesDisplay(item, displaySourceIds))
   }, [displayBlocksAll, displaySourceIds, searchMode, searchQuery.data, feedQuery.data])
+
   const total = displayBlocksAll
     ? 0
     : searchMode
       ? items.length
-      : (feedQuery.data?.total ?? 0)
+      : (feedQuery.data?.pages[0]?.total ?? 0)
+
+  const hasMore = !searchMode && Boolean(feedQuery.hasNextPage)
+  const page = feedQuery.data?.pages.length ?? 1
 
   useEffect(() => {
-    setPage(1)
     setSelectedId(null)
   }, [range, sourceType, unreadOnly, q, sourceIdsQuery])
 
@@ -102,7 +122,13 @@ export function useFeedList(progressRunning?: boolean) {
     if (items.length && selectedId == null) setSelectedId(items[0].id)
   }, [items, selectedId])
 
-  const unreadCount = useMemo(() => items.filter((i) => !i.read).length, [items])
+  const unreadCount = useMemo(() => {
+    if (searchMode) return items.filter((i) => !i.read).length
+    if (unreadOnly) return total
+    const fromServer = feedQuery.data?.pages[0]?.unreadTotal
+    if (typeof fromServer === 'number') return fromServer
+    return items.filter((i) => !i.read).length
+  }, [searchMode, unreadOnly, total, feedQuery.data, items])
 
   const clearSearch = () => {
     setInputQ('')
@@ -121,14 +147,19 @@ export function useFeedList(progressRunning?: boolean) {
     )
   }
 
-  const changePage = (next: number) => {
-    setPage(next)
-    setSelectedId(null)
+  const loadMore = useCallback(() => {
+    if (feedQuery.hasNextPage && !feedQuery.isFetchingNextPage) {
+      void feedQuery.fetchNextPage()
+    }
+  }, [feedQuery.hasNextPage, feedQuery.isFetchingNextPage, feedQuery.fetchNextPage])
+
+  const changePage = (_next: number) => {
+    loadMore()
   }
 
   const resetList = () => {
-    setPage(1)
     setSelectedId(null)
+    void feedQuery.refetch()
   }
 
   return {
@@ -146,14 +177,24 @@ export function useFeedList(progressRunning?: boolean) {
     hasSources,
     channelTypes,
     searchMode,
+    since,
     feedQuery,
     searchQuery,
     items,
     total,
     unreadCount,
+    hasMore,
+    loadMore,
+    isFetchingNextPage: feedQuery.isFetchingNextPage,
     clearSearch,
     onSourceTypeChange,
     changePage,
     resetList,
+    markAllQuery: (() => {
+      const parts: string[] = []
+      if (since) parts.push(`since=${encodeURIComponent(since)}`)
+      if (sourceType) parts.push(`sourceType=${encodeURIComponent(sourceType)}`)
+      return parts.length ? `?${parts.join('&')}` : ''
+    })(),
   }
 }

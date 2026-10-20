@@ -6,14 +6,45 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Change detail**: shows open **latestDecision** (kind / reason / revisit) with Update CTA instead of blank “record”; stale English impact why/recommendation nudges one-click refresh (`POST /api/changes/{id}/recompute-impact`)
+- **Radar “mark all read”**: respects current time range / sourceType (was wiping global unread); confirm copy matches scope
+- **Feed unread count**: list returns `unreadTotal` so the toolbar isn’t limited to the loaded page
+- **Heuristic impact**: `explicit_ignore` no longer false-positives on the JSON key itself — ignore tokens match title/summary only
 - **CLI/MCP**: `fetch` / `push` / `cluster` / `impact` (and MCP `run_*` jobs) no longer abort at the default 8s client timeout — job POSTs wait for the sync pipeline unless `AI_RADAR_TIMEOUT_MS` is set; docs note abort ≠ cancel and retry → 409
 
 ### Changed
 
+- **Decisions list**: denser rows (kind chip + reason), relative revisit (“今天回顾” / “已到期 N 天”); row opens Change with decision focus
+- **MagCard a11y**: screen-reader description uses a short lead teaser instead of the full body dump
+- **Copy**: drop user-facing “Impact / HIGH” jargon on Today / Changes / Actions empties — “生成今日关注” / “Today's focus”
+- **Today empty (has unread)**: title leads with “pick a few signals”, not the raw backlog count; subtitle softens ~N unread; primary CTA is **browse Radar**
+- **Nav unread**: sidebar / tabs show capped badges (`99+`) so huge backlogs don’t dominate the chrome; aria keeps the exact count
+- **Sidebar source types**: human labels (`Google 新闻`) instead of enum codes (`GOOGLE_NEWS`)
+- **Heuristic impact copy**: why / recommendation / evidence follow `summaryLanguage` (zh/en)
+- **Sources**: product-first subtitle / list lead / empty copy (display scope vs enable)
+- **Status badges**: localize enums (`IGNORE` → 可忽略 / Ignorable, tiers, etc.) instead of leaking codes
+- **Settings hub**: product lead + Context emphasized; system health moved under Advanced
+- **Feed**: end-of-list cue when infinite scroll is exhausted
+- **Focus bar**: single control strip (expand / save / dismiss / original); card footer actions hidden to avoid duplicate CTAs
+- **DecisionForm**: kind chips no longer nest inside `<label>` (fixes “决策 决策” a11y name); Change scores label drops “Impact” jargon
+- **Chat**: empty state steers to Today; typing dots while streaming; error bar has **Retry** that resends the last question
+- **Focus feed**: progress counter, prev/next, card enter motion; leaving a card silently marks read; end-of-list loads next page then advances; Enter/o → in-app reader, **u** → original
+- **Empty copy**: Radar empty/filter states push one clear next step (update / clear filters / Today)
+- **Decisions loop**: Change detail hosts **DecisionForm** (kind chips, default revisit); Today “Decide” scrolls/focuses it; save toast links back to Today or Decisions list
+- **Today deck**: watch swipe/key shares exit motion with dismiss; watched cards stay visible under Following for the session
+- **Feed actions**: mark-read / save / dismiss update list + unread badges **optimistically** (instant UI, rollback on error); opening the immersive reader silently marks read; card tap opens in-app reader (original URL stays an explicit CTA)
+- **Mobile chrome**: bottom tab active indicator + pull-to-refresh ready state; infinite feed shows skeleton rows while the next page loads
+- **Today**: major changes use one-at-a-time **RadarDeck** triage (swipe / keyboard) with optimistic home-cache updates instead of a stacked attention list
+- **Radar feed**: infinite cursor scroll + mobile default **focus** layout; MagCard dismiss/save exit motion; ImmersiveDrawer is a bottom sheet on small screens
+- **Mobile shell**: bottom tab bar (Today / Radar / Decisions / Chat / More), pull-to-refresh on Today & Radar; desktop sidebar unchanged
+- **API**: `GET /api/items` returns `nextCursor` / `hasMore` (offset still supported); `unread-counts` includes `total`; feed list indexes in Flyway `V2`
 - **Node floor**: require **20.19+** (`.nvmrc`, `engines.node`, install/doctor) so oxlint’s optional native bindings install under CI `npm ci` (oxlint 1.82+ needs `^20.19.0 || >=22.12.0`)
 - **Dependabot**: ignore Docker **major** bumps for `node` / `eclipse-temurin` / `maven` (root) and `python` (translate-service) so PRs cannot drift past `.nvmrc` / Temurin 21 pins
 
 ### Added
+
+- **API**: `GET /api/items/badge` — unread item count for tab badges; `POST /api/items/mark-all-read` optional `sourceType` / `since`; batch PATCH supports `dismissed`
+
 
 - **Docs**: [`mcp/README.md`](mcp/README.md) / [`mcp/README.zh.md`](mcp/README.zh.md) — package quickstart (EN/ZH); full tool reference remains [docs/mcp.md](docs/mcp.md)
 - **Ops CLI**: `./bin/ai-radar` / `cli/ai-radar.mjs` — health, home, sources, fetch/push/cluster/impact, pack import, check/backup bridges ([docs/cli.md](docs/cli.md))

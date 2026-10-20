@@ -1,10 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
-import { useCallback, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { FeedbackBar } from '../components/feedback/FeedbackBar'
+import { DecisionForm, type DecisionKind } from '../components/change/DecisionForm'
 import {
+  Button,
   EmptyState,
   ImmersiveDrawer,
   ItemDetailBody,
@@ -13,17 +15,51 @@ import {
   QueryErrorState,
   ScorePill,
   StatusBadge,
+  useToast,
   isZhihuSource,
 } from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
+import { useEngagement } from '../hooks/useEngagement'
 import { useEscapeBack } from '../hooks/useEscapeBack'
+import { useSettings } from '../hooks/useSettings'
 import { changeMatchesDisplay, itemMatchesDisplay } from '../lib/sourceFilter'
 import { dateLocale } from '../i18n'
 import { errorText } from '../lib/errors'
+import { needsImpactRefresh } from '../lib/impactCopy'
+import { revisitDayDelta } from '../lib/format'
+import { prefersReducedMotion } from '../lib/a11y'
 import { cn, focusRingClass, textLinkClass } from '../lib/cn'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
-type LocationState = { from?: string }
+type LocationState = { from?: string; focus?: 'decision' }
+
+function decisionKindLabel(kind: string, t: (key: string) => string) {
+  switch (kind) {
+    case 'watch':
+      return t('decisions.kindWatch')
+    case 'investigate':
+      return t('decisions.kindInvestigate')
+    case 'adopt':
+      return t('decisions.kindAdopt')
+    case 'ignore':
+      return t('decisions.kindIgnore')
+    default:
+      return kind
+  }
+}
+
+function decisionRevisitLabel(
+  iso: string,
+  locale: string,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+) {
+  const days = revisitDayDelta(iso)
+  if (days == null) return new Date(iso).toLocaleDateString(locale)
+  if (days < 0) return t('decisions.revisitOverdue', { count: Math.abs(days) })
+  if (days === 0) return t('decisions.revisitToday')
+  if (days <= 7) return t('decisions.revisitIn', { count: days })
+  return new Date(iso).toLocaleDateString(locale)
+}
 
 export default function ChangeDetailPage() {
   const { t, i18n } = useTranslation()
@@ -31,8 +67,14 @@ export default function ChangeDetailPage() {
   const location = useLocation()
   const { id } = useParams()
   const changeId = Number(id)
+  const qc = useQueryClient()
+  const { push: pushToast } = useToast()
+  const engagement = useEngagement()
   const [readerItemId, setReaderItemId] = useState<number | null>(null)
+  const focusDecision = (location.state as LocationState | null)?.focus === 'decision'
+  const [showDecision, setShowDecision] = useState(focusDecision)
   const { displaySourceIds } = useDisplaySources()
+  const settings = useSettings()
   const q = useQuery({
     queryKey: ['change', changeId],
     queryFn: () => api.change(changeId),
@@ -40,6 +82,11 @@ export default function ChangeDetailPage() {
   })
   useDocumentTitle({ title: q.data?.title ?? null })
   const locale = dateLocale(i18n.language)
+  const staleImpact = needsImpactRefresh(
+    settings.data?.summaryLanguage,
+    q.data?.why,
+    q.data?.recommendation,
+  )
 
   const fromState = (location.state as LocationState | null)?.from
   const fallbackFrom = fromState ?? '/radar?view=changes'
@@ -53,7 +100,62 @@ export default function ChangeDetailPage() {
     navigate(fallbackFrom, { replace: !fromState })
   }, [canGoBack, fallbackFrom, fromState, navigate])
 
-  useEscapeBack(goBack, readerItemId == null)
+  useEscapeBack(goBack, readerItemId == null && !showDecision)
+
+  useEffect(() => {
+    if (!focusDecision) return
+    setShowDecision(true)
+    const reduce = prefersReducedMotion()
+    window.requestAnimationFrame(() => {
+      document.getElementById('change-decision')?.scrollIntoView({
+        block: 'start',
+        behavior: reduce ? 'auto' : 'smooth',
+      })
+    })
+  }, [focusDecision, changeId])
+
+  const decisionMut = useMutation({
+    mutationFn: (body: { kind: DecisionKind; reason: string; revisitAt: string }) =>
+      api.postChangeDecision(changeId, {
+        kind: body.kind,
+        reason: body.reason.trim() || undefined,
+        revisitAt: body.revisitAt || undefined,
+      }),
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['decisions'] }),
+        qc.invalidateQueries({ queryKey: ['decisions-due'] }),
+        qc.invalidateQueries({ queryKey: ['intelligence-home'] }),
+        qc.invalidateQueries({ queryKey: ['change', changeId] }),
+        vars.kind === 'watch'
+          ? qc.invalidateQueries({ queryKey: ['watching'] })
+          : Promise.resolve(),
+      ])
+      setShowDecision(false)
+      pushToast('success', t(engagement.decisionToastKey()), {
+        label: fromState === '/' ? t('decisions.browseToday') : t('decisions.viewList'),
+        onClick: () => navigate(fromState === '/' ? '/' : '/decisions'),
+      })
+    },
+    onError: (err) => {
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
+  })
+
+  const recomputeMut = useMutation({
+    mutationFn: () => api.recomputeChangeImpact(changeId),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['change', changeId] }),
+        qc.invalidateQueries({ queryKey: ['changes'] }),
+        qc.invalidateQueries({ queryKey: ['intelligence-home'] }),
+      ])
+      pushToast('success', t('changes.recomputeImpactDone'))
+    },
+    onError: (err) => {
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
+    },
+  })
 
   const visibleItems = useMemo(
     () => (q.data?.items ?? []).filter((item) => itemMatchesDisplay(item, displaySourceIds)),
@@ -113,7 +215,7 @@ export default function ChangeDetailPage() {
   const readerItem = visibleItems.find((i) => i.id === readerItemId)
 
   return (
-    <div aria-busy={q.isFetching || undefined}>
+    <div aria-busy={q.isFetching || decisionMut.isPending || recomputeMut.isPending || undefined}>
       <PageHeader
         titleId="change-detail-heading"
         title={c.title}
@@ -123,16 +225,48 @@ export default function ChangeDetailPage() {
         })}
         back={{ label: t('common.backToList'), onClick: goBack }}
         actions={
-          <Link
-            to={`/chat?changeId=${c.id}`}
-            aria-label={t('chat.askAbout')}
-            className={cn(
-              'inline-flex min-h-9 items-center rounded-md border border-border bg-surface px-2.5 py-1 text-xs text-accent hover:bg-accent-soft',
-              focusRingClass(),
-            )}
-          >
-            {t('chat.askAbout')}
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {!showDecision ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setShowDecision(true)
+                  window.requestAnimationFrame(() => {
+                    document.getElementById('change-decision')?.scrollIntoView({
+                      block: 'start',
+                      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+                    })
+                  })
+                }}
+                aria-label={
+                  c.latestDecision ? t('decisions.updateCta') : t('decisions.record')
+                }
+              >
+                {c.latestDecision ? t('decisions.updateCta') : t('decisions.record')}
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={recomputeMut.isPending}
+              disabled={recomputeMut.isPending}
+              onClick={() => recomputeMut.mutate()}
+              aria-label={t('changes.recomputeImpact')}
+              title={staleImpact ? t('changes.recomputeImpactHint') : undefined}
+            >
+              {t('changes.recomputeImpact')}
+            </Button>
+            <Link
+              to={`/chat?changeId=${c.id}`}
+              aria-label={t('chat.askAbout')}
+              className={cn(
+                'inline-flex min-h-9 items-center rounded-md border border-border bg-surface px-2.5 py-1 text-xs text-accent hover:bg-accent-soft',
+                focusRingClass(),
+              )}
+            >
+              {t('chat.askAbout')}
+            </Link>
+          </div>
         }
       />
       <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label={t('changes.metaLabel')}>
@@ -150,6 +284,54 @@ export default function ChangeDetailPage() {
         ) : null}
       </div>
 
+      <section
+        id="change-decision"
+        className="mb-6 scroll-mt-24 rounded-xl border border-accent/25 bg-accent-soft/40 p-4"
+        aria-labelledby="change-decision-heading"
+      >
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="change-decision-heading" className="font-serif text-lg text-ink">
+            {c.latestDecision ? t('decisions.currentTitle') : t('decisions.record')}
+          </h2>
+          {!showDecision ? (
+            <Button size="sm" variant="ghost" onClick={() => setShowDecision(true)}>
+              {c.latestDecision ? t('decisions.updateCta') : t('decisions.recordCta')}
+            </Button>
+          ) : null}
+        </div>
+        {c.latestDecision && !showDecision ? (
+          <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-md bg-surface px-1.5 py-0.5 text-xs font-medium text-ink">
+                  {decisionKindLabel(c.latestDecision.kind, t)}
+                </span>
+                {c.latestDecision.reason ? (
+                  <span className="text-muted">{c.latestDecision.reason}</span>
+                ) : null}
+              </div>
+            </div>
+            {c.latestDecision.revisitAt ? (
+              <span className="shrink-0 text-xs tabular-nums text-moss">
+                {decisionRevisitLabel(c.latestDecision.revisitAt, locale, t)}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mb-3 text-sm text-muted">{t('decisions.recordHint')}</p>
+        )}
+        {showDecision ? (
+          <DecisionForm
+            autoFocus={focusDecision || Boolean(c.latestDecision)}
+            loading={decisionMut.isPending}
+            onCancel={() => setShowDecision(false)}
+            onSubmit={(kind, reason, revisitAt) =>
+              decisionMut.mutate({ kind, reason, revisitAt })
+            }
+          />
+        ) : null}
+      </section>
+
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <div
           className="rounded-xl border border-border bg-surface/70 p-4 md:col-span-2"
@@ -160,6 +342,23 @@ export default function ChangeDetailPage() {
             {t('changes.summary')}
           </h2>
           <p className="text-sm leading-relaxed text-muted">{c.summary || t('changes.noSummary')}</p>
+          {staleImpact ? (
+            <div
+              className="mt-4 rounded-lg border border-accent/25 bg-accent-soft/50 px-3 py-2.5"
+              role="status"
+            >
+              <p className="text-sm text-ink">{t('changes.recomputeImpactHint')}</p>
+              <Button
+                className="mt-2"
+                size="sm"
+                loading={recomputeMut.isPending}
+                disabled={recomputeMut.isPending}
+                onClick={() => recomputeMut.mutate()}
+              >
+                {t('changes.recomputeImpact')}
+              </Button>
+            </div>
+          ) : null}
           {c.why ? (
             <p className="mt-4 text-sm text-ink">
               <span className="text-muted">{t('home.whyMatters')}: </span>
@@ -249,34 +448,33 @@ export default function ChangeDetailPage() {
               <article key={item.id} className="flex gap-3 border-b border-border/80 py-3 last:border-0">
                 <ScorePill score={item.score} />
                 <div className="min-w-0 flex-1">
-                  {zhihu ? (
-                    <button
-                      type="button"
-                      onClick={() => setReaderItemId(item.id)}
-                      className={`inline-flex min-h-9 items-center text-left font-medium ${textLinkClass()}`}
-                    >
-                      {item.title}
-                    </button>
-                  ) : (
-                    <a
-                      href={item.canonicalUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={cn('inline-flex min-h-9 items-center font-medium hover:text-moss', textLinkClass())}
-                    >
-                      {item.title}
-                    </a>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setReaderItemId(item.id)}
+                    className={`inline-flex min-h-9 items-center text-left font-medium ${textLinkClass()}`}
+                  >
+                    {item.title}
+                  </button>
                   {item.summary ? <p className="mt-1 text-sm text-muted">{item.summary}</p> : null}
-                  {zhihu ? (
+                  <div className="mt-1 flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={() => setReaderItemId(item.id)}
-                      className={cn('mt-1 inline-flex min-h-9 items-center text-xs', textLinkClass())}
+                      className={cn('inline-flex min-h-9 items-center text-xs', textLinkClass())}
                     >
                       {t('feed.readInRadar')}
                     </button>
-                  ) : null}
+                    {!zhihu && item.canonicalUrl ? (
+                      <a
+                        href={item.canonicalUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={cn('inline-flex min-h-9 items-center text-xs', textLinkClass())}
+                      >
+                        {t('feed.openOriginal')} ↗
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               </article>
             )

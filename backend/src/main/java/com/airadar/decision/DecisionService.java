@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -89,6 +90,14 @@ public class DecisionService {
         return decisionRepository.findByStatusOrderByUpdatedAtDesc("open").stream()
                 .map(d -> toDto(d, null))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Map<String, Object>> latestOpen(Long changeId) {
+        return decisionRepository.findByChangeIdOrderByCreatedAtDesc(changeId).stream()
+                .filter(d -> "open".equalsIgnoreCase(d.getStatus()))
+                .findFirst()
+                .map(d -> toDto(d, null));
     }
 
     @Transactional(readOnly = true)

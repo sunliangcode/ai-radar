@@ -1,7 +1,8 @@
+import { useCallback, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api, type ImpactCard } from '../lib/api'
+import { api, type ImpactCard, type IntelligenceHome } from '../lib/api'
 import {
   Button,
   EmptyState,
@@ -10,7 +11,7 @@ import {
   QueryErrorState,
   useToast,
 } from '../components/ui'
-import { ChangeAttentionList } from '../components/today/ChangeAttentionList'
+import { RadarDeck } from '../components/today/RadarDeck'
 import { PackPicker } from '../components/PackPicker'
 import { FetchProgressSection } from '../components/fetch/FetchProgressSection'
 import { useFetchJobWithProgress } from '../hooks/useFetchJobWithProgress'
@@ -23,6 +24,22 @@ import { impactEventMatchesDisplay } from '../lib/sourceFilter'
 import { errorText } from '../lib/errors'
 import { dateLocale } from '../i18n'
 import { cn, focusRingClass, textLinkClass } from '../lib/cn'
+
+function removeHomeMajor(
+  prev: IntelligenceHome | undefined,
+  eventId: number,
+): IntelligenceHome | undefined {
+  if (!prev) return prev
+  const strip = (list?: ImpactCard[]) =>
+    (list ?? []).filter((c) => c.eventId !== eventId && c.changeId !== eventId)
+  return {
+    ...prev,
+    majorChanges: strip(prev.majorChanges),
+    todayChanges: strip(prev.todayChanges),
+    whyCare: strip(prev.whyCare),
+    impacts: strip(prev.impacts),
+  }
+}
 
 function greetingKey(hour: number) {
   if (hour < 12) return 'today.goodMorning'
@@ -45,6 +62,7 @@ function todayIsoDate(timeZone?: string) {
 
 export default function TodayPage() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { push: pushToast } = useToast()
   const engagement = useEngagement()
@@ -62,6 +80,8 @@ export default function TodayPage() {
     ['sources'],
     ['decisions'],
   ])
+  /** Cards watched this session — shown under Following after optimistic deck removal. */
+  const [sessionWatched, setSessionWatched] = useState<ImpactCard[]>([])
 
   const impactJob = useMutation({
     mutationFn: api.impactJob,
@@ -72,42 +92,98 @@ export default function TodayPage() {
     onError: (err) => pushToast('error', errorText(err, t)),
   })
 
-  const dismissMut = useMutation({
-    mutationFn: (changeId: number) => api.dismissChange(changeId),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-      pushToast('success', t('today.dismissed'))
-      queueMicrotask(() =>
-        document.getElementById('today-attention-count')?.focus({ preventScroll: true }),
+  const removeMajorOptimistic = useCallback(
+    (eventId: number) => {
+      qc.setQueryData<IntelligenceHome>(['intelligence-home'], (prev) =>
+        removeHomeMajor(prev, eventId),
       )
     },
-    onError: (err) => pushToast('error', errorText(err, t)),
+    [qc],
+  )
+
+  const dismissMut = useMutation({
+    mutationFn: (changeId: number) => api.dismissChange(changeId),
+    onMutate: async (changeId) => {
+      await qc.cancelQueries({ queryKey: ['intelligence-home'] })
+      const prev = qc.getQueryData<IntelligenceHome>(['intelligence-home'])
+      removeMajorOptimistic(changeId)
+      return { prev }
+    },
+    onSuccess: () => {
+      pushToast('success', t('today.dismissed'))
+    },
+    onError: (err, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['intelligence-home'], ctx.prev)
+      pushToast('error', errorText(err, t))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+    },
   })
 
   const followMut = useMutation({
     mutationFn: (changeId: number) => api.putWatch(changeId, { capability: true, api: true }),
+    onMutate: async (changeId) => {
+      await qc.cancelQueries({ queryKey: ['intelligence-home'] })
+      const prev = qc.getQueryData<IntelligenceHome>(['intelligence-home'])
+      removeMajorOptimistic(changeId)
+      return { prev }
+    },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['intelligence-home'] })
       await qc.invalidateQueries({ queryKey: ['watching'] })
       pushToast('success', t('today.followed'))
-      queueMicrotask(() =>
-        document.getElementById('today-attention-count')?.focus({ preventScroll: true }),
-      )
     },
-    onError: (err) => pushToast('error', errorText(err, t)),
+    onError: (err, changeId, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['intelligence-home'], ctx.prev)
+      setSessionWatched((prev) =>
+        prev.filter((x) => (x.eventId ?? x.changeId) !== changeId),
+      )
+      pushToast('error', errorText(err, t))
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+    },
   })
+
+  const onDeckCleared = useCallback(() => {
+    if (engagement.claimDeckCleared()) {
+      pushToast('success', t(engagement.deckClearToastKey()))
+    }
+  }, [engagement, pushToast, t])
+
+  const onInvestigate = useCallback(
+    (card: ImpactCard) => {
+      const id = card.changeId ?? card.eventId
+      if (id) navigate(`/changes/${id}`, { state: { from: '/' } })
+    },
+    [navigate],
+  )
+
+  const onDecide = useCallback(
+    (card: ImpactCard) => {
+      const id = card.changeId ?? card.eventId
+      if (id) navigate(`/changes/${id}`, { state: { from: '/', focus: 'decision' } })
+    },
+    [navigate],
+  )
 
   const data = home.data
   const sourceCount = sources.data?.length ?? 0
   const hasSources = sourceCount > 0
-  const feedUnread = Object.values(unread.data ?? {}).reduce((sum, n) => sum + n, 0)
+  const feedUnread = (() => {
+    const m = unread.data ?? {}
+    if (typeof m.total === 'number') return m.total
+    return Object.entries(m).reduce((sum, [k, n]) => (k === 'total' ? sum : sum + n), 0)
+  })()
   const hasFeed = feedUnread > 0
   const filterCard = (card: ImpactCard) =>
     impactEventMatchesDisplay(card.eventId, changeSourceMap, displaySourceIds)
 
   const major = (data?.majorChanges ?? data?.todayChanges ?? []).filter(filterCard).slice(0, 5)
   const minor = (data?.minorSignals ?? []).filter(filterCard).slice(0, 8)
-  const following = major.filter((c) => c.watched)
+  const following = sessionWatched.filter((c) =>
+    impactEventMatchesDisplay(c.eventId, changeSourceMap, displaySourceIds),
+  )
   const revisit = (data?.decisionsToRevisit ?? [])
     .filter((d) => impactEventMatchesDisplay(d.changeId, changeSourceMap, displaySourceIds))
     .slice(0, 1)
@@ -116,10 +192,7 @@ export default function TodayPage() {
   )
   const majorCount = major.length
   const ready = major.length > 0 || minor.length > 0
-  const busyEventId =
-    (dismissMut.isPending ? dismissMut.variables : null) ??
-    (followMut.isPending ? followMut.variables : null) ??
-    null
+  const deckBusy = dismissMut.isPending || followMut.isPending
   const locale = dateLocale(i18n.language)
   const dateLabel = new Date().toLocaleDateString(locale, {
     weekday: 'short',
@@ -179,7 +252,7 @@ export default function TodayPage() {
             !hasSources
               ? t('home.gettingStarted.title')
               : hasFeed
-                ? t('home.gettingStarted.hasFeedTitle')
+                ? t('home.gettingStarted.hasFeedTitle', { count: feedUnread })
                 : t('home.gettingStarted.hasSourcesTitle')
           }
           description={
@@ -203,13 +276,14 @@ export default function TodayPage() {
                     to="/radar"
                     aria-label={t('home.gettingStarted.browseRadar')}
                     className={cn(
-                      'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink transition motion-reduce:transition-none hover:border-accent/40',
+                      'inline-flex min-h-10 items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-white transition motion-reduce:transition-none hover:bg-accent/90',
                       focusRingClass(),
                     )}
                   >
                     {t('home.gettingStarted.browseRadar')}
                   </Link>
                   <Button
+                    variant="ghost"
                     onClick={() => impactJob.mutate()}
                     loading={impactJob.isPending}
                     disabled={impactJob.isPending || isPending}
@@ -303,26 +377,26 @@ export default function TodayPage() {
             {t('today.attentionCount', { count: majorCount })}
           </p>
 
-          {major.length > 0 ? (
-            <ChangeAttentionList
-              cards={major}
-              busyEventId={busyEventId}
-              onFollow={(c) => c.eventId && followMut.mutate(c.eventId)}
-              onDismiss={(c) => c.eventId && dismissMut.mutate(c.eventId)}
-            />
-          ) : null}
-
-          <div className="mt-6">
-            <Link
-              to="/radar"
-              className={cn(
-                'inline-flex min-h-10 items-center rounded-full border border-border bg-surface px-4 text-sm font-medium text-ink transition motion-reduce:transition-none hover:border-accent/40 hover:text-accent',
-                focusRingClass(),
-              )}
-            >
-              {t('today.exploreLink')}
-            </Link>
-          </div>
+          <RadarDeck
+            cards={major}
+            busy={deckBusy}
+            onWatch={(c) => {
+              const id = c.eventId ?? c.changeId
+              if (!id) return
+              setSessionWatched((prev) => {
+                const key = c.eventId ?? c.changeId
+                return [c, ...prev.filter((x) => (x.eventId ?? x.changeId) !== key)]
+              })
+              followMut.mutate(id)
+            }}
+            onDismiss={(c) => {
+              const id = c.eventId ?? c.changeId
+              if (id) dismissMut.mutate(id)
+            }}
+            onInvestigate={onInvestigate}
+            onDecide={onDecide}
+            onCleared={onDeckCleared}
+          />
 
           {following.length > 0 ? (
             <section className="mt-8" aria-labelledby="today-following-heading">

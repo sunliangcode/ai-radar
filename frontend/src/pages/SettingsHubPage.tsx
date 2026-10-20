@@ -86,13 +86,12 @@ export default function SettingsHubPage() {
         </div>
       ) : null}
 
-      <div className="mb-8">
-        <SystemHealthCard />
-      </div>
+      <p className="mb-6 text-sm text-muted">{t('settingsHub.lead')}</p>
 
       <nav className="space-y-8" aria-labelledby="settings-hub-heading">
         {sections.map((section, si) => {
           const headingId = `settings-hub-section-${si}`
+          const isSystem = si === sections.length - 1
           return (
             <section key={section.label} aria-labelledby={headingId}>
               <h2
@@ -111,6 +110,7 @@ export default function SettingsHubPage() {
                       'group flex min-h-[5.5rem] flex-col rounded-xl border border-border bg-surface p-5 transition hover:border-accent/50 motion-reduce:transition-none',
                       focusRingClass(),
                       c.muted && 'opacity-80',
+                      !c.muted && si === 0 && c.to === '/settings/context' && 'border-accent/30 bg-accent-soft/30',
                     )}
                   >
                     <h3 className="text-base font-medium text-ink">{c.title}</h3>
@@ -121,6 +121,11 @@ export default function SettingsHubPage() {
                   </Link>
                 ))}
               </div>
+              {isSystem ? (
+                <div className="mt-4">
+                  <SystemHealthCard />
+                </div>
+              ) : null}
             </section>
           )
         })}

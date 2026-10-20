@@ -84,4 +84,63 @@ class HeuristicAiServiceTest {
         assertTrue(kws.contains("Agent"));
         assertTrue(kws.contains("LLM"));
     }
+
+    @Test
+    void analyzeImpactUsesZhCopyWhenSummaryLanguageZh() {
+        ImpactAnalysisResult hit = service.analyzeImpact(
+                "{\"role\":\"eng\"}",
+                "New open-source LLM Agent for inference",
+                "agentic toolkit",
+                null,
+                null);
+        assertTrue(hit.why().contains("Context"), "why=" + hit.why());
+        assertTrue(hit.recommendation().contains("试验") || hit.recommendation().contains("小试验"),
+                "rec=" + hit.recommendation());
+
+        ImpactAnalysisResult ignored = service.analyzeImpact(
+                "{\"explicit_ignore\":[\"cryptocurrency trading bots\"]}",
+                "Best cryptocurrency trading bots for 2026",
+                "crypto trading",
+                null,
+                null);
+        assertEquals("IGNORE", ignored.tier());
+        assertTrue(ignored.why().contains("忽略"), "why=" + ignored.why());
+    }
+
+    @Test
+    void analyzeImpactUsesEnCopyWhenSummaryLanguageEn() {
+        RadarProperties props = new RadarProperties();
+        props.setInterestProfile("LLM, Agent");
+        props.setSummaryLanguage("en");
+        NewsItemRepository repo = mock(NewsItemRepository.class);
+        when(repo.findBySavedTrue()).thenReturn(List.of());
+        PreferenceKeywordRepository prefRepo = mock(PreferenceKeywordRepository.class);
+        when(prefRepo.findByKindOrderByCreatedAtDesc(org.mockito.ArgumentMatchers.anyString())).thenReturn(List.of());
+        InterestSignalsService signals = new InterestSignalsService(props, repo, prefRepo);
+        SettingsService settings = mock(SettingsService.class);
+        when(settings.effectiveSourceWeights()).thenReturn(Map.of());
+        HeuristicAiService en = new HeuristicAiService(props, signals, settings);
+
+        ImpactAnalysisResult r = en.analyzeImpact(
+                "{\"explicit_ignore\":[\"cryptocurrency trading\"]}",
+                "cryptocurrency trading guide",
+                "crypto",
+                null,
+                null);
+        assertEquals("IGNORE", r.tier());
+        assertTrue(r.why().toLowerCase().contains("ignored theme") || r.why().toLowerCase().contains("ignore"),
+                "why=" + r.why());
+        assertTrue(r.recommendation().toLowerCase().contains("experiment"), "rec=" + r.recommendation());
+    }
+
+    @Test
+    void analyzeImpactDoesNotIgnoreJustBecauseContextHasExplicitIgnoreKey() {
+        ImpactAnalysisResult r = service.analyzeImpact(
+                "{\"explicit_ignore\":[\"体育赛况\"]}",
+                "New open-source LLM Agent for inference",
+                "agentic toolkit",
+                null,
+                null);
+        assertFalse("IGNORE".equals(r.tier()), "tier=" + r.tier() + " why=" + r.why());
+    }
 }

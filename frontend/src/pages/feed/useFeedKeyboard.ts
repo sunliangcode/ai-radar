@@ -1,11 +1,10 @@
 import { useEffect } from 'react'
 import type { Item } from '../../lib/api'
-import { isZhihuSource } from '../../components/magazine/magCover'
 import { isAriaModalOpen, isEditableTarget } from '../../lib/a11y'
 
 /**
- * Feed keyboard: j/k (n/p in focus) move; Enter open original (drawer for Zhihu);
- * o open drawer; s save; x not-interested (advance); m read; / search; [ ] page.
+ * Feed keyboard: j/k (n/p in focus) move; Enter / o open in-app reader;
+ * s save; x not-interested (advance); m read; / search; [ ] page.
  * When the drawer is open, j/k still advances selection (drawer content follows).
  */
 export function useFeedKeyboard({
@@ -68,18 +67,17 @@ export function useFeedKeyboard({
       } else if (e.key === 'k' || e.key === 'ArrowUp' || (focusMode && e.key === 'p')) {
         e.preventDefault()
         goPrev()
-      } else if (e.key === 'Enter') {
-        const cur = items[idx] ?? (selectedId == null ? items[0] : undefined)
-        if (cur) {
-          e.preventDefault()
-          if (isZhihuSource(cur.primarySourceType)) onOpenDrawer(cur.id)
-          else onOpenExternal(cur)
-        }
-      } else if (e.key === 'o') {
+      } else if (e.key === 'Enter' || e.key === 'o') {
         const cur = items[idx] ?? (selectedId == null ? items[0] : undefined)
         if (cur) {
           e.preventDefault()
           onOpenDrawer(cur.id)
+        }
+      } else if (e.key === 'u' || e.key === 'U') {
+        const cur = items[idx] ?? (selectedId == null ? items[0] : undefined)
+        if (cur) {
+          e.preventDefault()
+          onOpenExternal(cur)
         }
       } else if (e.key === 's') {
         const cur = items[idx]

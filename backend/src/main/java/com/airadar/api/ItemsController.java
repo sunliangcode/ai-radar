@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Stream;
@@ -94,10 +95,12 @@ public class ItemsController {
             @RequestParam(required = false) String sourceType,
             @RequestParam(defaultValue = "score") String sort,
             @RequestParam(defaultValue = "0") int offset,
-            @RequestParam(defaultValue = "50") int limit
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(required = false) String cursor
     ) {
         boolean savedOnly = Boolean.TRUE.equals(saved);
         boolean channelFilter = sourceType != null && !sourceType.isBlank();
+        boolean useFeedOrder = !savedOnly && "score".equalsIgnoreCase(sort);
         Stream<NewsItem> stream;
         if (savedOnly) {
             stream = newsItemRepository.findBySavedTrue().stream().map(entityMapper::toDomain);
@@ -109,7 +112,15 @@ public class ItemsController {
                     .atStartOfDay()
                     .toInstant(ZoneOffset.UTC);
             String sinceStr = from.toString();
-            if (channelFilter) {
+            if (channelFilter && useFeedOrder) {
+                stream = newsItemRepository
+                        .findFeedBySourceTypeSinceNative(sourceType.trim().toUpperCase(), sinceStr)
+                        .stream().map(entityMapper::toDomain);
+                channelFilter = false;
+            } else if (useFeedOrder) {
+                stream = newsItemRepository.findFeedSinceNative(sinceStr)
+                        .stream().map(entityMapper::toDomain);
+            } else if (channelFilter) {
                 stream = newsItemRepository
                         .findBySourceTypeSinceNative(sourceType.trim().toUpperCase(), sinceStr)
                         .stream().map(entityMapper::toDomain);
@@ -151,26 +162,49 @@ public class ItemsController {
         } else if ("createdAt".equalsIgnoreCase(sort)) {
             secondary = Comparator.comparing(NewsItem::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
         } else {
-            secondary = Comparator.comparing(NewsItem::getScore, Comparator.nullsLast(Comparator.reverseOrder()));
+            secondary = Comparator.comparing(NewsItem::getScore, Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(NewsItem::getId, Comparator.nullsLast(Comparator.reverseOrder()));
         }
         // Unread first, then the requested sort within each group.
         Comparator<NewsItem> comparator = Comparator.comparing(NewsItem::isRead).thenComparing(secondary);
 
-        List<NewsItem> filtered = stream.sorted(comparator).toList();
+        List<NewsItem> filtered = useFeedOrder && !savedOnly
+                ? stream.toList() // already ordered by SQL
+                : stream.sorted(comparator).toList();
         int total = filtered.size();
-        int off = Math.max(0, offset);
+        long unreadTotal = filtered.stream().filter(i -> !i.isRead()).count();
         int lim = Math.max(1, Math.min(limit, 200));
-        List<Map<String, Object>> page = filtered.stream()
-                .skip(off)
-                .limit(lim)
-                .map(this::toDto)
-                .toList();
+
+        Optional<ItemListCursor> parsedCursor = ItemListCursor.decode(cursor);
+        List<NewsItem> window;
+        int off = Math.max(0, offset);
+        if (parsedCursor.isPresent() && useFeedOrder) {
+            ItemListCursor c = parsedCursor.get();
+            window = filtered.stream().filter(c::isBefore).limit(lim + 1L).toList();
+            off = 0;
+        } else {
+            window = filtered.stream().skip(off).limit(lim + 1L).toList();
+        }
+
+        boolean hasMore = window.size() > lim;
+        List<NewsItem> pageItems = hasMore ? window.subList(0, lim) : window;
+        String nextCursor = null;
+        if (hasMore && !pageItems.isEmpty() && useFeedOrder) {
+            nextCursor = ItemListCursor.fromItem(pageItems.get(pageItems.size() - 1)).encode();
+        }
+
+        List<Map<String, Object>> page = pageItems.stream().map(this::toDto).toList();
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("items", page);
         out.put("total", total);
+        out.put("unreadTotal", unreadTotal);
         out.put("offset", off);
         out.put("limit", lim);
+        out.put("hasMore", hasMore);
+        if (nextCursor != null) {
+            out.put("nextCursor", nextCursor);
+        }
         return out;
     }
 
@@ -232,25 +266,50 @@ public class ItemsController {
     }
 
     @PostMapping("/mark-all-read")
-    public Map<String, Object> markAllRead() {
+    public Map<String, Object> markAllRead(
+            @RequestParam(required = false) String sourceType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since
+    ) {
         List<NewsItemEntity> unread = newsItemRepository.findByReadFlagFalse();
-        for (NewsItemEntity entity : unread) {
+        boolean filterType = sourceType != null && !sourceType.isBlank();
+        String wanted = filterType ? sourceType.trim().toUpperCase() : null;
+        List<NewsItemEntity> toUpdate = unread.stream()
+                .filter(e -> !e.isDismissed())
+                .filter(e -> !filterType
+                        || (e.getPrimarySourceType() != null
+                        && wanted.equalsIgnoreCase(e.getPrimarySourceType().name())))
+                .filter(e -> since == null || (e.getCreatedAt() != null && !e.getCreatedAt().isBefore(since)))
+                .toList();
+        for (NewsItemEntity entity : toUpdate) {
             entity.setReadFlag(true);
         }
-        newsItemRepository.saveAll(unread);
-        return Map.of("updated", unread.size());
+        newsItemRepository.saveAll(toUpdate);
+        return Map.of("updated", toUpdate.size());
     }
 
     @GetMapping("/unread-counts")
     public Map<String, Object> unreadCounts() {
         Map<String, Object> out = new LinkedHashMap<>();
+        long total = 0L;
         for (Object[] row : snapshotRepository.unreadCountsBySourceType()) {
             Object type = row[0];
             Object count = row[1];
             if (type != null) {
-                out.put(String.valueOf(type), ((Number) count).longValue());
+                long n = ((Number) count).longValue();
+                out.put(String.valueOf(type), n);
+                total += n;
             }
         }
+        out.put("total", total);
+        return out;
+    }
+
+    @GetMapping("/badge")
+    public Map<String, Object> badge() {
+        long unread = newsItemRepository.countByReadFlagFalse();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("unreadItems", unread);
+        out.put("total", unread);
         return out;
     }
 
@@ -299,9 +358,16 @@ public class ItemsController {
         boolean readValue = Boolean.parseBoolean(String.valueOf(body.get("read")));
         boolean setSaved = body.containsKey("saved");
         boolean savedValue = Boolean.parseBoolean(String.valueOf(body.get("saved")));
+        boolean setDismissed = body.containsKey("dismissed") || body.containsKey("notInterested");
+        Object dismissedRaw = body.containsKey("dismissed") ? body.get("dismissed") : body.get("notInterested");
+        boolean dismissedValue = Boolean.parseBoolean(String.valueOf(dismissedRaw));
         for (NewsItemEntity entity : entities) {
             if (setRead) entity.setReadFlag(readValue);
             if (setSaved) entity.setSaved(savedValue);
+            if (setDismissed) {
+                entity.setDismissed(dismissedValue);
+                if (dismissedValue) entity.setReadFlag(true);
+            }
         }
         newsItemRepository.saveAll(entities);
         Map<String, Object> out = new LinkedHashMap<>();

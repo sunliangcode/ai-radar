@@ -1,11 +1,14 @@
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/cn'
 
-/** Status badge for changes/actions (tier, status). */
+/** Status / tier badge for changes and actions — never leak raw enum codes to the UI. */
 export function StatusBadge({ status, className }: { status?: string; className?: string }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   if (!status) return null
-  const label = t(`events.status.${status}`, { defaultValue: status })
+  const key = status.toUpperCase()
+  const candidates = [`statusBadge.${key}`, `events.status.${key}`, `changes.tier.${key}`]
+  const label =
+    candidates.map((k) => (i18n.exists(k) ? t(k) : '')).find(Boolean) || status.replace(/_/g, ' ')
   return (
     <span
       className={cn(
