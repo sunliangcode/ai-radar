@@ -85,8 +85,43 @@ const tools = [
     inputSchema: { type: 'object', properties: {} },
   },
   {
+    name: 'list_changes',
+    description: 'List recent Change cards (product loop: Change → Decision → Action)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max rows (default 40)' },
+        tier: { type: 'string', description: 'Optional impact tier filter' },
+      },
+    },
+  },
+  {
+    name: 'get_change',
+    description: 'Get one Change card (impact, recommendation, latestDecision, watched)',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'number' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'list_decisions',
+    description: 'List open decisions; pass revisit=due for past-revisit queue',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        revisit: { type: 'string', description: 'Use "due" for past-revisit queue' },
+      },
+    },
+  },
+  {
+    name: 'list_actions',
+    description: 'List recommended actions',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'list_events',
-    description: 'List AI Radar events',
+    description: 'List AI Radar events (internal clustering surface; prefer list_changes)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -98,7 +133,7 @@ const tools = [
   },
   {
     name: 'get_event',
-    description: 'Get one event with timeline and items',
+    description: 'Get one event with timeline and items (prefer get_change for product loop)',
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'number' } },
@@ -109,6 +144,15 @@ const tools = [
     name: 'list_briefs',
     description: 'List daily brief dates',
     inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_brief',
+    description: 'Get one daily brief body by date (YYYY-MM-DD)',
+    inputSchema: {
+      type: 'object',
+      properties: { date: { type: 'string', description: 'Brief date YYYY-MM-DD' } },
+      required: ['date'],
+    },
   },
   {
     name: 'get_intelligence_home',
@@ -191,6 +235,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'probe_llm':
         data = await api('/api/health/llm')
         break
+      case 'list_changes': {
+        const q = new URLSearchParams()
+        if (args.limit != null) q.set('limit', String(args.limit))
+        if (args.tier) q.set('tier', String(args.tier))
+        const qs = q.toString()
+        data = await api(`/api/changes${qs ? `?${qs}` : ''}`)
+        break
+      }
+      case 'get_change':
+        data = await api(`/api/changes/${args.id}`)
+        break
+      case 'list_decisions': {
+        const q = new URLSearchParams()
+        if (args.revisit) q.set('revisit', String(args.revisit))
+        const qs = q.toString()
+        data = await api(`/api/decisions${qs ? `?${qs}` : ''}`)
+        break
+      }
+      case 'list_actions':
+        data = await api('/api/actions')
+        break
       case 'list_events': {
         const q = new URLSearchParams()
         if (args.status) q.set('status', String(args.status))
@@ -204,6 +269,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break
       case 'list_briefs':
         data = await api('/api/briefs')
+        break
+      case 'get_brief':
+        data = await api(`/api/briefs/${encodeURIComponent(String(args.date))}`)
         break
       case 'get_intelligence_home':
         data = await api('/api/intelligence/home')

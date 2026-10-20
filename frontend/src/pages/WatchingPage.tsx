@@ -124,9 +124,8 @@ export default function WatchingPage() {
     },
   })
 
-  const groups = (timeline.data?.groups ?? []).filter((g) =>
-    changeMatchesDisplay(g, displaySourceIds),
-  )
+  const rawGroups = timeline.data?.groups ?? []
+  const groups = rawGroups.filter((g) => changeMatchesDisplay(g, displaySourceIds))
   const watchedIds = new Set(groups.map((g) => g.eventId))
   // Following page: only actively followed changes (timeline source of truth).
   const tracked = (changes.data ?? [])
@@ -134,6 +133,15 @@ export default function WatchingPage() {
     .filter((c) => watchedIds.has(c.id) || watchedIds.has(c.eventId))
   const savedItems = saved.data?.items ?? []
   const visibleGroups = showAllTimeline ? groups : groups.slice(0, TIMELINE_PREVIEW)
+  const displayFilterEmpty =
+    !noneSelected &&
+    !timeline.isLoading &&
+    !changes.isLoading &&
+    !saved.isLoading &&
+    rawGroups.length > 0 &&
+    groups.length === 0 &&
+    tracked.length === 0 &&
+    savedItems.length === 0
 
   return (
     <div
@@ -165,6 +173,27 @@ export default function WatchingPage() {
         <EmptyState
           title={t('sources.displayNoneActive')}
           description={t('watching.displayNoneHint')}
+          primary={
+            <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
+              {t('sources.displayRestoreAll')}
+            </Button>
+          }
+          secondary={
+            <Link
+              to="/settings/sources"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                focusRingClass(),
+              )}
+            >
+              {t('nav.sources')}
+            </Link>
+          }
+        />
+      ) : displayFilterEmpty ? (
+        <EmptyState
+          title={t('watching.displayFilterEmpty')}
+          description={t('watching.displayFilterEmptyHint')}
           primary={
             <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
               {t('sources.displayRestoreAll')}

@@ -190,14 +190,19 @@ export function RadarChangesPanel({
 
   const loading = changes.isLoading || (followingOnly && watching.isLoading)
   const err = changes.error ?? (followingOnly ? watching.error : null)
+  const rawCount = (changes.data ?? []).length
+  const displayFilterEmpty =
+    !noneSelected && !followingOnly && !q && rawCount > 0 && rows.length === 0
 
   const emptyTitle = noneSelected
     ? t('sources.displayNoneActive')
-    : followingOnly
-      ? t('radar.emptyFollowing')
-      : q
-        ? t('radar.emptySearch')
-        : t('changes.empty')
+    : displayFilterEmpty
+      ? t('radar.displayFilterEmpty')
+      : followingOnly
+        ? t('radar.emptyFollowing')
+        : q
+          ? t('radar.emptySearch')
+          : t('changes.empty')
 
   return (
     <div aria-busy={changes.isFetching || (followingOnly && watching.isFetching) || undefined}>
@@ -229,12 +234,14 @@ export function RadarChangesPanel({
           description={
             noneSelected
               ? t('radar.displayNoneHint')
-              : !followingOnly && !q
-                ? t('changes.emptyHint')
-                : undefined
+              : displayFilterEmpty
+                ? t('radar.displayFilterEmptyHint')
+                : !followingOnly && !q
+                  ? t('changes.emptyHint')
+                  : undefined
           }
           primary={
-            noneSelected ? (
+            noneSelected || displayFilterEmpty ? (
               <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
                 {t('sources.displayRestoreAll')}
               </Button>
@@ -272,7 +279,7 @@ export function RadarChangesPanel({
             )
           }
           secondary={
-            noneSelected ? (
+            noneSelected || displayFilterEmpty ? (
               <Link
                 to="/settings/sources"
                 className={cn(

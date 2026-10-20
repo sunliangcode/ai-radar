@@ -143,12 +143,25 @@ export default function TodayPage() {
       removeMajorOptimistic(changeId)
       return { prev }
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, changeId, ctx) => {
       await qc.invalidateQueries({ queryKey: ['watching-timeline'] })
       await qc.invalidateQueries({ queryKey: ['changes-watching'] })
       pushToast('success', t('today.followed'), {
-        label: t('nav.watching'),
-        onClick: () => navigate('/watching'),
+        label: t('common.undo'),
+        onClick: () => {
+          void api
+            .deleteWatch(changeId)
+            .then(() => {
+              if (ctx?.prev) qc.setQueryData(['intelligence-home'], ctx.prev)
+              setSessionWatched((prev) =>
+                prev.filter((x) => (x.eventId ?? x.changeId) !== changeId),
+              )
+              void qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+              void qc.invalidateQueries({ queryKey: ['changes-watching'] })
+              void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+            })
+            .catch(() => undefined)
+        },
       })
     },
     onError: (err, changeId, ctx) => {
@@ -336,6 +349,13 @@ export default function TodayPage() {
   const majorCount = major.length
   // Following alone is still a valid Today surface (don't show "getting started").
   const ready = major.length > 0 || minor.length > 0 || following.length > 0
+  // Unfiltered home payload still has triage — display scope hid everything.
+  const unfilteredReady =
+    (data?.majorChanges ?? data?.todayChanges ?? []).length > 0 ||
+    (data?.minorSignals ?? []).length > 0 ||
+    (data?.following ?? []).length > 0 ||
+    sessionWatched.length > 0
+  const displayFilterEmpty = !ready && !noneSelected && unfilteredReady
   const deckBusy = dismissMut.isPending || followMut.isPending || unfollowMut.isPending
   const locale = dateLocale(i18n.language)
   const dateLabel = new Date().toLocaleDateString(locale, {
@@ -414,7 +434,31 @@ export default function TodayPage() {
         />
       ) : null}
 
-      {!home.isLoading && !home.isError && !ready && !noneSelected ? (
+      {!home.isLoading && !home.isError && displayFilterEmpty ? (
+        <EmptyState
+          title={t('today.displayFilterEmpty')}
+          description={t('today.displayFilterEmptyHint')}
+          primary={
+            <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
+              {t('sources.displayRestoreAll')}
+            </Button>
+          }
+          secondary={
+            <Link
+              to="/settings/sources"
+              aria-label={t('nav.sources')}
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md border border-border px-3 py-2 text-sm text-accent hover:border-accent/50',
+                focusRingClass(),
+              )}
+            >
+              {t('nav.sources')}
+            </Link>
+          }
+        />
+      ) : null}
+
+      {!home.isLoading && !home.isError && !ready && !noneSelected && !displayFilterEmpty ? (
         <EmptyState
           title={
             !hasSources

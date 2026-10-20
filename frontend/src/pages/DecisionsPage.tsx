@@ -160,6 +160,14 @@ export default function DecisionsPage() {
       .filter((d) => changeMatchesDisplay(d, displaySourceIds))
       .filter((d) => !dueIds.has(d.id))
   }, [q.data, displaySourceIds, dueRows])
+  const hasAnyDecisions = (q.data ?? []).length > 0 || (due.data ?? []).length > 0
+  const displayFilterEmpty =
+    !noneSelected &&
+    hasAnyDecisions &&
+    openRows.length === 0 &&
+    dueRows.length === 0 &&
+    !q.isLoading &&
+    !due.isLoading
 
   const snoozeMut = useMutation({
     mutationFn: (id: number) => api.snoozeDecision(id, 7),
@@ -302,6 +310,29 @@ export default function DecisionsPage() {
             ) : dueRows.length > 0 ? (
               !q.isLoading && (
                 <p className="text-sm text-muted">{t('decisions.openEmptyWhileDue')}</p>
+              )
+            ) : displayFilterEmpty ? (
+              !q.isError && (
+                <EmptyState
+                  title={t('decisions.displayFilterEmpty')}
+                  description={t('decisions.displayFilterEmptyHint')}
+                  primary={
+                    <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
+                      {t('sources.displayRestoreAll')}
+                    </Button>
+                  }
+                  secondary={
+                    <Link
+                      to="/settings/sources"
+                      className={cn(
+                        'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                        focusRingClass(),
+                      )}
+                    >
+                      {t('nav.sources')}
+                    </Link>
+                  }
+                />
               )
             ) : (
               !q.isLoading && !q.isError && (

@@ -68,7 +68,7 @@ Same via CLI: `./bin/ai-radar health` · `./bin/ai-radar health-llm` · `./bin/a
 | POST | `/api/jobs/cleanup-duplicate-titles` | Title dedup maintenance |
 | POST | `/api/pipeline/run` | Legacy alias of fetch pipeline |
 
-Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code **3**.
+Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code **3**. The SPA treats fetch **409** as join-in-progress (poll `GET …/fetch/progress`) rather than a hard failure.
 
 ---
 
@@ -80,6 +80,15 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | PUT/DELETE | `/api/watch/{changeId}` | Follow / unfollow a change (`GET /api/changes/{id}` includes `watched`) |
 | GET | `/api/watching/timeline` | Followed changes + recent timeline entries (subscriptions, not memory audit) |
 | GET/PUT | `/api/contexts` | Single-user Context profile |
+| POST | `/api/contexts/extract` | Draft Context fields from free text |
+| POST | `/api/contexts/import/markdown` | Import Context from markdown |
+| POST | `/api/contexts/import/github` | Import Context hints from a GitHub profile/repo URL |
+| GET | `/api/decisions` | Open decisions; `?revisit=due` for past-revisit queue |
+| GET | `/api/actions` | Recommended actions derived from decisions / opportunities |
+| PATCH | `/api/actions/{id}` | Update action status |
+| GET | `/api/opportunities` | Opportunity list (internal engine surface) |
+| GET | `/api/memory` | Memory audit rows |
+| GET | `/api/outcomes/summary` | Outcome summary |
 | GET | `/api/events` | List events (filters: status, scores, limit — see Swagger) |
 | GET | `/api/events/{id}` | Event + timeline / items |
 | GET | `/api/changes` / `/api/changes/{id}` | Change cards (impact why / recommendation; detail includes `latestDecision` when open) |
@@ -99,14 +108,22 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | POST | `/api/packs/import` | Body `{"packId":"ai-core\|ai-cn\|ai-signals"}`; optional `"path"` = absolute JSON array file (no jar rebuild). Prefer CLI: `ai-radar pack validate` / `pack import … --path` |
 | GET/PATCH | `/api/items` | Filters: `saved` / `unread` / `sourceType`; list also accepts `cursor` + `limit` (returns `nextCursor` / `hasMore`; `offset` still supported). PATCH `read` / `saved` / `dismissed` |
 | GET | `/api/items/{id}` | Single item DTO (deep-link / Actions related item) |
+| GET | `/api/items/{id}/detail` | Item + enrichment / related context for reader drawer |
 | GET | `/api/items/unread-counts` | Unread per `primary_source_type` plus aggregate `total`; optional `sourceIds` / `sourceType` |
 | GET | `/api/items/badge` | `{ unreadItems, total }` for nav badges; optional `sourceIds` / `sourceType` / `since` |
 | POST | `/api/items/mark-all-read` | Optional query `sourceType` / `since` / `sourceIds`; returns `{ updated, ids }` (`ids` capped at 2000 for Undo) |
 | GET | `/api/items/search` | Also accepts `sourceType` / `unread` / `since` (plus `sourceIds`) so search matches feed filters |
 | GET | `/api/decisions/badge` | `{ due }` count of open decisions past revisit |
 | POST | `/api/decisions/{id}/snooze` | Body optional `{ days }` (default 7, max 90) or `{ revisitAt }` to restore absolute time (Undo) |
+| DELETE | `/api/decisions/{id}` | Withdraw an open decision (Undo after save); watch-kind also Unfollows |
 | POST | `/api/items/batch` | Body `ids` + optional `read` / `saved` / `dismissed` |
 | GET | `/api/items/interest-keywords` | Keywords from Interested titles |
+| GET | `/api/news` | Legacy news list alias (prefer `/api/items`) |
+| POST | `/api/feedback` | Light feedback on a change or action (`useful` / `irrelevant` / `watch` / `ignore` / `tried`) |
+| DELETE | `/api/feedback` | Undo feedback: body `{ targetType, targetId, kind, previousActionStatus? }` — forgets memory; reverses topic-weight nudge for changes; restores action status when `previousActionStatus` set |
+| POST | `/api/delivery/feishu/bind/start` | Start Feishu scan-to-bind session (Settings) |
+| GET | `/api/delivery/feishu/bind/{sessionId}` | Poll bind session status |
+| DELETE | `/api/delivery/feishu/bind` | Clear Feishu bind |
 | GET | `/api/briefs` | Brief dates |
 | GET | `/api/briefs/{date}` | Brief for a date |
 
@@ -116,10 +133,13 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET/PUT | `/api/settings` | App settings |
+| GET/PUT | `/api/settings` | App settings (customer PUT: language, push, smtpTo, `retentionDays` ≥ 0; secrets stay env-only) |
+| GET/POST | `/api/preferences/keywords` | Manual preference keywords (`?kind=`); POST body `{ kind, text }` |
+| DELETE | `/api/preferences/keywords/{id}` | Delete a preference keyword |
 | POST | `/api/chat` | SSE Radar Chat |
 | POST | `/api/chat/sync` | Sync chat helper |
 | GET | `/api/experiments` | Experiments list (MCP filters to `running`) |
+| PUT | `/api/experiments/{id}` | Update experiment fields / status |
 
 ---
 
@@ -190,8 +210,16 @@ Mutex: concurrent runs of guarded jobs → **409**. CLI maps this to exit code *
 | POST | `/api/chat`（SSE 对话）、`/api/chat/sync` |
 | POST | `/api/pipeline/run`（fetch 流水线遗留别名） |
 | GET | `/api/intelligence/home`（变了什么 / 为何关心 / 影响 / 做什么 / 观察） |
-| GET/PUT | `/api/contexts` |
-| POST | `/api/jobs/impact` |
+| GET/PUT | `/api/contexts`；`POST /api/contexts/extract` · `/import/markdown` · `/import/github` |
+| GET | `/api/changes` · `/api/changes/{id}`；`POST …/decisions` · `…/dismiss` · `…/recompute-impact` |
+| PUT/DELETE | `/api/watch/{changeId}`；`GET /api/watching/timeline` |
+| GET | `/api/decisions`（`?revisit=due`）；`POST /api/decisions/{id}/snooze`；`DELETE /api/decisions/{id}`（撤销 open）；`GET /api/decisions/badge` |
+| POST/DELETE | `/api/feedback`（提交 / 撤销反馈） |
+| GET/PATCH | `/api/actions` · `/api/actions/{id}`；`GET /api/opportunities` · `/api/memory` · `/api/outcomes/summary` |
+| GET | `/api/items/{id}/detail`；`GET/POST/DELETE /api/preferences/keywords` |
+| GET/PUT | `/api/experiments` · `/api/experiments/{id}` |
+| POST/GET/DELETE | `/api/delivery/feishu/bind/*`（设置页扫码绑定） |
+| POST | `/api/jobs/impact` · `/api/jobs/cleanup` · `/api/jobs/cleanup-duplicate-titles`；`GET /api/jobs/schedule` · `/api/jobs/fetch/progress` |
 | GET | `/api/events`, `/api/events/{id}` |
 | POST | `/api/jobs/cluster` |
 | POST | `/api/packs/import` body `{"packId":"…"}`，可选 `"path"`（本地 JSON 数组，无需重打 jar） |

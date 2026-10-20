@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MonitorBubble } from './MonitorBubble'
-import type { IoEntry } from './monitorUtils'
+import { monitorOpLabel, type IoEntry } from './monitorUtils'
 import { isAriaModalOpen, isEditableTarget } from '../../lib/a11y'
 import { cn, focusRingClass } from '../../lib/cn'
 
@@ -132,24 +132,27 @@ export function LiveConsole({
           >
             {t('settings.monitorAllOps')}
           </button>
-          {operations.map((op) => (
-            <button
-              key={op}
-              type="button"
-              onClick={() => onOpFilterChange(op)}
-              aria-pressed={opFilter === op}
-              aria-label={op}
-              className={cn(
-                'min-h-9 rounded px-2.5 py-1 font-mono text-[11px]',
-                focusRingClass(),
-                opFilter === op
-                  ? 'bg-moss text-surface'
-                  : 'border border-border text-muted hover:text-accent',
-              )}
-            >
-              {op}
-            </button>
-          ))}
+          {operations.map((op) => {
+            const label = monitorOpLabel(op, t)
+            return (
+              <button
+                key={op}
+                type="button"
+                onClick={() => onOpFilterChange(op)}
+                aria-pressed={opFilter === op}
+                aria-label={label}
+                className={cn(
+                  'min-h-9 rounded px-2.5 py-1 font-mono text-[11px]',
+                  focusRingClass(),
+                  opFilter === op
+                    ? 'bg-moss text-surface'
+                    : 'border border-border text-muted hover:text-accent',
+                )}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
       ) : null}
       <div

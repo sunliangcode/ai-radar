@@ -113,6 +113,7 @@ User-visible changes → update `CHANGELOG.md` (PR template checkbox).
 - `build:embed` `emptyOutDir: true` wipes `backend/src/main/resources/static/` — expected; do not hand-edit those baked assets.
 - i18n via `react-i18next`; primary language is a Settings concept (`summaryLanguage` zh/en), not a locale switch of the whole SPA.
 - **Source region modes** (localStorage): 国内模式 / 国外模式 / 全部 on Settings → Sources display picker.
+- UI norms: [docs/product-principles.md](docs/product-principles.md) (empty vs filter-empty vs 404, Undo, display filter, i18n). Privacy: [PRIVACY.md](PRIVACY.md).
 
 ## Do not commit
 
@@ -120,4 +121,4 @@ User-visible changes → update `CHANGELOG.md` (PR template checkbox).
 
 ## Useful docs
 
-`CONTRIBUTING.md` · `docs/installation.md` · `docs/cli.md` · `docs/api.md` · `docs/mcp.md` · `docs/agents.md` · `docs/development.md` · `docs/extensibility.md` · `docs/extending-connectors.md` · `docs/extending-delivery.md` · `docs/release.md` · `docs/ai-radar-2.0-domain.md` · `SKILL.md`
+`CONTRIBUTING.md` · `docs/installation.md` · `docs/cli.md` · `docs/api.md` · `docs/mcp.md` · `docs/agents.md` · `docs/development.md` · `docs/extensibility.md` · `docs/extending-connectors.md` · `docs/extending-delivery.md` · `docs/release.md` · `docs/ai-radar-2.0-domain.md` · `docs/product-principles.md` · `PRIVACY.md` · `GOVERNANCE.md` · `SKILL.md`

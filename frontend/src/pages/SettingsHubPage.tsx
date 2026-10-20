@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
+import { ApiError, api, readLocalToken } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { ListSkeleton, PageHeader, QueryErrorState } from '../components/ui'
 import { useEscapeBack } from '../hooks/useEscapeBack'
+import { LocalTokenSection } from './settings/LocalTokenSection'
 import { SystemHealthCard } from './settings/SystemHealthCard'
 import { cn, focusRingClass } from '../lib/cn'
 
@@ -13,6 +14,11 @@ export default function SettingsHubPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings })
+  const settingsUnauthorized =
+    settings.isError &&
+    settings.error instanceof ApiError &&
+    settings.error.status === 401 &&
+    !readLocalToken()
 
   const goBack = useCallback(() => {
     if (window.history.length > 1) {
@@ -92,12 +98,18 @@ export default function SettingsHubPage() {
         </div>
       ) : null}
 
-      {settings.isError ? (
+      {settings.isError && !settingsUnauthorized ? (
         <div className="mb-6">
           <QueryErrorState
             message={t('common.loadFailed', { message: errorText(settings.error, t) })}
             onRetry={() => void settings.refetch()}
           />
+        </div>
+      ) : null}
+
+      {settingsUnauthorized ? (
+        <div className="mb-6">
+          <LocalTokenSection emphasize onSaved={() => void settings.refetch()} />
         </div>
       ) : null}
 
@@ -137,7 +149,13 @@ export default function SettingsHubPage() {
                 ))}
               </div>
               {isSystem ? (
-                <div className="mt-4">
+                <div className="mt-4 space-y-4">
+                  {!settingsUnauthorized ? (
+                    <LocalTokenSection
+                      serverConfigured={settings.data?.localTokenConfigured}
+                      onSaved={() => void settings.refetch()}
+                    />
+                  ) : null}
                   <SystemHealthCard />
                 </div>
               ) : null}

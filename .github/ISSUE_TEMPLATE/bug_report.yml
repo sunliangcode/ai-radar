@@ -66,11 +66,17 @@ body:
     validations:
       required: true
 
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste secrets** — cookies, `LOCAL_TOKEN`, API keys, SMTP passwords, Feishu/webhook URLs, or `.env` contents.
+        What stays local vs may leave the host: [PRIVACY.md](https://github.com/sunliangcode/ai-radar/blob/main/PRIVACY.md).
+
   - type: textarea
     id: diagnostics
     attributes:
       label: Diagnostics (recommended)
-      description: Paste doctor/health/status output (redact secrets). Prefer doctor (cliVersion, versionAlign, llm, modelPresent, SPI connectors/deliveryChannels, backend version when up).
+      description: Paste doctor/health/status output with secrets redacted. Prefer doctor (cliVersion, versionAlign, llm, modelPresent, SPI connectors/deliveryChannels, backend version when up).
       placeholder: |
         ./bin/ai-radar doctor   # look for versionAlign / llm / SPI catalog warns
         # or
@@ -88,5 +94,5 @@ body:
     id: logs
     attributes:
       label: Relevant logs (optional)
-      description: Paste truncated logs; redact secrets
+      description: Paste truncated logs; redact cookies, tokens, webhooks, and .env values (see PRIVACY.md)
       render: text

@@ -13,4 +13,5 @@
 ## Docs
 
 - [ ] CHANGELOG.md updated if user-visible
+- [ ] If UI/product: follows [docs/product-principles.md](docs/product-principles.md) (empty vs filter-empty vs 404; Undo; display filter; i18n en+zh)
 - [ ] If release-facing: versions aligned (`package.json` / `radar.api.version` / `CITATION.cff`) — see [docs/release.md](docs/release.md)

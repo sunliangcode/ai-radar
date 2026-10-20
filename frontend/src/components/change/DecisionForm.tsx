@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Field, Input, Textarea } from '../ui'
+import { Button, ConfirmDialog, Field, Input, Textarea } from '../ui'
 import { isAriaModalOpen } from '../../lib/a11y'
 import { cn, focusRingClass } from '../../lib/cn'
 
@@ -57,6 +57,7 @@ export function DecisionForm({
   const reasonId = `${formId}-reason`
   const revisitId = `${formId}-revisit`
   const reasonRef = useRef<HTMLTextAreaElement>(null)
+  const [confirmIgnore, setConfirmIgnore] = useState(false)
 
   useEffect(() => {
     if (!autoFocus) return
@@ -85,13 +86,20 @@ export function DecisionForm({
     setRevisitAt((prev) => (prev ? prev : defaultRevisit(next)))
   }
 
+  const commit = () => onSubmit(kind, reason, revisitAt)
+
   return (
+    <>
     <form
       className="space-y-3"
       aria-busy={loading || undefined}
       onSubmit={(e) => {
         e.preventDefault()
-        onSubmit(kind, reason, revisitAt)
+        if (kind === 'ignore') {
+          setConfirmIgnore(true)
+          return
+        }
+        commit()
       }}
     >
       <div className="space-y-1.5">
@@ -166,5 +174,20 @@ export function DecisionForm({
         </Button>
       </div>
     </form>
+    <ConfirmDialog
+      open={confirmIgnore}
+      title={t('decisions.ignoreConfirmTitle')}
+      description={t('decisions.ignoreConfirmBody')}
+      confirmLabel={t('decisions.ignoreConfirm')}
+      cancelLabel={t('common.cancel')}
+      danger
+      pending={loading}
+      onConfirm={() => {
+        setConfirmIgnore(false)
+        commit()
+      }}
+      onCancel={() => setConfirmIgnore(false)}
+    />
+    </>
   )
 }

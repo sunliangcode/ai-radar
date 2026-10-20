@@ -1,11 +1,29 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api, type FeedbackKind } from '../../lib/api'
+import { api, type ActionCard, type FeedbackKind } from '../../lib/api'
 import { Chip } from '../primitives/Chip'
+import { useToast } from '../providers/ToastProvider'
 import { errorText } from '../../lib/errors'
 
 const KINDS: FeedbackKind[] = ['useful', 'irrelevant', 'watch', 'ignore', 'tried']
+
+/** Mirrors backend FeedbackService.actionStatus */
+function actionStatusForKind(kind: FeedbackKind): string {
+  switch (kind) {
+    case 'useful':
+      return 'useful'
+    case 'irrelevant':
+    case 'ignore':
+      return 'ignored'
+    case 'watch':
+      return 'watching'
+    case 'tried':
+      return 'started'
+    default:
+      return 'open'
+  }
+}
 
 export function FeedbackBar({
   targetType,
@@ -18,22 +36,67 @@ export function FeedbackBar({
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
+  const { push: pushToast } = useToast()
   const targetKey = `${targetType}:${targetId}`
   const [activeKind, setActiveKind] = useState<FeedbackKind | null>(() => {
     return (sessionStorage.getItem(`radar-feedback:${targetKey}`) as FeedbackKind | null) ?? null
   })
 
+  const invalidateSurfaces = () => {
+    for (const key of invalidateKeys) {
+      void qc.invalidateQueries({ queryKey: key })
+    }
+    void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+    void qc.invalidateQueries({ queryKey: ['actions'] })
+    void qc.invalidateQueries({ queryKey: ['changes'] })
+    void qc.invalidateQueries({ queryKey: ['memory'] })
+    void qc.invalidateQueries({ queryKey: ['contexts'] })
+  }
+
   const feedback = useMutation({
     mutationFn: (kind: FeedbackKind) => api.postFeedback({ targetType, targetId, kind }),
-    onSuccess: (_data, kind) => {
+    onMutate: async (kind) => {
+      if (targetType !== 'action') return {}
+      await qc.cancelQueries({ queryKey: ['actions'] })
+      const prev = qc.getQueryData<ActionCard[]>(['actions'])
+      const status = actionStatusForKind(kind)
+      qc.setQueryData<ActionCard[]>(['actions'], (old) =>
+        (old ?? []).map((a) => (a.id === targetId ? { ...a, status } : a)),
+      )
+      return { prevActions: prev, prevStatus: prev?.find((a) => a.id === targetId)?.status }
+    },
+    onSuccess: (_data, kind, ctx) => {
       setActiveKind(kind)
       sessionStorage.setItem(`radar-feedback:${targetKey}`, kind)
-      for (const key of invalidateKeys) {
-        void qc.invalidateQueries({ queryKey: key })
-      }
-      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-      void qc.invalidateQueries({ queryKey: ['actions'] })
-      void qc.invalidateQueries({ queryKey: ['changes'] })
+      invalidateSurfaces()
+      const prevStatus = ctx?.prevStatus
+      const toastKey = targetType === 'action' ? 'actions.statusUpdated' : 'feedback.saved'
+      pushToast('success', t(toastKey), {
+        label: t('common.undo'),
+        onClick: () => {
+          void api
+            .withdrawFeedback({
+              targetType,
+              targetId,
+              kind,
+              previousActionStatus:
+                targetType === 'action' && prevStatus && prevStatus !== actionStatusForKind(kind)
+                  ? prevStatus
+                  : undefined,
+            })
+            .then(() => {
+              if (ctx?.prevActions) qc.setQueryData(['actions'], ctx.prevActions)
+              sessionStorage.removeItem(`radar-feedback:${targetKey}`)
+              setActiveKind(null)
+              invalidateSurfaces()
+            })
+            .catch(() => undefined)
+        },
+      })
+    },
+    onError: (err, _kind, ctx) => {
+      if (ctx?.prevActions) qc.setQueryData(['actions'], ctx.prevActions)
+      pushToast('error', t('common.loadFailed', { message: errorText(err, t) }))
     },
   })
 
@@ -63,16 +126,6 @@ export function FeedbackBar({
           </Chip>
         )
       })}
-      {feedback.isSuccess ? (
-        <span className="self-center text-xs text-moss" role="status" aria-live="polite">
-          {t('feedback.saved')}
-        </span>
-      ) : null}
-      {feedback.isError ? (
-        <span className="self-center text-xs text-ember" role="alert">
-          {errorText(feedback.error, t)}
-        </span>
-      ) : null}
     </div>
   )
 }

@@ -9,6 +9,8 @@ import { prefersReducedMotion } from '../lib/a11y'
 import { useEscapeBack } from '../hooks/useEscapeBack'
 import { useSaveSettings, useSettings } from '../hooks/useSettings'
 import { BasicsSection } from './settings/BasicsSection'
+import { LocalTokenSection } from './settings/LocalTokenSection'
+import { MaintenanceSection } from './settings/MaintenanceSection'
 import { NotifySection } from './settings/NotifySection'
 import { cn, focusRingClass } from '../lib/cn'
 
@@ -90,6 +92,7 @@ export default function ContextsPage() {
         timezone: settingsForm.timezone,
         pushOnlyWhenItems: settingsForm.pushOnlyWhenItems,
         smtpTo: settingsForm.smtpTo,
+        retentionDays: settingsForm.retentionDays ?? 0,
       },
       {
         onSuccess: () => {
@@ -122,25 +125,57 @@ export default function ContextsPage() {
       }
       return api.saveContext({ payload: nextPayload, rawText, source })
     },
-    onSuccess: (data) => {
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['contexts'] })
+      const prev = qc.getQueryData<UserContext>(['contexts'])
+      return { prev }
+    },
+    onSuccess: (data, _vars, ctx) => {
       qc.setQueryData(['contexts'], data)
       setPayload(data.payload)
       setRawText(data.rawText ?? rawText)
       setBaseline(JSON.stringify({ payload: data.payload, rawText: data.rawText ?? rawText }))
-      void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-      void qc.invalidateQueries({ queryKey: ['changes'] })
-      void qc.invalidateQueries({ queryKey: ['changes-list'] })
+      const invalidateSurfaces = () =>
+        Promise.all([
+          qc.invalidateQueries({ queryKey: ['intelligence-home'] }),
+          qc.invalidateQueries({ queryKey: ['changes'] }),
+          qc.invalidateQueries({ queryKey: ['changes-list'] }),
+        ])
+      void invalidateSurfaces()
+      const prev = ctx?.prev
+      const canUndo = Boolean(prev)
       pushToast('success', t('contexts.saved'), {
-        label: t('contexts.refreshToday'),
+        label: canUndo ? t('common.undo') : t('contexts.refreshToday'),
         onClick: () => {
+          if (!canUndo || !prev) {
+            void api
+              .impactJob()
+              .then(() => {
+                void invalidateSurfaces()
+                navigate('/')
+              })
+              .catch(() => navigate('/'))
+            return
+          }
           void api
-            .impactJob()
-            .then(() => {
-              void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
-              void qc.invalidateQueries({ queryKey: ['changes'] })
-              navigate('/')
+            .saveContext({
+              payload: prev.payload,
+              rawText: prev.rawText ?? '',
+              source: prev.source ?? 'manual',
             })
-            .catch(() => navigate('/'))
+            .then((restored) => {
+              qc.setQueryData(['contexts'], restored)
+              setPayload(restored.payload)
+              setRawText(restored.rawText ?? '')
+              setBaseline(
+                JSON.stringify({
+                  payload: restored.payload,
+                  rawText: restored.rawText ?? '',
+                }),
+              )
+              void invalidateSurfaces()
+            })
+            .catch(() => undefined)
         },
       })
       queueMicrotask(() =>
@@ -150,38 +185,48 @@ export default function ContextsPage() {
     onError: (e) => pushToast('error', errorText(e, t)),
   })
 
+  const focusUnderstood = () => {
+    const reduce = prefersReducedMotion()
+    window.requestAnimationFrame(() => {
+      understoodRef.current?.focus({ preventScroll: true })
+      understoodRef.current?.scrollIntoView({
+        block: 'nearest',
+        behavior: reduce ? 'auto' : 'smooth',
+      })
+    })
+  }
+
   const extract = useMutation({
     mutationFn: () => api.extractContext(rawText),
-    onSuccess: (draft) => {
+    onMutate: () => ({ prevPayload: payload }),
+    onSuccess: (draft, _vars, ctx) => {
       setPayload(draft.payload)
-      pushToast('success', t('contexts.extracted'))
-      const reduce = prefersReducedMotion()
-      window.requestAnimationFrame(() => {
-        understoodRef.current?.focus({ preventScroll: true })
-        understoodRef.current?.scrollIntoView({
-          block: 'nearest',
-          behavior: reduce ? 'auto' : 'smooth',
-        })
+      pushToast('success', t('contexts.extracted'), {
+        label: t('common.undo'),
+        onClick: () => {
+          if (ctx?.prevPayload) setPayload(ctx.prevPayload)
+        },
       })
+      focusUnderstood()
     },
     onError: (e) => pushToast('error', errorText(e, t)),
   })
 
   const importGithub = useMutation({
     mutationFn: () => api.importGithubContext(githubUrl),
-    onSuccess: (draft) => {
+    onMutate: () => ({ prevPayload: payload, prevRawText: rawText }),
+    onSuccess: (draft, _vars, ctx) => {
       setPayload(draft.payload)
       if (draft.rawText) setRawText(draft.rawText)
       setAdvancedOpen(true)
-      pushToast('success', t('contexts.imported'))
-      const reduce = prefersReducedMotion()
-      window.requestAnimationFrame(() => {
-        understoodRef.current?.focus({ preventScroll: true })
-        understoodRef.current?.scrollIntoView({
-          block: 'nearest',
-          behavior: reduce ? 'auto' : 'smooth',
-        })
+      pushToast('success', t('contexts.imported'), {
+        label: t('common.undo'),
+        onClick: () => {
+          if (ctx?.prevPayload) setPayload(ctx.prevPayload)
+          if (ctx?.prevRawText != null) setRawText(ctx.prevRawText)
+        },
       })
+      focusUnderstood()
     },
     onError: (e) => pushToast('error', errorText(e, t)),
   })
@@ -365,7 +410,7 @@ export default function ContextsPage() {
                       className="min-w-64 flex-1"
                       value={githubUrl}
                       onChange={(e) => setGithubUrl(e.target.value)}
-                      placeholder="https://github.com/owner/repo"
+                      placeholder={t('contexts.githubUrlPlaceholder')}
                       aria-label={t('contexts.importGithub')}
                       disabled={importGithub.isPending}
                     />
@@ -417,6 +462,8 @@ export default function ContextsPage() {
               emailTransportReady={settings.data?.emailTransportReady}
               feishuBound={settings.data?.feishuBound}
             />
+            <MaintenanceSection form={settingsForm} patch={patchSettings} />
+            <LocalTokenSection serverConfigured={settings.data?.localTokenConfigured} />
             <FormSaveBar
               dirty={settingsDirty}
               saving={saveSettings.isPending}

@@ -6,6 +6,9 @@ contact_links:
   - name: Support
     url: https://github.com/sunliangcode/ai-radar/blob/main/SUPPORT.md
     about: How to ask for help (prefer doctor / status output)
+  - name: Privacy
+    url: https://github.com/sunliangcode/ai-radar/blob/main/PRIVACY.md
+    about: What stays local vs what may leave the host when you enable integrations
   - name: Security advisories
     url: https://github.com/sunliangcode/ai-radar/security/advisories/new
     about: Private vulnerability reports only — do not open a public issue

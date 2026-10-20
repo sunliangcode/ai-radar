@@ -16,11 +16,25 @@ export function normalizeLocalToken(raw: string | null | undefined): string {
   return (raw ?? '').trim()
 }
 
-function readLocalToken(): string {
+export function readLocalToken(): string {
   try {
     return normalizeLocalToken(localStorage.getItem('localToken'))
   } catch {
     return ''
+  }
+}
+
+/** Persist browser LAN token (X-Local-Token). Empty clears. */
+export function persistLocalToken(raw: string | null | undefined): void {
+  try {
+    const token = normalizeLocalToken(raw)
+    if (token) {
+      localStorage.setItem('localToken', token)
+    } else {
+      localStorage.removeItem('localToken')
+    }
+  } catch {
+    /* private mode / quota */
   }
 }
 
@@ -684,6 +698,8 @@ export const api = {
   clusterJob: () => request<Record<string, unknown>>('/api/jobs/cluster', { method: 'POST' }),
   impactJob: () => request<Record<string, unknown>>('/api/jobs/impact', { method: 'POST' }),
   cleanupJob: () => request<Record<string, unknown>>('/api/jobs/cleanup', { method: 'POST' }),
+  cleanupDuplicateTitlesJob: () =>
+    request<Record<string, unknown>>('/api/jobs/cleanup-duplicate-titles', { method: 'POST' }),
   events: (q: string = '') => request<RadarEvent[]>(`/api/events${q}`),
   event: (id: number) => request<RadarEvent>(`/api/events/${id}`),
   changes: (limit: number = 40, tier?: string) => {
@@ -731,6 +747,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ revisitAt }),
     }),
+  /** Withdraw an open decision (Undo after save). Watch-kind also Unfollows. */
+  withdrawDecision: (id: number) =>
+    request<{ id: number; changeId: number; kind: string; withdrawn: boolean }>(
+      `/api/decisions/${id}`,
+      { method: 'DELETE' },
+    ),
   intelligenceHome: () => request<IntelligenceHome>('/api/intelligence/home'),
   getContext: () => request<UserContext>('/api/contexts'),
   saveContext: (body: unknown) =>
@@ -855,6 +877,14 @@ export const api = {
     request<ActionCard>(`/api/actions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   postFeedback: (body: { targetType: 'change' | 'action'; targetId: number; kind: FeedbackKind }) =>
     request<Record<string, unknown>>('/api/feedback', { method: 'POST', body: JSON.stringify(body) }),
+  /** Undo feedback (forget memory; reverse topic nudge; optional action status restore). */
+  withdrawFeedback: (body: {
+    targetType: 'change' | 'action'
+    targetId: number
+    kind: FeedbackKind
+    previousActionStatus?: string
+  }) =>
+    request<Record<string, unknown>>('/api/feedback', { method: 'DELETE', body: JSON.stringify(body) }),
   experiments: () => request<ExperimentCard[]>('/api/experiments'),
   updateExperiment: (id: number, body: Record<string, unknown>) =>
     request<ExperimentCard>(`/api/experiments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

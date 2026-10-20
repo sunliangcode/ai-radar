@@ -1,0 +1,42 @@
+name: Docs / Question
+description: Clarify docs, install, or how something is supposed to work
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Prefer reading [SUPPORT.md](https://github.com/sunliangcode/ai-radar/blob/main/SUPPORT.md)
+        and running `./bin/ai-radar doctor` before opening an issue.
+        Security: [SECURITY.md](https://github.com/sunliangcode/ai-radar/blob/main/SECURITY.md) (private).
+        Privacy / data leaving the host: [PRIVACY.md](https://github.com/sunliangcode/ai-radar/blob/main/PRIVACY.md).
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Documentation gap or typo
+        - Install / Docker / one-box question
+        - API / CLI / MCP usage
+        - Product behavior clarification
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question or gap
+      description: What is unclear? Link the doc section if you have one.
+      placeholder: |
+        In docs/installation.md, the LOCAL_TOKEN section does not say whether…
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (optional)
+      description: OS, install path (install.sh / Docker / Maven), and a redacted `doctor` JSON if relevant.
+      render: shell

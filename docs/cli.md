@@ -110,6 +110,39 @@ make health-llm
 ./bin/ai-radar home | jq .
 ```
 
+### `changes` / `change`
+
+`GET /api/changes` — recent Change cards (product loop). Optional `--limit` / `--tier`.
+
+`GET /api/changes/{id}` — one Change (impact, recommendation, `latestDecision`, `watched`).
+
+```bash
+./bin/ai-radar changes --limit 20
+./bin/ai-radar change 42 | jq .
+```
+
+### `decisions` / `actions`
+
+`GET /api/decisions` — open decisions; `--due` → `?revisit=due`.
+
+`GET /api/actions` — recommended actions.
+
+```bash
+./bin/ai-radar decisions --due
+./bin/ai-radar actions | jq .
+```
+
+### `briefs` / `brief`
+
+`GET /api/briefs` — brief dates.
+
+`GET /api/briefs/{date}` — daily brief body (`YYYY-MM-DD`).
+
+```bash
+./bin/ai-radar briefs
+./bin/ai-radar brief 2026-10-20 | jq .
+```
+
 ### `sources`
 
 `GET /api/sources` — configured sources JSON.
@@ -242,6 +275,9 @@ Shell out to repo scripts (cwd = repo root):
 | Health | `ai-radar health` | `get_health` | `GET /api/health` |
 | Live LLM probe | `ai-radar health-llm` | `probe_llm` | `GET /api/health/llm` |
 | Intelligence home | `ai-radar home` | `get_intelligence_home` | `GET /api/intelligence/home` |
+| Changes | `ai-radar changes` / `change <id>` | `list_changes` / `get_change` | `GET /api/changes` |
+| Decisions / actions | `ai-radar decisions` / `actions` | `list_decisions` / `list_actions` | `GET /api/decisions` · `/api/actions` |
+| Briefs | `ai-radar briefs` / `brief <date>` | `list_briefs` / `get_brief` | `GET /api/briefs` · `/{date}` |
 | List sources | `ai-radar sources` | `list_sources` | `GET /api/sources` |
 | Connector catalog | `ai-radar connectors` | `list_connectors` | `GET /api/connectors` |
 | Delivery catalog | `ai-radar delivery-channels` | `list_delivery_channels` | `GET /api/delivery/channels` |

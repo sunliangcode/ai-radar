@@ -10,17 +10,38 @@ export function progressFromElapsed(elapsedMs: number): number {
   return Math.min(90, 90 * (1 - Math.exp(-elapsedMs / 15_000)))
 }
 
-export function formatClock(iso: string): string {
+/** Locale-aware clock for monitor rows (backend Instant is UTC). */
+export function formatClock(iso: string, locale = 'en'): string {
   const d = Date.parse(iso)
   if (!Number.isFinite(d)) return iso.slice(11, 19) || iso
-  // Backend Instant is UTC; display in Asia/Shanghai (UTC+8)
-  return new Date(d).toLocaleTimeString('zh-CN', {
-    timeZone: 'Asia/Shanghai',
+  const tag = locale.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
+  return new Date(d).toLocaleTimeString(tag, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
   })
+}
+
+const MONITOR_OP_KEYS: Record<string, string> = {
+  chat: 'settings.monitorOp.chat',
+  score: 'settings.monitorOp.score',
+  summarize: 'settings.monitorOp.summarize',
+  summarizeBatch: 'settings.monitorOp.summarizeBatch',
+  extractPreference: 'settings.monitorOp.extractPreference',
+  suggestItemAction: 'settings.monitorOp.suggestItemAction',
+  assignEvent: 'settings.monitorOp.assignEvent',
+  eventIntelligence: 'settings.monitorOp.eventIntelligence',
+  extractItems: 'settings.monitorOp.extractItems',
+  extractContext: 'settings.monitorOp.extractContext',
+  analyzeImpact: 'settings.monitorOp.analyzeImpact',
+  suggestOpportunity: 'settings.monitorOp.suggestOpportunity',
+}
+
+/** Map backend operation codes to i18n labels; unknown codes stay as-is. */
+export function monitorOpLabel(operation: string, t: (key: string) => string): string {
+  const key = MONITOR_OP_KEYS[operation]
+  return key ? t(key) : operation
 }
 
 export type IoEntry = {

@@ -1,6 +1,7 @@
 # Security Policy
 
 AI Radar is a **single-user, self-hosted** app. Treat the host and `.env` as the trust boundary.
+What data stays local vs leaves the host: [PRIVACY.md](PRIVACY.md).
 
 ## Supported Versions
 
@@ -24,10 +25,13 @@ We will acknowledge receipt and work on a fix; no specific SLA is guaranteed.
 - Never commit `.env`, cookies, API keys, or SQLite DBs (`data/`, `backend/data/`).
 - MCP writes (`run_fetch` / `run_push` / `run_cluster`) stay off unless `ALLOW_WRITES=true`.
 - Connector credentials (Zhihu/Weibo cookies, `PH_TOKEN`, `APIFY_TOKEN`, …) are secrets — paste in Settings / Sources UI, do not put them in pack JSON committed to git.
+- When `LOCAL_TOKEN` is set, paste the same value in **Settings → Browser local token** (stored in this browser as `X-Local-Token`). Without it, Settings and mutations return 401.
 
 ## Dependency updates
 
 Weekly [Dependabot](.github/dependabot.yml) PRs cover Maven (`backend/`), npm (`frontend/`, `mcp/`), pip (`translate-service/`), Docker (root + `translate-service/`), and GitHub Actions. Review and CI-gate before merge.
+
+PRs also run [dependency review](.github/workflows/dependency-review.yml) (fails on high+ advisories in changed manifests). [CodeQL](.github/workflows/codeql.yml) scans Java and JavaScript/TypeScript on push/PR and weekly.
 
 ## Useful checks
 

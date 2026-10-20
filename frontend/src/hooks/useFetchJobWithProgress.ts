@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, type FetchProgress } from '../lib/api'
+import { useTranslation } from 'react-i18next'
+import { ApiError, api, type FetchProgress } from '../lib/api'
+import { useToast } from '../components/providers/ToastProvider'
 
 const PROGRESS_KEY = ['fetch-progress'] as const
 
@@ -22,12 +24,22 @@ const DEFAULT_INVALIDATE: string[][] = [
   ['sources'],
 ]
 
+/** Overlapping fetch/push/cluster jobs return HTTP 409 (mutex). */
+export function isJobConflict(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409
+}
+
 export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
   const qc = useQueryClient()
+  const { t } = useTranslation()
+  const { push: pushToast } = useToast()
   const [phase, setPhase] = useState<FetchPhase>('idle')
   const [summaryProgress, setSummaryProgress] = useState<FetchProgress | null>(null)
   const [jobError, setJobError] = useState<Error | null>(null)
+  /** True when POST returned 409 and we are polling the in-flight job. */
+  const [joining, setJoining] = useState(false)
   const invalidateKeysRef = useRef(onSuccessInvalidate ?? DEFAULT_INVALIDATE)
+  const joinedToastShown = useRef(false)
 
   useEffect(() => {
     invalidateKeysRef.current = onSuccessInvalidate ?? DEFAULT_INVALIDATE
@@ -48,6 +60,8 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
   }, [qc])
 
   const finishFromJob = useCallback(async () => {
+    setJoining(false)
+    joinedToastShown.current = false
     const finalSnap = await api.fetchProgress().catch(() => qc.getQueryData<FetchProgress>(PROGRESS_KEY))
     setSummaryProgress(finalSnap ?? EMPTY_PROGRESS)
     setPhase('summary')
@@ -55,18 +69,27 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     void invalidateAll()
   }, [invalidateAll, qc])
 
-  const fetchJob = useMutation({
-    mutationFn: (opts?: { sourceType?: string }) => api.fetchJob(opts),
-    onMutate: () => {
-      setPhase('running')
-      setSummaryProgress(null)
-      setJobError(null)
-      qc.setQueryData(PROGRESS_KEY, EMPTY_PROGRESS)
-    },
-    onSuccess: async () => {
-      await finishFromJob()
-    },
-    onError: async (err) => {
+  const joinInFlight = useCallback(async () => {
+    setJobError(null)
+    setJoining(true)
+    setPhase('running')
+    if (!joinedToastShown.current) {
+      joinedToastShown.current = true
+      pushToast('success', t('fetchProgress.joinedRunning'))
+    }
+    const snap = await api.fetchProgress().catch(() => null)
+    if (snap) {
+      qc.setQueryData(PROGRESS_KEY, snap)
+      if (!snap.running) {
+        await finishFromJob()
+      }
+    }
+  }, [finishFromJob, pushToast, qc, t])
+
+  const failJob = useCallback(
+    async (err: unknown) => {
+      setJoining(false)
+      joinedToastShown.current = false
       setJobError(err as Error)
       const finalSnap = await api.fetchProgress().catch(() => qc.getQueryData<FetchProgress>(PROGRESS_KEY))
       setSummaryProgress(
@@ -78,6 +101,29 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
         },
       )
       setPhase('summary')
+    },
+    [qc],
+  )
+
+  const fetchJob = useMutation({
+    mutationFn: (opts?: { sourceType?: string }) => api.fetchJob(opts),
+    onMutate: () => {
+      setPhase('running')
+      setSummaryProgress(null)
+      setJobError(null)
+      setJoining(false)
+      joinedToastShown.current = false
+      qc.setQueryData(PROGRESS_KEY, EMPTY_PROGRESS)
+    },
+    onSuccess: async () => {
+      await finishFromJob()
+    },
+    onError: async (err) => {
+      if (isJobConflict(err)) {
+        await joinInFlight()
+        return
+      }
+      await failJob(err)
     },
   })
 
@@ -92,23 +138,19 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
       setPhase('running')
       setSummaryProgress(null)
       setJobError(null)
+      setJoining(false)
+      joinedToastShown.current = false
       qc.setQueryData(PROGRESS_KEY, EMPTY_PROGRESS)
     },
     onSuccess: async () => {
       await finishFromJob()
     },
     onError: async (err) => {
-      setJobError(err as Error)
-      const finalSnap = await api.fetchProgress().catch(() => qc.getQueryData<FetchProgress>(PROGRESS_KEY))
-      setSummaryProgress(
-        finalSnap ?? {
-          ...EMPTY_PROGRESS,
-          running: false,
-          stage: 'error',
-          error: (err as Error).message,
-        },
-      )
-      setPhase('summary')
+      if (isJobConflict(err)) {
+        await joinInFlight()
+        return
+      }
+      await failJob(err)
     },
   })
 
@@ -128,10 +170,21 @@ export function useFetchJobWithProgress(onSuccessInvalidate?: string[][]) {
     void qc.fetchQuery({ queryKey: PROGRESS_KEY, queryFn: api.fetchProgress })
   }, [polling, qc])
 
+  // Joined a 409 in-flight job: when server reports idle, show summary.
+  useEffect(() => {
+    if (phase !== 'running' || !joining) return
+    const p = progressQuery.data
+    if (p && !p.running) {
+      void finishFromJob()
+    }
+  }, [phase, joining, progressQuery.data, finishFromJob])
+
   const dismiss = useCallback(async () => {
     await invalidateAll()
     setSummaryProgress(null)
     setJobError(null)
+    setJoining(false)
+    joinedToastShown.current = false
     setPhase('idle')
   }, [invalidateAll])
 

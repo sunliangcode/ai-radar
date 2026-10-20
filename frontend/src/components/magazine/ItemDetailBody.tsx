@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import { errorText } from '../../lib/errors'
 import { cn, textLinkClass } from '../../lib/cn'
 import { Button } from '../ui'
@@ -13,31 +13,39 @@ function ItemDetailError({
 }: {
   lead?: string | null
   message: string
-  onRetry: () => void
+  onRetry?: () => void
 }) {
   const { t } = useTranslation()
   const retryRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    retryRef.current?.focus({ preventScroll: true })
-  }, [])
+    if (onRetry) retryRef.current?.focus({ preventScroll: true })
+  }, [onRetry])
 
   return (
     <>
       {lead ? <p className="mb-4 text-sm leading-relaxed text-ink/90">{lead}</p> : null}
       <div role="alert" className="rounded-lg border border-dashed border-border bg-surface px-3 py-4">
         <p className="text-xs text-ember">
-          {t('feed.detailError')} {message}
+          {onRetry ? (
+            <>
+              {t('feed.detailError')} {message}
+            </>
+          ) : (
+            message
+          )}
         </p>
-        <Button
-          ref={retryRef}
-          variant="ghost"
-          className="mt-2"
-          aria-label={t('common.retry')}
-          onClick={onRetry}
-        >
-          {t('common.retry')}
-        </Button>
+        {onRetry ? (
+          <Button
+            ref={retryRef}
+            variant="ghost"
+            className="mt-2"
+            aria-label={t('common.retry')}
+            onClick={onRetry}
+          >
+            {t('common.retry')}
+          </Button>
+        ) : null}
       </div>
     </>
   )
@@ -57,6 +65,10 @@ export function ItemDetailBody({
   const detail = useQuery({
     queryKey: ['item-detail', itemId],
     queryFn: () => api.itemDetail(itemId),
+    retry: (count, err) => {
+      if (err instanceof ApiError && err.status === 404) return false
+      return count < 2
+    },
   })
 
   if (detail.isLoading) {
@@ -73,11 +85,12 @@ export function ItemDetailBody({
   }
 
   if (detail.isError) {
+    const missing = detail.error instanceof ApiError && detail.error.status === 404
     return (
       <ItemDetailError
         lead={lead}
-        message={errorText(detail.error, t)}
-        onRetry={() => void detail.refetch()}
+        message={missing ? t('common.notFound') : errorText(detail.error, t)}
+        onRetry={missing ? undefined : () => void detail.refetch()}
       />
     )
   }

@@ -165,6 +165,36 @@ public class DecisionService {
         return snooze(decisionId, days, null);
     }
 
+    /**
+     * Withdraw an open decision (Undo after save). Does not reopen a superseded prior
+     * decision — callers that need the previous call should record it again.
+     */
+    @Transactional
+    public Map<String, Object> withdraw(Long decisionId) {
+        DecisionEntity row = decisionRepository.findById(decisionId)
+                .orElseThrow(() -> new NoSuchElementException("decision not found: " + decisionId));
+        if (!"open".equalsIgnoreCase(row.getStatus())) {
+            throw new IllegalArgumentException("decision is not open: " + decisionId);
+        }
+        Instant now = Instant.now();
+        String kind = row.getKind();
+        Long changeId = row.getChangeId();
+        row.setStatus("withdrawn");
+        row.setUpdatedAt(now);
+        decisionRepository.save(row);
+
+        if ("watch".equalsIgnoreCase(kind) && changeId != null) {
+            watchSubscriptionService.removeIfPresent(changeId);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", decisionId);
+        out.put("changeId", changeId);
+        out.put("kind", kind);
+        out.put("withdrawn", true);
+        return out;
+    }
+
     private Map<String, Object> toDto(DecisionEntity d, Long updatesSince) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", d.getId());

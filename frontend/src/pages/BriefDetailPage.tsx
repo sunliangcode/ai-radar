@@ -2,9 +2,16 @@ import { useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import { BriefEntryCard } from '../components/brief/BriefEntryCard'
-import { PageHeader, ScorePill, ListSkeleton, QueryErrorState, EmptyState } from '../components/ui'
+import {
+  Button,
+  PageHeader,
+  ScorePill,
+  ListSkeleton,
+  QueryErrorState,
+  EmptyState,
+} from '../components/ui'
 import { useDisplaySources } from '../hooks/useDisplaySources'
 import { useEscapeBack } from '../hooks/useEscapeBack'
 import { itemMatchesDisplay } from '../lib/sourceFilter'
@@ -33,11 +40,15 @@ export default function BriefDetailPage() {
   const locale = dateLocale(i18n.language)
   const navigate = useNavigate()
   const { date = '' } = useParams()
-  const { displaySourceIds } = useDisplaySources()
+  const { displaySourceIds, setAllDisplayed, noneSelected } = useDisplaySources()
   const q = useQuery({
     queryKey: ['brief', date],
     queryFn: () => api.brief(date),
     enabled: Boolean(date),
+    retry: (count, err) => {
+      if (err instanceof ApiError && err.status === 404) return false
+      return count < 2
+    },
   })
   const titleDate = q.data
     ? briefDateParts(q.data.date, locale).titleDate
@@ -86,37 +97,83 @@ export default function BriefDetailPage() {
     return visibleItems.filter((item) => !inBrief.has(item.canonicalUrl))
   }, [parsed, events, topItems, visibleItems])
 
-  if (q.isLoading) return <ListSkeleton rows={5} />
+  const missing =
+    !q.data &&
+    (q.isError
+      ? q.error instanceof ApiError && q.error.status === 404
+      : !q.isLoading && !q.isFetching && Boolean(date))
+
+  if (q.isLoading) {
+    return (
+      <div className="mx-auto max-w-3xl" aria-busy>
+        <ListSkeleton rows={5} />
+      </div>
+    )
+  }
+  if (missing) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <EmptyState
+          title={t('common.notFound')}
+          description={t('briefs.notFoundHint')}
+          primary={
+            <Link
+              to="/briefs"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                focusRingClass(),
+              )}
+            >
+              {t('briefs.backToArchive')}
+            </Link>
+          }
+        />
+      </div>
+    )
+  }
   if (q.isError) {
     return (
-      <QueryErrorState
-        message={t('common.loadFailed', { message: errorText(q.error, t) })}
-        onRetry={() => void q.refetch()}
-      />
+      <div className="mx-auto max-w-3xl" aria-busy={q.isFetching || undefined}>
+        <QueryErrorState
+          message={t('common.loadFailed', { message: errorText(q.error, t) })}
+          onRetry={() => void q.refetch()}
+        />
+      </div>
     )
   }
   if (!q.data || !parsed) {
     return (
-      <EmptyState
-        title={t('common.notFound')}
-        primary={
-          <Link
-            to="/briefs"
-            className={cn(
-              'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
-              focusRingClass(),
-            )}
-          >
-            {t('common.backToList')}
-          </Link>
-        }
-      />
+      <div className="mx-auto max-w-3xl">
+        <EmptyState
+          title={t('common.notFound')}
+          description={t('briefs.notFoundHint')}
+          primary={
+            <Link
+              to="/briefs"
+              className={cn(
+                'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                focusRingClass(),
+              )}
+            >
+              {t('briefs.backToArchive')}
+            </Link>
+          }
+        />
+      </div>
     )
   }
 
   const parts = briefDateParts(q.data.date, locale)
   const curatedCount = events.length + topItems.length
   const hasCurated = curatedCount > 0
+  const rawCurated =
+    (parsed.events?.length ?? 0) + (parsed.topItems?.length ?? 0) + (q.data.items?.length ?? 0)
+  const displayFilterEmpty =
+    !noneSelected &&
+    !hasCurated &&
+    extraItems.length === 0 &&
+    rawCurated > 0 &&
+    displaySourceIds !== null
 
   return (
     <div className="mx-auto max-w-3xl" aria-busy={q.isFetching || undefined}>
@@ -151,7 +208,9 @@ export default function BriefDetailPage() {
           <p className="mt-2 text-sm text-ink" aria-live="polite">
             {hasCurated
               ? t('briefs.curatedCount', { count: curatedCount })
-              : t('briefs.emptyDay')}
+              : displayFilterEmpty
+                ? t('briefs.displayFilterEmpty')
+                : t('briefs.emptyDay')}
             {extraItems.length > 0
               ? ` · ${t('briefs.moreFromDay', { count: extraItems.length })}`
               : null}
@@ -160,32 +219,59 @@ export default function BriefDetailPage() {
       </header>
 
       {!hasCurated && extraItems.length === 0 ? (
-        <EmptyState
-          title={parsed.emptyNote ?? t('briefs.emptyDay')}
-          description={t('briefs.emptyDayHint')}
-          primary={
-            <Link
-              to="/"
-              className={cn(
-                'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
-                focusRingClass(),
-              )}
-            >
-              {t('common.backToToday')}
-            </Link>
-          }
-          secondary={
-            <Link
-              to="/briefs"
-              className={cn(
-                'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
-                focusRingClass(),
-              )}
-            >
-              {t('briefs.backToArchive')}
-            </Link>
-          }
-        />
+        displayFilterEmpty || noneSelected ? (
+          <EmptyState
+            title={
+              noneSelected ? t('sources.displayNoneActive') : t('briefs.displayFilterEmpty')
+            }
+            description={
+              noneSelected ? t('briefs.displayNoneHint') : t('briefs.displayFilterEmptyHint')
+            }
+            primary={
+              <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
+                {t('sources.displayRestoreAll')}
+              </Button>
+            }
+            secondary={
+              <Link
+                to="/settings/sources"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
+                  focusRingClass(),
+                )}
+              >
+                {t('nav.sources')}
+              </Link>
+            }
+          />
+        ) : (
+          <EmptyState
+            title={parsed.emptyNote ?? t('briefs.emptyDay')}
+            description={t('briefs.emptyDayHint')}
+            primary={
+              <Link
+                to="/"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                  focusRingClass(),
+                )}
+              >
+                {t('common.backToToday')}
+              </Link>
+            }
+            secondary={
+              <Link
+                to="/briefs"
+                className={cn(
+                  'inline-flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium text-muted hover:text-ink',
+                  focusRingClass(),
+                )}
+              >
+                {t('briefs.backToArchive')}
+              </Link>
+            }
+          />
+        )
       ) : null}
 
       {events.length > 0 ? (

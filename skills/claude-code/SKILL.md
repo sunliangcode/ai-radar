@@ -18,7 +18,7 @@ Clone or open [ai-radar](https://github.com/sunliangcode/ai-radar), then:
 
 No npm install required for the CLI (`cli/` uses Node built-ins). Backend must be running on `:8080` (or set `AI_RADAR_BASE_URL`).
 
-MCP (read-only by default): prefer `get_health` / `probe_llm` / `get_intelligence_home` before write tools. SPI catalogs: `list_connectors` / `list_delivery_channels` (sorted by id).
+MCP (read-only by default): prefer `get_health` / `probe_llm` / `get_intelligence_home` before write tools. Change loop: `list_changes` / `get_change` / `list_decisions` / `list_actions`. SPI catalogs: `list_connectors` / `list_delivery_channels` (sorted by id).
 
 ```bash
 cd /path/to/ai-radar/mcp && npm install

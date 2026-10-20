@@ -4,7 +4,49 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Security CI**: [CodeQL](.github/workflows/codeql.yml) (Java + JS/TS) and [dependency review](.github/workflows/dependency-review.yml) on PRs; documented in [SECURITY.md](SECURITY.md); gated by `shared/community-files.test.mjs`
+- **CI norm gates**: `shared/a11y-baseline.test.mjs` (focus trap / reduced-motion / ConfirmDialog); `shared/api-docs-jobs-sync.test.mjs` (JobsController ↔ `docs/api.md` ↔ SPA client)
+- **Privacy / Governance**: root [PRIVACY.md](PRIVACY.md) (self-host data boundary, no phone-home) and [GOVERNANCE.md](GOVERNANCE.md) (single-maintainer decision process)
+- **Product principles**: [docs/product-principles.md](docs/product-principles.md) — Undo, empty vs filter-empty vs 404, display-filter consistency, a11y/i18n checklist for UI PRs
+- **OSS hygiene**: Docs/Question issue template; PR checkbox for product principles; CI gate `shared/community-files.test.mjs` for community-health files; Privacy contact link in issue chooser; `.env.example` points at PRIVACY/SECURITY; [MAINTAINERS](MAINTAINERS); Quick Start links PRIVACY
+- **API docs**: decisions list, actions, context import, Feishu bind, item detail, feedback, opportunities/memory/outcomes in [docs/api.md](docs/api.md)
+
 ### Fixed
+
+- **Today / Radar / Decisions / Actions / Following / Brief detail display-filter empty**: distinct from getting-started / true-empty (restore-all CTA)
+- **Brief detail 404**: not-found empty (no retry loop); network errors keep Retry
+- **Feed reader / deep-link item 404**: no retry loop; detail body shows not-found without Retry
+- **AI Monitor**: locale-aware clock (not hard-coded Shanghai); operation codes localized
+- **Follow toast**: Undo unfollow (parity with Unfollow), Today + Change detail
+- **Decision ignore**: confirm dialog before submit (unfollow side effect)
+- **Decision save Undo**: `DELETE /api/decisions/{id}` withdraws the open row (watch-kind Unfollows); toast restores previous decision or clears a first save — parity with dismiss/unfollow
+- **Settings Feishu unbind**: confirm before disconnect (re-bind required)
+- **Pack import**: confirm before merging starter-pack sources
+- **FeedbackBar Undo**: `DELETE /api/feedback` forgets memory, reverses change topic nudge, restores action status; toast Undo on change + action (parity with quick status)
+- **Send today's brief**: confirm before push (Settings Notify, Briefs, ⌘K two-step) — delivery leaves the host
+- **Data retention UI**: Settings can PUT `retentionDays` + confirm “Run cleanup now”; save Undo includes retention
+- **Browser LOCAL_TOKEN UI**: Settings hub + Context page field (unlocks writes when server requires token; banner on 401)
+- **Fetch 409**: overlapping Update joins in-flight progress (toast + poll) instead of a hard error summary
+- **Context save Undo**: toast restores previous profile via `PUT /api/contexts` (parity with settings save)
+- **Context extract / GitHub import Undo**: toast restores prior draft payload (and raw text for import)
+- **Duplicate-title cleanup UI**: Settings → maintenance confirms `POST /api/jobs/cleanup-duplicate-titles`
+- **MCP/CLI Change loop**: `list_changes` / `get_change` / `list_decisions` / `list_actions` (+ CLI `changes` / `change` / `decisions` / `actions`) — agents match product IA
+- **MCP/CLI brief body**: `get_brief` / `ai-radar brief <date>` → `GET /api/briefs/{date}` (parity with SPA); CLI `briefs` lists dates
+- **Chat clear Undo**: toast restores local session after confirm clear
+- **CI gates**: `shared/a11y-baseline.test.mjs` (focus trap / modal / reduced-motion); `shared/api-docs-jobs-sync.test.mjs` (JobsController ↔ api.md ↔ SPA client)
+- **Pull-to-refresh**: also on Actions and Briefs
+- **Settings save Undo**: toast restores previous notify/language fields from cache snapshot
+- **AI Monitor**: page shell keeps `aria-busy` on loading/error; `tok/s` column i18n
+- **Feed shortcuts i18n**: duplicate `keyFocusNav` split into `keyBracketNav` for `[`/`]`
+- **Dead code**: remove unrouted `ChangesPage` (Radar hosts Changes; `/changes` redirects)
+
+### Changed
+
+- **Docs cross-links**: GOVERNANCE → MAINTAINERS; AGENTS/docs index point at product-principles + PRIVACY; Chinese `docs/api.md` quick table covers decisions/actions/Feishu bind; installation + development link PRIVACY / product-principles; release Related + bug template point at PRIVACY/GOVERNANCE
+- **API docs**: preferences keywords + experiment PUT; Chinese quick table closer to English surface
+
 
 - **Decisions / Radar / Following / Actions display-none**: empty + restore-all when no display sources selected (parity with Today/Feed)
 - **Feed reader open**: no longer marks read immediately — 1.2s dwell on first open and j/k (peek-safe)

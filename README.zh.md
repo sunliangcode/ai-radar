@@ -69,6 +69,8 @@ cd ai-radar
 
 打开 [http://localhost:8080](http://localhost:8080)。
 
+数据默认留在本机；只有你启用 LLM / 投递 / 抓取源时才会出站 — 见 [PRIVACY.md](PRIVACY.md)。
+
 ```bash
 ./scripts/status.sh    # 健康状态快照（人类可读）
 ./bin/ai-radar doctor  # 前置检查 + 健康（JSON）
@@ -122,7 +124,8 @@ cd frontend && npm install && npm run dev
 - [扩展总览](docs/extensibility.md) · [连接器](docs/extending-connectors.md) · [投递](docs/extending-delivery.md)
 - [发布清单](docs/release.md)
 - [MCP](docs/mcp.md)
-- [贡献指南](CONTRIBUTING.md) · [行为准则](CODE_OF_CONDUCT.md) · [支持](SUPPORT.md) · [安全](SECURITY.md) · [变更日志](CHANGELOG.md) · [引用](CITATION.cff)
+- [贡献指南](CONTRIBUTING.md) · [行为准则](CODE_OF_CONDUCT.md) · [支持](SUPPORT.md) · [安全](SECURITY.md) · [隐私](PRIVACY.md) · [治理](GOVERNANCE.md) · [维护者](MAINTAINERS) · [变更日志](CHANGELOG.md) · [引用](CITATION.cff)
+- [产品原则](docs/product-principles.md)
 
 ## License
 

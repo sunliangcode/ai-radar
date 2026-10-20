@@ -319,6 +319,16 @@ public class ContextService {
 
     @Transactional
     public void noteTopicFeedback(String title, boolean relevant) {
+        adjustTopicWeight(title, relevant ? -0.5 : 1.0);
+    }
+
+    /** Reverse a prior {@link #noteTopicFeedback} nudge (Undo). */
+    @Transactional
+    public void revertTopicFeedback(String title, boolean relevant) {
+        adjustTopicWeight(title, relevant ? 0.5 : -1.0);
+    }
+
+    private void adjustTopicWeight(String title, double delta) {
         UserContextEntity row = repository.findById(1L).orElse(null);
         if (row == null || title == null || title.isBlank()) {
             return;
@@ -333,7 +343,6 @@ public class ContextService {
                     ? new LinkedHashMap<>((Map<String, Number>) m)
                     : new LinkedHashMap<>();
             String key = title.trim().split("\\s+")[0].toLowerCase(Locale.ROOT);
-            double delta = relevant ? -0.5 : 1.0;
             weights.put(key, weights.getOrDefault(key, 0).doubleValue() + delta);
             payload.put("weights", weights);
             payload.put("schemaVersion", 2);

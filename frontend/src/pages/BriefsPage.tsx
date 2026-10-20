@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type BriefSummary } from '../lib/api'
 import {
   Button,
+  ConfirmDialog,
   EmptyState,
   ListSkeleton,
   PageHeader,
@@ -156,9 +157,11 @@ export default function BriefsPage() {
   }, [navigate])
   useEscapeBack(goBack)
 
+  const [confirmPush, setConfirmPush] = useState(false)
   const pushNow = useMutation({
     mutationFn: api.pushJob,
     onSuccess: (body) => {
+      setConfirmPush(false)
       void qc.invalidateQueries({ queryKey: ['jobs-schedule'] })
       const result = body as PushResultBody
       const failed = (result.results ?? []).some((r) => r.success === false && !r.skipped)
@@ -176,6 +179,18 @@ export default function BriefsPage() {
 
   return (
     <div aria-busy={isPending || pushNow.isPending || undefined}>
+      <ConfirmDialog
+        open={confirmPush}
+        title={t('common.pushNowConfirm')}
+        description={t('common.pushNowConfirmHint')}
+        confirmLabel={t('briefs.pushToday')}
+        cancelLabel={t('common.cancel')}
+        pending={pushNow.isPending}
+        onConfirm={() => pushNow.mutate()}
+        onCancel={() => {
+          if (!pushNow.isPending) setConfirmPush(false)
+        }}
+      />
       <PageHeader
         titleId="briefs-page-heading"
         title={t('briefs.title')}
@@ -184,7 +199,7 @@ export default function BriefsPage() {
           <>
             <Button
               variant="ghost"
-              onClick={() => pushNow.mutate()}
+              onClick={() => setConfirmPush(true)}
               loading={pushNow.isPending}
               disabled={!hasToday || pushNow.isPending}
               title={!hasToday ? t('briefs.pushNeedToday') : undefined}

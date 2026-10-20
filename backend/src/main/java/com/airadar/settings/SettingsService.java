@@ -30,7 +30,8 @@ public class SettingsService {
             "pushCron",
             "timezone",
             "pushOnlyWhenItems",
-            "smtpTo"
+            "smtpTo",
+            "retentionDays"
     );
 
     private final RadarProperties properties;
@@ -154,6 +155,13 @@ public class SettingsService {
         }
         if (body.containsKey("smtpTo")) {
             row.setSmtpTo(asString(body.get("smtpTo")));
+        }
+        if (body.containsKey("retentionDays")) {
+            Integer days = asNonNegativeInt(body.get("retentionDays"));
+            if (days == null) {
+                throw new IllegalArgumentException("retentionDays must be an integer >= 0");
+            }
+            row.setRetentionDays(days);
         }
 
         repository.save(row);
@@ -355,6 +363,28 @@ public class SettingsService {
             return b;
         }
         return Boolean.parseBoolean(String.valueOf(v));
+    }
+
+    /** Parse a non-negative int; returns null when missing/blank/invalid. */
+    private static Integer asNonNegativeInt(Object v) {
+        if (v == null) {
+            return null;
+        }
+        try {
+            int n;
+            if (v instanceof Number num) {
+                n = num.intValue();
+            } else {
+                String s = String.valueOf(v).trim();
+                if (s.isEmpty()) {
+                    return null;
+                }
+                n = Integer.parseInt(s);
+            }
+            return n < 0 ? null : n;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public record EffectiveSettings(

@@ -12,6 +12,8 @@ cd ai-radar
 
 Open [http://localhost:8080](http://localhost:8080). `install.sh` copies `backend/.env.example` → `backend/.env` if missing, sets up the **Argos Translate** sidecar (Python 3, en→zh titles), embeds the frontend into Spring static resources, and starts the backend.
 
+Self-host data stays on this machine unless you enable LLM / delivery / source fetch — see [PRIVACY.md](../PRIVACY.md) and [SECURITY.md](../SECURITY.md) (`LOCAL_TOKEN` when the API is exposed beyond loopback).
+
 Stop:
 
 ```bash
@@ -242,6 +244,8 @@ cd ai-radar
 ```
 
 打开 [http://localhost:8080](http://localhost:8080)。`install.sh` 会在缺少时复制 `.env`、把前端打进 Spring 静态资源并启动后端。
+
+自托管数据默认留在本机；只有启用 LLM / 投递 / 抓取源时才会出站 — 见 [PRIVACY.md](../PRIVACY.md) 与 [SECURITY.md](../SECURITY.md)（API 暴露到非本机时请设 `LOCAL_TOKEN`）。
 
 停止：
 

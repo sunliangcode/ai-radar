@@ -69,5 +69,5 @@ EOF
 
 ## Related
 
-- [CHANGELOG.md](../CHANGELOG.md) · [CONTRIBUTING.md](../CONTRIBUTING.md) · [development.md](development.md)
-- [SECURITY.md](../SECURITY.md) · [SUPPORT.md](../SUPPORT.md) · [installation.md](installation.md)
+- [CHANGELOG.md](../CHANGELOG.md) · [CONTRIBUTING.md](../CONTRIBUTING.md) · [development.md](development.md) · [product-principles.md](product-principles.md)
+- [SECURITY.md](../SECURITY.md) · [PRIVACY.md](../PRIVACY.md) · [GOVERNANCE.md](../GOVERNANCE.md) · [SUPPORT.md](../SUPPORT.md) · [installation.md](installation.md)

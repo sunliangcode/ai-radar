@@ -16,6 +16,6 @@ Point the skill at the repo root (directory with `SKILL.md` / `bin/ai-radar`).
 ./bin/ai-radar sources
 ```
 
-Writes (fetch / push / cluster) only when the user asks and the backend is up. MCP: prefer `get_health` / `probe_llm` before writes; SPI catalogs via `list_connectors` / `list_delivery_channels`; write tools need `ALLOW_WRITES=true`.
+Writes (fetch / push / cluster) only when the user asks and the backend is up. MCP: prefer `get_health` / `probe_llm` before writes; Change loop via `list_changes` / `get_change` / `list_decisions` / `list_actions`; SPI catalogs via `list_connectors` / `list_delivery_channels`; write tools need `ALLOW_WRITES=true`.
 
 Full agent guide: [SKILL.md](../../SKILL.md) · CLI: [docs/cli.md](../../docs/cli.md) · MCP: [docs/mcp.md](../../docs/mcp.md).

@@ -2,7 +2,7 @@
 
 How to hack on AI Radar locally — layout, run modes, checks, and extension points.
 
-Product overview: [README.md](../README.md). Ops install: [installation.md](installation.md). Domain model: [ai-radar-2.0-domain.md](ai-radar-2.0-domain.md).
+Product overview: [README.md](../README.md). Ops install: [installation.md](installation.md). Domain model: [ai-radar-2.0-domain.md](ai-radar-2.0-domain.md). UI / empty-state norms: [product-principles.md](product-principles.md). Privacy: [PRIVACY.md](../PRIVACY.md).
 
 ---
 

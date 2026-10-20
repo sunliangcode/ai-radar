@@ -10,6 +10,7 @@ import {
   Input,
   PageHeader,
   StatusBadge,
+  useToast,
 } from '../components/ui'
 import { errorText } from '../lib/errors'
 import { isAriaModalOpen, prefersReducedMotion } from '../lib/a11y'
@@ -46,6 +47,7 @@ function saveSession(session: StoredSession) {
 export default function ChatPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { push: pushToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const seedParam = searchParams.get('changeId')
   const seedChangeId = seedParam && Number.isFinite(Number(seedParam)) ? Number(seedParam) : undefined
@@ -207,12 +209,39 @@ export default function ChatPage() {
 
   function clearChat() {
     abortRef.current?.abort()
+    const snapshot: StoredSession & { usedSeeds: number[]; error: string | null } = {
+      messages: [...messages],
+      citedChangeIds: [...citedChangeIds],
+      lastCited: [...lastCited],
+      usedSeeds: [...usedSeeds],
+      error,
+    }
+    const hadContent =
+      snapshot.messages.length > 0 ||
+      snapshot.citedChangeIds.length > 0 ||
+      snapshot.lastCited.length > 0
     setMessages([])
     setCitedChangeIds([])
     setLastCited([])
     setUsedSeeds([])
     setError(null)
     localStorage.removeItem(STORAGE_KEY)
+    if (!hadContent) return
+    pushToast('success', t('chat.cleared'), {
+      label: t('common.undo'),
+      onClick: () => {
+        setMessages(snapshot.messages)
+        setCitedChangeIds(snapshot.citedChangeIds)
+        setLastCited(snapshot.lastCited)
+        setUsedSeeds(snapshot.usedSeeds)
+        setError(snapshot.error)
+        saveSession({
+          messages: snapshot.messages,
+          citedChangeIds: snapshot.citedChangeIds,
+          lastCited: snapshot.lastCited,
+        })
+      },
+    })
   }
 
   const suggestions =

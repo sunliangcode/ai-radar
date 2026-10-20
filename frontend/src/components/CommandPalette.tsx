@@ -101,9 +101,14 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'monitor', label: t('nav.monitor'), hint: '/settings/system', run: () => navigate('/settings/system') },
       {
         id: 'push-now',
-        label: t('common.pushNow'),
-        hint: t('palette.jobs'),
+        label: armed === 'push-now' ? t('common.pushNowConfirm') : t('common.pushNow'),
+        hint: armed === 'push-now' ? t('common.confirm') : t('palette.jobs'),
         run: () => {
+          if (armed !== 'push-now') {
+            setArmed('push-now')
+            return false
+          }
+          setArmed(null)
           void api
             .pushJob()
             .then((body) => {

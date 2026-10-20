@@ -40,7 +40,7 @@ import { FeedToolbar } from './feed/FeedToolbar'
 import { useFeedKeyboard } from './feed/useFeedKeyboard'
 import { useFeedList } from './feed/useFeedList'
 import { useFeedActions } from './feed/useFeedActions'
-import { api, type Item } from '../lib/api'
+import { api, ApiError, type Item } from '../lib/api'
 
 function scoreTier(score?: number): string | undefined {
   if (score == null) return undefined
@@ -98,6 +98,10 @@ export default function FeedPage({
     queryKey: ['item', deepLinkItemId],
     queryFn: () => api.item(deepLinkItemId!),
     enabled: deepLinkItemId != null,
+    retry: (count, err) => {
+      if (err instanceof ApiError && err.status === 404) return false
+      return count < 2
+    },
   })
   const [exploreView, setExploreView] = useState<ExploreView>(() => {
     if (layoutParam === 'focus') return 'focus'
@@ -949,7 +953,7 @@ export default function FeedPage({
               <kbd aria-hidden>/</kbd> {t('feed.keySearch')}
             </span>
             <span>
-              <kbd aria-hidden>[</kbd>/<kbd aria-hidden>]</kbd> {t('feed.keyFocusNav')}
+              <kbd aria-hidden>[</kbd>/<kbd aria-hidden>]</kbd> {t('feed.keyBracketNav')}
             </span>
             <span>
               <kbd aria-hidden>⌘K</kbd> {t('nav.search')}

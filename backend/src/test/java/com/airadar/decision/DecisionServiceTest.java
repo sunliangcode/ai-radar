@@ -130,4 +130,50 @@ class DecisionServiceTest {
         assertEquals("2020-06-15T00:00:00Z", result.get("revisitAt"));
         verify(decisionRepository).save(open);
     }
+
+    @Test
+    void withdraw_marksOpenDecisionAndUnfollowsWatch() {
+        DecisionEntity open = new DecisionEntity();
+        open.setId(11L);
+        open.setChangeId(7L);
+        open.setKind("watch");
+        open.setStatus("open");
+        when(decisionRepository.findById(11L)).thenReturn(Optional.of(open));
+        when(watchSubscriptionService.removeIfPresent(7L)).thenReturn(true);
+
+        var result = decisionService.withdraw(11L);
+
+        assertEquals(true, result.get("withdrawn"));
+        assertEquals(11L, result.get("id"));
+        assertEquals("withdrawn", open.getStatus());
+        verify(decisionRepository).save(open);
+        verify(watchSubscriptionService).removeIfPresent(7L);
+    }
+
+    @Test
+    void withdraw_investigateDoesNotTouchWatch() {
+        DecisionEntity open = new DecisionEntity();
+        open.setId(12L);
+        open.setChangeId(8L);
+        open.setKind("investigate");
+        open.setStatus("open");
+        when(decisionRepository.findById(12L)).thenReturn(Optional.of(open));
+
+        var result = decisionService.withdraw(12L);
+
+        assertEquals(true, result.get("withdrawn"));
+        assertEquals("investigate", result.get("kind"));
+        verify(watchSubscriptionService, never()).removeIfPresent(any());
+    }
+
+    @Test
+    void withdraw_rejectsNonOpen() {
+        DecisionEntity row = new DecisionEntity();
+        row.setId(13L);
+        row.setStatus("superseded");
+        when(decisionRepository.findById(13L)).thenReturn(Optional.of(row));
+
+        assertThrows(IllegalArgumentException.class, () -> decisionService.withdraw(13L));
+        verify(decisionRepository, never()).save(any());
+    }
 }

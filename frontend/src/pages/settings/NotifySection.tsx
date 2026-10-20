@@ -5,7 +5,7 @@ import { api, type Settings } from '../../lib/api'
 import { errorText } from '../../lib/errors'
 import { formatPushResult, type PushResultBody } from '../../lib/formatPushResult'
 import { isAriaModalOpen } from '../../lib/a11y'
-import { Button, Card, Field, Input, Select, useToast } from '../../components/ui'
+import { Button, Card, ConfirmDialog, Field, Input, Select, useToast } from '../../components/ui'
 import { cn, textLinkClass } from '../../lib/cn'
 
 const PUSH_PRESETS = [
@@ -41,6 +41,8 @@ export function NotifySection({
   const qc = useQueryClient()
   const { push } = useToast()
   const [bindSessionId, setBindSessionId] = useState<string | null>(null)
+  const [confirmUnbind, setConfirmUnbind] = useState(false)
+  const [confirmPush, setConfirmPush] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const bindBtnRef = useRef<HTMLButtonElement>(null)
   const cancelBindRef = useRef<HTMLButtonElement>(null)
@@ -66,6 +68,7 @@ export function NotifySection({
   const pushNow = useMutation({
     mutationFn: api.pushJob,
     onSuccess: (body) => {
+      setConfirmPush(false)
       void qc.invalidateQueries({ queryKey: ['jobs-schedule'] })
       const result = body as PushResultBody
       const failed = (result.results ?? []).some((r) => r.success === false && !r.skipped)
@@ -90,6 +93,7 @@ export function NotifySection({
   const unbind = useMutation({
     mutationFn: api.feishuUnbind,
     onSuccess: () => {
+      setConfirmUnbind(false)
       void qc.invalidateQueries({ queryKey: ['settings'] })
       setBindSessionId(null)
       push('success', t('settings.feishuUnbound'))
@@ -146,11 +150,38 @@ export function NotifySection({
           loading={pushNow.isPending}
           disabled={pushNow.isPending}
           aria-label={pushNow.isPending ? t('common.pushing') : t('common.pushNow')}
-          onClick={() => pushNow.mutate()}
+          onClick={() => setConfirmPush(true)}
         >
           {pushNow.isPending ? t('common.pushing') : t('common.pushNow')}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmPush}
+        title={t('common.pushNowConfirm')}
+        description={t('common.pushNowConfirmHint')}
+        confirmLabel={t('common.pushNow')}
+        cancelLabel={t('common.cancel')}
+        pending={pushNow.isPending}
+        onConfirm={() => pushNow.mutate()}
+        onCancel={() => {
+          if (!pushNow.isPending) setConfirmPush(false)
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmUnbind}
+        title={t('settings.feishuUnbindConfirm')}
+        description={t('settings.feishuUnbindConfirmHint')}
+        confirmLabel={t('settings.feishuUnbind')}
+        cancelLabel={t('common.cancel')}
+        danger
+        pending={unbind.isPending}
+        onConfirm={() => unbind.mutate()}
+        onCancel={() => {
+          if (!unbind.isPending) setConfirmUnbind(false)
+        }}
+      />
 
       <div className="grid gap-6">
         <div>
@@ -181,7 +212,7 @@ export function NotifySection({
                 variant="ghost"
                 loading={unbind.isPending}
                 aria-label={t('settings.feishuUnbind')}
-                onClick={() => unbind.mutate()}
+                onClick={() => setConfirmUnbind(true)}
               >
                 {t('settings.feishuUnbind')}
               </Button>

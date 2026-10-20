@@ -207,7 +207,7 @@ export default function ChangeDetailPage() {
       }
       return { prevHome, prevChange }
     },
-    onSuccess: async (data, vars) => {
+    onSuccess: async (data, vars, ctx) => {
       qc.setQueryData<ChangeCard>(['change', changeId], (old) =>
         old
           ? {
@@ -220,6 +220,15 @@ export default function ChangeDetailPage() {
       )
       setShowDecision(false)
       const touchWatching = vars.kind === 'watch' || vars.kind === 'ignore'
+      const invalidateDecisionSurfaces = () =>
+        Promise.all([
+          qc.invalidateQueries({ queryKey: ['decisions'] }),
+          qc.invalidateQueries({ queryKey: ['decisions-due'] }),
+          qc.invalidateQueries({ queryKey: ['intelligence-home'] }),
+          qc.invalidateQueries({ queryKey: ['change', changeId] }),
+          qc.invalidateQueries({ queryKey: ['watching-timeline'] }),
+          qc.invalidateQueries({ queryKey: ['changes-watching'] }),
+        ])
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['decisions'] }),
         qc.invalidateQueries({ queryKey: ['decisions-due'] }),
@@ -232,15 +241,50 @@ export default function ChangeDetailPage() {
             ])
           : Promise.resolve(),
       ])
-      const watchCta = vars.kind === 'watch'
+      const prevDecision = ctx?.prevChange?.latestDecision
+      const prevWatched = Boolean(ctx?.prevChange?.watched)
+      const canUndo = Boolean(data?.id)
       pushToast('success', t(engagement.decisionToastKey()), {
-        label: watchCta
-          ? t('nav.watching')
-          : fromState === '/'
-            ? t('decisions.browseToday')
-            : t('decisions.viewList'),
-        onClick: () =>
-          navigate(watchCta ? '/watching' : fromState === '/' ? '/' : '/decisions'),
+        label: canUndo
+          ? t('common.undo')
+          : vars.kind === 'watch'
+            ? t('nav.watching')
+            : fromState === '/'
+              ? t('decisions.browseToday')
+              : t('decisions.viewList'),
+        onClick: () => {
+          if (!canUndo) {
+            navigate(vars.kind === 'watch' ? '/watching' : fromState === '/' ? '/' : '/decisions')
+            return
+          }
+          void (async () => {
+            try {
+              await api.withdrawDecision(data.id)
+              if (prevDecision) {
+                await api.postChangeDecision(changeId, {
+                  kind: prevDecision.kind,
+                  reason: prevDecision.reason,
+                  revisitAt: prevDecision.revisitAt,
+                })
+                // watch/ignore kinds adjust Follow; restore Follow for other kinds.
+                if (prevDecision.kind !== 'watch' && prevDecision.kind !== 'ignore') {
+                  if (prevWatched) {
+                    await api.putWatch(changeId, { capability: true, api: true })
+                  } else {
+                    await api.deleteWatch(changeId).catch(() => undefined)
+                  }
+                }
+              } else if (vars.kind === 'ignore' && prevWatched) {
+                await api.putWatch(changeId, { capability: true, api: true })
+              }
+              if (ctx?.prevChange) qc.setQueryData(['change', changeId], ctx.prevChange)
+              if (ctx?.prevHome) qc.setQueryData(['intelligence-home'], ctx.prevHome)
+              await invalidateDecisionSurfaces()
+            } catch {
+              /* toast already consumed */
+            }
+          })()
+        },
       })
     },
     onError: (err, _vars, ctx) => {
@@ -356,11 +400,24 @@ export default function ChangeDetailPage() {
       }
       return { prev, prevHome, prevTimeline }
     },
-    onSuccess: (_data, watched) => {
+    onSuccess: (_data, watched, ctx) => {
       if (watched) {
         pushToast('success', t('today.followed'), {
-          label: t('nav.watching'),
-          onClick: () => navigate('/watching'),
+          label: t('common.undo'),
+          onClick: () => {
+            void api
+              .deleteWatch(changeId)
+              .then(() => {
+                if (ctx?.prev) qc.setQueryData(['change', changeId], ctx.prev)
+                if (ctx?.prevHome) qc.setQueryData(['intelligence-home'], ctx.prevHome)
+                if (ctx?.prevTimeline) qc.setQueryData(['watching-timeline'], ctx.prevTimeline)
+                void qc.invalidateQueries({ queryKey: ['change', changeId] })
+                void qc.invalidateQueries({ queryKey: ['watching-timeline'] })
+                void qc.invalidateQueries({ queryKey: ['intelligence-home'] })
+                void qc.invalidateQueries({ queryKey: ['changes-watching'] })
+              })
+              .catch(() => undefined)
+          },
         })
       } else {
         pushToast('success', t('today.unfollowed'), {

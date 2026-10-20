@@ -56,7 +56,8 @@ node "<skill-root>/cli/ai-radar.mjs" health
 2. Confirm the stack is up: `bin/ai-radar doctor` (or `health` / MCP `get_health` / ask the user to run `./install.sh` / `./scripts/status.sh`).
 3. For “what changed / why care”:
    - Prefer `bin/ai-radar home` or MCP `get_intelligence_home`
-   - Optionally `list_high_impacts` / `list_events` via MCP
+   - Prefer Change loop: `bin/ai-radar changes` / `change <id>` / `decisions` / `actions`, or MCP `list_changes` / `get_change` / `list_decisions` / `list_actions`
+   - Optionally `list_high_impacts` / `list_events` via MCP (events are internal clustering)
 4. For connector / delivery SPI catalogs: `bin/ai-radar connectors` / `delivery-channels`, or MCP `list_connectors` / `list_delivery_channels` (sorted by id).
 5. For ops the user explicitly requests:
    - Fetch → `bin/ai-radar fetch` or MCP `run_fetch` (**only if** `ALLOW_WRITES=true`)

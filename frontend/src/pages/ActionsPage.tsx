@@ -68,7 +68,13 @@ export default function ActionsPage() {
     [visibleStatuses, grouped],
   )
   const filterEmpty = !noneSelected && !actions.isLoading && scoped.length > 0 && visibleCount === 0
-  const trulyEmpty = !noneSelected && !actions.isLoading && scoped.length === 0
+  const displayFilterEmpty =
+    !noneSelected &&
+    !actions.isLoading &&
+    (actions.data ?? []).length > 0 &&
+    scoped.length === 0
+  const trulyEmpty =
+    !noneSelected && !actions.isLoading && (actions.data ?? []).length === 0
 
   return (
     <div aria-busy={actions.isFetching || undefined}>
@@ -144,6 +150,28 @@ export default function ActionsPage() {
             <QueryErrorState
               message={t('common.loadFailed', { message: errorText(actions.error, t) })}
               onRetry={() => void actions.refetch()}
+            />
+          ) : null}
+          {displayFilterEmpty ? (
+            <EmptyState
+              title={t('actions.displayFilterEmpty')}
+              description={t('actions.displayFilterEmptyHint')}
+              primary={
+                <Button onClick={setAllDisplayed} aria-label={t('sources.displayRestoreAll')}>
+                  {t('sources.displayRestoreAll')}
+                </Button>
+              }
+              secondary={
+                <Link
+                  to="/settings/sources"
+                  className={cn(
+                    'inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent/40',
+                    focusRingClass(),
+                  )}
+                >
+                  {t('nav.sources')}
+                </Link>
+              }
             />
           ) : null}
           {trulyEmpty ? (

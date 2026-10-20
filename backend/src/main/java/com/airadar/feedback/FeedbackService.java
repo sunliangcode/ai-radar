@@ -96,6 +96,59 @@ public class FeedbackService {
         return out;
     }
 
+    /**
+     * Undo feedback: drop memory rows; reverse topic-weight nudge for change;
+     * optionally restore prior action status when {@code previousActionStatus} is set.
+     */
+    @Transactional
+    public Map<String, Object> withdraw(
+            String targetType,
+            Long targetId,
+            String kind,
+            String previousActionStatus
+    ) {
+        if (targetType == null || targetId == null || kind == null) {
+            throw new IllegalArgumentException("targetType, targetId and kind are required");
+        }
+        String type = targetType.trim().toLowerCase();
+        String feedbackKind = kind.trim().toLowerCase();
+        if (!KINDS.contains(feedbackKind)) {
+            throw new IllegalArgumentException("invalid kind: " + kind);
+        }
+        if (!List.of("change", "action").contains(type)) {
+            throw new IllegalArgumentException("invalid targetType: " + targetType);
+        }
+
+        String memKind = memoryKind(feedbackKind);
+        int forgotten = memoryService.forget(memKind, type, targetId);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("targetType", type);
+        out.put("targetId", targetId);
+        out.put("kind", feedbackKind);
+        out.put("withdrawn", true);
+        out.put("forgotten", forgotten);
+
+        if ("change".equals(type)) {
+            EventEntity event = eventRepository.findById(targetId).orElse(null);
+            if (event != null) {
+                if ("irrelevant".equals(feedbackKind) || "ignore".equals(feedbackKind)) {
+                    contextService.revertTopicFeedback(event.getTitle(), false);
+                } else if ("useful".equals(feedbackKind)) {
+                    contextService.revertTopicFeedback(event.getTitle(), true);
+                }
+                out.put("title", event.getTitle());
+            }
+            return out;
+        }
+
+        if (previousActionStatus != null && !previousActionStatus.isBlank()) {
+            Map<String, Object> updated = actionService.patch(targetId, Map.of("status", previousActionStatus.trim()));
+            out.put("action", updated);
+        }
+        return out;
+    }
+
     private static String memoryKind(String kind) {
         return switch (kind) {
             case "useful" -> "useful";

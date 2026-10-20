@@ -1,6 +1,7 @@
 package com.airadar.api;
 
 import com.airadar.decision.DecisionService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,5 +61,11 @@ public class DecisionsController {
             }
         }
         return decisionService.snooze(id, days, revisitAt);
+    }
+
+    /** Withdraw an open decision (Undo after save). Watch-kind also Unfollows. */
+    @DeleteMapping("/decisions/{id}")
+    public Map<String, Object> withdraw(@PathVariable Long id) {
+        return decisionService.withdraw(id);
     }
 }

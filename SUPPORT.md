@@ -9,6 +9,8 @@ AI Radar is a **single-user, self-hosted** project. Use the channels below.
 | How to install / run | [docs/installation.md](docs/installation.md) · [README.md](README.md) |
 | How to extend (connectors / delivery) | [docs/extending-connectors.md](docs/extending-connectors.md) · [docs/extending-delivery.md](docs/extending-delivery.md) |
 | Security vulnerability | [SECURITY.md](SECURITY.md) — **do not** open a public issue |
+| Privacy / data leaving the host | [PRIVACY.md](PRIVACY.md) |
+| How the project is governed | [GOVERNANCE.md](GOVERNANCE.md) |
 | Community conduct | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
 
 There is no commercial SLA. Maintainers respond as capacity allows.

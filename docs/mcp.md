@@ -73,9 +73,14 @@ Replace `/ABS/PATH/ai-radar` with your checkout. Prefer **read-only** (`ALLOW_WR
 | --- | --- | --- |
 | `get_health` | — | `GET /api/health` (`version`, DB, translate, LLM) |
 | `probe_llm` | — | `GET /api/health/llm` (live models probe; check `modelPresent` / `hint`; empty `models[]` skips; accepts `{data:[]}` or bare array) |
-| `list_events` | optional `status`, `minScore`, `limit` | `GET /api/events?…` |
-| `get_event` | required `id` | `GET /api/events/{id}` |
+| `list_changes` | optional `limit`, `tier` | `GET /api/changes?…` (product loop) |
+| `get_change` | required `id` | `GET /api/changes/{id}` |
+| `list_decisions` | optional `revisit` (`due`) | `GET /api/decisions` / `?revisit=due` |
+| `list_actions` | — | `GET /api/actions` |
+| `list_events` | optional `status`, `minScore`, `limit` | `GET /api/events?…` (internal; prefer `list_changes`) |
+| `get_event` | required `id` | `GET /api/events/{id}` (prefer `get_change`) |
 | `list_briefs` | — | `GET /api/briefs` |
+| `get_brief` | required `date` (YYYY-MM-DD) | `GET /api/briefs/{date}` |
 | `get_intelligence_home` | — | `GET /api/intelligence/home` |
 | `list_sources` | — | `GET /api/sources` |
 | `list_connectors` | — | `GET /api/connectors` (sorted by id; id == typeCode; expect `FIXTURE`/`path`, `RSS`/`feedUrl`, `DAILY_HOT`/`route`, `WEB`/`url`, `TELEGRAM`/`channels`, `HACKER_NEWS`/`query`, `GOOGLE_NEWS`/`query`, `GDELT`/`query`, `REDDIT`/`subreddits`, `V2EX`/`nodes`, `GITHUB`/`query`, `TWITTER`/`users`, `OSS_INSIGHT`/`keywords`, `GITHUB_TRENDING`/`since`, `PRODUCT_HUNT`/`maxItems`, `EMAIL`/`maxMessages`, `ZHIHU`/`cliPath`, `WEIBO`/`cliPath`, `BILIBILI`/`cliPath`) |
@@ -119,7 +124,28 @@ Tool: get_intelligence_home
 Args: {}
 ```
 
-List high-score events:
+List recent changes (product loop):
+
+```text
+Tool: list_changes
+Args: { "limit": 20 }
+```
+
+Due decisions:
+
+```text
+Tool: list_decisions
+Args: { "revisit": "due" }
+```
+
+One brief body:
+
+```text
+Tool: get_brief
+Args: { "date": "2026-10-20" }
+```
+
+List high-score events (internal; prefer `list_changes`):
 
 ```text
 Tool: list_events
@@ -142,6 +168,9 @@ Args: {}
 | Health snapshot | `get_health` | `ai-radar health` |
 | Live LLM probe | `probe_llm` | `ai-radar health-llm` |
 | Home payload | `get_intelligence_home` | `ai-radar home` |
+| Changes | `list_changes` / `get_change` | `ai-radar changes` / `change <id>` |
+| Decisions / actions | `list_decisions` / `list_actions` | `ai-radar decisions` / `actions` |
+| Briefs | `list_briefs` / `get_brief` | `ai-radar briefs` / `brief <date>` |
 | Sources | `list_sources` | `ai-radar sources` |
 | Connector catalog | `list_connectors` | `ai-radar connectors` |
 | Delivery catalog | `list_delivery_channels` | `ai-radar delivery-channels` |

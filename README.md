@@ -69,6 +69,8 @@ cd ai-radar
 
 Open [http://localhost:8080](http://localhost:8080).
 
+Data stays on your host unless you enable LLM / delivery / source fetch — see [PRIVACY.md](PRIVACY.md).
+
 ```bash
 ./scripts/status.sh    # health snapshot (human)
 ./bin/ai-radar doctor  # prereq + health (JSON)
@@ -122,7 +124,8 @@ Environment variables, delivery channels, and more: [docs/installation.md](docs/
 - [Extensibility overview](docs/extensibility.md) · [Connectors](docs/extending-connectors.md) · [Delivery](docs/extending-delivery.md)
 - [Release checklist](docs/release.md)
 - [MCP](docs/mcp.md)
-- [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Support](SUPPORT.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [Cite](CITATION.cff)
+- [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Support](SUPPORT.md) · [Security](SECURITY.md) · [Privacy](PRIVACY.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS) · [Changelog](CHANGELOG.md) · [Cite](CITATION.cff)
+- [Product principles](docs/product-principles.md)
 
 ## License
 

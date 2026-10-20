@@ -85,6 +85,13 @@ Commands:
   status              Alias of health
   health-llm          GET /api/health/llm (live LLM probe)
   home                GET /api/intelligence/home
+  changes [--limit N] [--tier T]
+                      GET /api/changes
+  change <id>         GET /api/changes/{id}
+  decisions [--due]   GET /api/decisions (optional ?revisit=due)
+  actions             GET /api/actions
+  briefs              GET /api/briefs (dates)
+  brief <date>        GET /api/briefs/{date} (YYYY-MM-DD)
   sources             GET /api/sources
   connectors          GET /api/connectors (SPI catalog; expect ${formatBuiltinConnectorExpect()})
   delivery-channels   GET /api/delivery/channels (SPI catalog; expect ${formatBuiltinDeliveryExpect()})
@@ -130,6 +137,15 @@ function parseFetchType(argv) {
   if (i >= 0 && argv[i + 1]) return argv[i + 1]
   const eq = argv.find((a) => a.startsWith('--type='))
   if (eq) return eq.slice('--type='.length)
+  return null
+}
+
+function parseFlagValue(argv, name) {
+  const flag = `--${name}`
+  const i = argv.indexOf(flag)
+  if (i >= 0 && argv[i + 1]) return argv[i + 1]
+  const eq = argv.find((a) => a.startsWith(`${flag}=`))
+  if (eq) return eq.slice(flag.length + 1)
   return null
 }
 
@@ -436,6 +452,48 @@ async function main() {
       }
       case 'home': {
         printJson(await api('/api/intelligence/home'))
+        break
+      }
+      case 'changes': {
+        const rest = argv.slice(1)
+        const q = new URLSearchParams()
+        const limit = parseFlagValue(rest, 'limit')
+        const tier = parseFlagValue(rest, 'tier')
+        if (limit) q.set('limit', limit)
+        if (tier) q.set('tier', tier)
+        const qs = q.toString()
+        printJson(await api(`/api/changes${qs ? `?${qs}` : ''}`))
+        break
+      }
+      case 'change': {
+        const id = argv[1]
+        if (!id || id.startsWith('-')) {
+          console.error('Usage: ai-radar change <id>')
+          process.exit(2)
+        }
+        printJson(await api(`/api/changes/${encodeURIComponent(id)}`))
+        break
+      }
+      case 'decisions': {
+        const due = argv.slice(1).includes('--due')
+        printJson(await api(due ? '/api/decisions?revisit=due' : '/api/decisions'))
+        break
+      }
+      case 'actions': {
+        printJson(await api('/api/actions'))
+        break
+      }
+      case 'briefs': {
+        printJson(await api('/api/briefs'))
+        break
+      }
+      case 'brief': {
+        const date = argv[1]
+        if (!date || date.startsWith('-')) {
+          console.error('Usage: ai-radar brief <YYYY-MM-DD>')
+          process.exit(2)
+        }
+        printJson(await api(`/api/briefs/${encodeURIComponent(date)}`))
         break
       }
       case 'sources': {

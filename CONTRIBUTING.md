@@ -121,9 +121,9 @@ Optional smoke:
 ./bin/ai-radar health-llm          # live models probe
 ```
 
-Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Support: [SUPPORT.md](SUPPORT.md). Security reports: [SECURITY.md](SECURITY.md) (not public issues).
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Support: [SUPPORT.md](SUPPORT.md). Security reports: [SECURITY.md](SECURITY.md) (not public issues). Privacy posture: [PRIVACY.md](PRIVACY.md). Decision-making: [GOVERNANCE.md](GOVERNANCE.md) · [MAINTAINERS](MAINTAINERS).
 
-Cutting a version: [docs/release.md](docs/release.md) (bump package.json + `radar.api.version` + `CITATION.cff` together). Extending connectors/delivery: [docs/extensibility.md](docs/extensibility.md).
+UI / product norms: [docs/product-principles.md](docs/product-principles.md). Cutting a version: [docs/release.md](docs/release.md) (bump package.json + `radar.api.version` + `CITATION.cff` together). Extending connectors/delivery: [docs/extensibility.md](docs/extensibility.md).
 
 When changing the Argos Translate pin, update `translate-service/requirements.txt` and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) together (CI: `shared/argos-version-sync.test.mjs`).
 

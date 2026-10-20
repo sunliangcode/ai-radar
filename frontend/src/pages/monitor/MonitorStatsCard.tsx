@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AiMonitor, AiMonitorCall } from '../../lib/api'
 import { cn, focusRingClass } from '../../lib/cn'
-import { formatClock, formatTps } from './monitorUtils'
+import { formatClock, formatTps, monitorOpLabel } from './monitorUtils'
 import { HistoryBody } from './MonitorBubble'
 
 /** TPS / context stats grid plus the expandable recent-calls table. */
@@ -13,7 +13,7 @@ export function MonitorStatsCard({
   mon: AiMonitor
   filteredRecent: AiMonitorCall[]
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [expandedCall, setExpandedCall] = useState<string | null>(null)
 
   const usedPct = Math.min(100, Math.max(0, mon.lastContextUsedPct ?? 0))
@@ -83,7 +83,7 @@ export function MonitorStatsCard({
               <th className="py-1.5 pr-2 font-medium">{t('settings.monitorColTime')}</th>
               <th className="py-1.5 pr-2 font-medium">{t('settings.monitorColOp')}</th>
               <th className="py-1.5 pr-2 font-medium">{t('settings.monitorColTokens')}</th>
-              <th className="py-1.5 pr-2 font-medium">tok/s</th>
+              <th className="py-1.5 pr-2 font-medium">{t('settings.monitorColTokPerSec')}</th>
               <th className="py-1.5 pr-2 font-medium">{t('settings.monitorColStatus')}</th>
             </tr>
           </thead>
@@ -111,7 +111,7 @@ export function MonitorStatsCard({
                     role="button"
                     aria-expanded={open}
                     aria-controls={open ? detailId : undefined}
-                    aria-label={`${row.operation} · ${formatClock(row.ts)}`}
+                    aria-label={`${monitorOpLabel(row.operation, t)} · ${formatClock(row.ts, i18n.language)}`}
                     onClick={toggle}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -121,11 +121,11 @@ export function MonitorStatsCard({
                     }}
                   >
                     <td className="py-2.5 pr-2 font-mono text-[11px] text-muted">
-                      {formatClock(row.ts)}
+                      {formatClock(row.ts, i18n.language)}
                     </td>
                     <td className="py-2.5 pr-2 font-mono">
                       {open ? '▾ ' : '▸ '}
-                      {row.operation}
+                      {monitorOpLabel(row.operation, t)}
                     </td>
                     <td className="py-2.5 pr-2 font-mono">
                       {row.promptTokens}+{row.completionTokens}

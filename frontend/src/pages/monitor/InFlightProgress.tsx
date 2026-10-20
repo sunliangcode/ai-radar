@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AiMonitorInFlight } from '../../lib/api'
 import { prefersReducedMotion } from '../../lib/a11y'
-import { progressFromElapsed } from './monitorUtils'
+import { monitorOpLabel, progressFromElapsed } from './monitorUtils'
 
 /** Live progress bars for in-flight AI calls. */
 export function InFlightProgress({
@@ -37,17 +37,18 @@ export function InFlightProgress({
             ? Math.min(95, 20 + flight.responseSoFar.length / 20)
             : progressFromElapsed(liveElapsedMs)
         const pct = Math.round(liveProgress)
+        const opLabel = monitorOpLabel(flight.operation, t)
         return (
           <div
             key={flight.id}
             className="rounded-xl border border-accent/40 bg-accent/5 px-4 py-3"
             role="status"
-            aria-label={`${t('settings.monitorInFlight')} ${flight.operation}`}
+            aria-label={`${t('settings.monitorInFlight')} ${opLabel}`}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-sm font-medium text-ink">
                 {t('settings.monitorInFlight')}{' '}
-                <span className="font-mono text-accent">{flight.operation}</span>
+                <span className="font-mono text-accent">{opLabel}</span>
               </p>
               <p className="font-mono text-xs text-muted">
                 {(liveElapsedMs / 1000).toFixed(1)}s · {flight.model}
@@ -60,7 +61,7 @@ export function InFlightProgress({
               aria-valuemax={100}
               aria-valuenow={pct}
               aria-valuetext={`${pct}%`}
-              aria-label={`${t('settings.monitorInFlight')} ${flight.operation}`}
+              aria-label={`${t('settings.monitorInFlight')} ${opLabel}`}
             >
               <div
                 className="h-full rounded-full bg-accent transition-[width] duration-200 motion-reduce:transition-none"

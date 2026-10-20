@@ -95,7 +95,9 @@ function Shell() {
     location.pathname === '/radar' ||
     location.pathname.startsWith('/radar') ||
     location.pathname === '/watching' ||
-    location.pathname === '/decisions'
+    location.pathname === '/decisions' ||
+    location.pathname === '/actions' ||
+    location.pathname === '/briefs'
   const [pullRefreshing, setPullRefreshing] = useState(false)
 
   const visibleSources = useMemo(
@@ -131,6 +133,7 @@ function Shell() {
         qc.refetchQueries({ queryKey: ['unread-counts'], type: 'active' }),
         qc.refetchQueries({ queryKey: ['sources'], type: 'active' }),
         qc.refetchQueries({ queryKey: ['actions'], type: 'active' }),
+        qc.refetchQueries({ queryKey: ['briefs'], type: 'active' }),
       ])
     } finally {
       setPullRefreshing(false)

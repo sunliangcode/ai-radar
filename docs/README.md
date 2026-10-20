@@ -14,6 +14,7 @@
 | [extending-connectors.md](extending-connectors.md) | Add a source connector |
 | [extending-delivery.md](extending-delivery.md) | Add a delivery channel |
 | [release.md](release.md) | SemVer / tag / GitHub Release checklist |
+| [product-principles.md](product-principles.md) | UX / empty-state / Undo / display-filter norms |
 | [pack-manifest-draft.md](pack-manifest-draft.md) | Pack manifest notes |
 
 Also:
@@ -24,9 +25,9 @@ Also:
 - [SKILL.md](../SKILL.md) — Cursor agent skill
 - [skills/](../skills/) — Claude / Codex / Gemini copies
 - [Contributing](../CONTRIBUTING.md) · [Code of Conduct](../CODE_OF_CONDUCT.md) · [Support](../SUPPORT.md)
-- [Security](../SECURITY.md)
+- [Security](../SECURITY.md) · [Privacy](../PRIVACY.md) · [Governance](../GOVERNANCE.md) · [Maintainers](../MAINTAINERS)
 - [Changelog](../CHANGELOG.md)
 - [Cite](../CITATION.cff)
-- [Code owners](../.github/CODEOWNERS)
+- [Code owners](../.github/CODEOWNERS) · [CodeQL](../.github/workflows/codeql.yml) · [Dependency review](../.github/workflows/dependency-review.yml)
 - [Third-party notices (Argos Translate)](../THIRD_PARTY_NOTICES.md)
 - [Historical iteration](../aim/README.md)

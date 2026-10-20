@@ -10,8 +10,8 @@ Canonical skill: [SKILL.md](../SKILL.md). Platform short copies: [skills/](../sk
 
 | Surface | Role |
 | --- | --- |
-| **Ops CLI** ([cli.md](cli.md)) | Doctor/health/`health-llm`, home JSON, jobs, connectors, delivery-channels, pack list/validate/import, backup (`AI_RADAR_DB` / `BACKUP_KEEP`) |
-| **MCP** ([mcp.md](mcp.md)) | Structured tool calls (read-mostly; optional writes) |
+| **Ops CLI** ([cli.md](cli.md)) | Doctor/health/`health-llm`, home / changes / decisions / actions JSON, jobs, connectors, delivery-channels, pack list/validate/import, backup (`AI_RADAR_DB` / `BACKUP_KEEP`) |
+| **MCP** ([mcp.md](mcp.md)) | Structured tool calls (read-mostly; optional writes) — prefer `list_changes` / `get_change` / `list_decisions` / `list_actions` over raw events |
 | **In-app Chat** | Interprets a **Change** for the human — not a general ops channel |
 
 Agents should **not** scrape the SPA or invent SQL against `radar.db`. Prefer CLI or MCP → REST.

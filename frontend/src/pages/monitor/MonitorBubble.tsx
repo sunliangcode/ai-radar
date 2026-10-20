@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useTranslation } from 'react-i18next'
 import { formatAiMonitorBody } from '../../lib/formatAiMonitorBody'
-import { formatClock, type IoEntry } from './monitorUtils'
+import { formatClock, monitorOpLabel, type IoEntry } from './monitorUtils'
 
 export function MonitorBubble({
   entry,
@@ -13,7 +13,8 @@ export function MonitorBubble({
   showRaw: boolean
   onToggleRaw: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const opLabel = monitorOpLabel(entry.operation, t)
   const isInput = entry.kind === 'input'
   // Input: show prompt raw (same as「查看原始」). Output: conversational format.
   const formatted = isInput
@@ -34,7 +35,7 @@ export function MonitorBubble({
     <div
       className={`mb-4 flex ${isInput ? 'justify-end' : 'justify-start'}`}
       role="article"
-      aria-label={`${isInput ? t('settings.monitorYou') : t('settings.monitorAssistant')} · ${entry.operation}`}
+      aria-label={`${isInput ? t('settings.monitorYou') : t('settings.monitorAssistant')} · ${opLabel}`}
       aria-busy={entry.pending || undefined}
     >
       <div
@@ -54,8 +55,8 @@ export function MonitorBubble({
           >
             {isInput ? t('settings.monitorYou') : t('settings.monitorAssistant')}
           </span>
-          <span className="font-mono text-[11px] text-muted">{entry.operation}</span>
-          <span className="text-[11px] text-muted/70">{formatClock(entry.at)}</span>
+          <span className="font-mono text-[11px] text-muted">{opLabel}</span>
+          <span className="text-[11px] text-muted/70">{formatClock(entry.at, i18n.language)}</span>
           {entry.pending ? (
             <span className="animate-pulse text-[11px] text-accent motion-reduce:animate-none">
               {entry.streaming

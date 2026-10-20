@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -75,5 +76,38 @@ class FeedbackServiceTest {
     @Test
     void invalidKind_rejected() {
         assertThrows(IllegalArgumentException.class, () -> feedbackService.submit("change", 1L, "nope"));
+    }
+
+    @Test
+    void withdraw_change_forgetsMemoryAndRevertsTopic() {
+        EventEntity event = new EventEntity();
+        event.setId(9L);
+        event.setTitle("Model pricing drop");
+        when(eventRepository.findById(9L)).thenReturn(Optional.of(event));
+        when(memoryService.forget("useful", "change", 9L)).thenReturn(1);
+
+        Map<String, Object> out = feedbackService.withdraw("change", 9L, "useful", null);
+
+        assertEquals(true, out.get("withdrawn"));
+        assertEquals(1, out.get("forgotten"));
+        verify(memoryService).forget("useful", "change", 9L);
+        verify(contextService).revertTopicFeedback("Model pricing drop", true);
+        verify(actionService, never()).patch(any(), any());
+    }
+
+    @Test
+    void withdraw_action_restoresStatusAndForgets() {
+        when(memoryService.forget("watch", "action", 3L)).thenReturn(1);
+        when(actionService.patch(eq(3L), any())).thenReturn(Map.of("id", 3L, "status", "open"));
+
+        Map<String, Object> out = feedbackService.withdraw("action", 3L, "watch", "open");
+
+        assertEquals(true, out.get("withdrawn"));
+        verify(memoryService).forget("watch", "action", 3L);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        verify(actionService).patch(eq(3L), body.capture());
+        assertEquals("open", body.getValue().get("status"));
+        assertEquals("open", ((Map<?, ?>) out.get("action")).get("status"));
     }
 }
