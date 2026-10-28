@@ -1,6 +1,6 @@
 # Argos Translate sidecar for AI Radar title localization (en→zh).
 # Language model is downloaded at build time from the official Argos package index.
-FROM python:3.11-slim
+FROM python:3.15-slim
 
 WORKDIR /app
 
